@@ -30,6 +30,8 @@ import { supabase } from '../lib/supabase';
 import logo from '../assets/logo.png';
 
 import Sidebar from '../components/Sidebar';
+import CustomSelect from '../components/CustomSelect';
+import DataTable from '../components/DataTable';
 
 import { useAuth } from '../context/AuthContext';
 
@@ -213,79 +215,77 @@ export default function Users() {
                     </div>
                 </header>
 
-                <div className="glass rounded-[2.5rem] p-8">
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-left">
-                            <thead className="text-variable-muted text-xs uppercase tracking-[0.2em] font-bold border-b border-variable">
-                                <tr>
-                                    <th className="pb-6">Usuario</th>
-                                    <th className="pb-6">Email Corporativo</th>
-                                    <th className="pb-6 text-center">Rol de Acceso</th>
-                                    <th className="pb-6">Fecha Registro</th>
-                                    <th className="pb-6 text-right">Acciones</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-variable">
-                                {loading && usersList.length === 0 ? (
-                                    <tr>
-                                        <td colSpan="5" className="py-20 text-center">
-                                            <div className="flex flex-col items-center gap-4">
-                                                <div className="size-10 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
-                                                <p className="text-variable-muted font-medium">Conectando con Supabase...</p>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ) : usersList.length === 0 ? (
-                                    <tr>
-                                        <td colSpan="5" className="py-20 text-center">
-                                            <div className="flex flex-col items-center gap-4 text-variable-muted">
-                                                <UsersIcon size={40} className="opacity-20" />
-                                                <p className="font-medium">No se encontraron miembros en la base de datos</p>
-                                                <p className="text-xs italic">Asegúrate de haber configurado las políticas RLS en Supabase</p>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ) : (
-                                    usersList.map((user) => (
-                                        <tr key={user.id} className="group hover:bg-white/[0.02] transition-colors">
-                                            <td className="py-6">
-                                                <div className="flex items-center gap-4">
-                                                    <div className="size-10 rounded-2xl bg-primary/10 text-primary flex items-center justify-center font-bold">
-                                                        <UserCircle size={20} />
-                                                    </div>
-                                                    <div>
-                                                        <p className="font-bold text-variable-main">{user.name}</p>
-                                                        <p className="text-[10px] text-variable-muted uppercase font-black tracking-widest">{user.first_name} {user.second_name}</p>
-                                                    </div>
-                                                </div>
-                                            </td>
-                                            <td className="py-6 text-variable-muted font-medium italic">{user.email}</td>
-                                            <td className="py-6 text-center">
-                                                <span className={`px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest border ${user.role === 'admin' ? 'bg-rose-500/10 text-rose-500 border-rose-500/20 shadow-sm shadow-rose-500/5' :
-                                                    user.role === 'editor' ? 'bg-blue-500/10 text-blue-500 border-blue-500/20 shadow-sm shadow-blue-500/5' :
-                                                        'bg-emerald-500/10 text-emerald-500 border-emerald-500/20 shadow-sm shadow-emerald-500/5'
-                                                    }`}>
-                                                    {user.role}
-                                                </span>
-                                            </td>
-                                            <td className="py-6 text-variable-muted text-sm">{new Date(user.created_at).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' })}</td>
-                                            <td className="py-6 text-right">
-                                                <div className="flex justify-end gap-2">
-                                                    <button className="p-2 text-variable-muted hover:text-primary transition-colors glass rounded-xl border-variable">
-                                                        <Settings size={18} />
-                                                    </button>
-                                                    <button className="p-2 text-variable-muted hover:text-rose-500 transition-colors glass rounded-xl border-variable">
-                                                        <Trash2 size={18} />
-                                                    </button>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    ))
-                                )}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
+                <DataTable
+                    loading={loading}
+                    data={usersList}
+                    rowKey="id"
+                    defaultSort={{ key: 'created_at', dir: 'desc' }}
+                    emptyIcon={<UsersIcon size={40} className="opacity-20" />}
+                    emptyTitle="No se encontraron miembros en la base de datos"
+                    emptySub="Asegúrate de haber configurado las políticas RLS en Supabase"
+                    columns={[
+                        {
+                            key: 'name',
+                            label: 'Usuario',
+                            render: (user) => (
+                                <div className="flex items-center gap-4">
+                                    <div className="size-10 rounded-2xl bg-primary/10 text-primary flex items-center justify-center font-bold">
+                                        <UserCircle size={20} />
+                                    </div>
+                                    <div>
+                                        <p className="font-bold text-variable-main">{user.name}</p>
+                                        <p className="text-[10px] text-variable-muted uppercase font-black tracking-widest">{user.first_name} {user.second_name}</p>
+                                    </div>
+                                </div>
+                            ),
+                        },
+                        {
+                            key: 'email',
+                            label: 'Email Corporativo',
+                            render: (user) => (
+                                <span className="text-variable-muted font-medium italic">{user.email}</span>
+                            ),
+                        },
+                        {
+                            key: 'role',
+                            label: 'Rol de Acceso',
+                            align: 'center',
+                            render: (user) => (
+                                <span className={`px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest border ${user.role === 'admin' ? 'bg-rose-500/10 text-rose-500 border-rose-500/20 shadow-sm shadow-rose-500/5' :
+                                    user.role === 'editor' ? 'bg-blue-500/10 text-blue-500 border-blue-500/20 shadow-sm shadow-blue-500/5' :
+                                        'bg-emerald-500/10 text-emerald-500 border-emerald-500/20 shadow-sm shadow-emerald-500/5'
+                                    }`}>
+                                    {user.role}
+                                </span>
+                            ),
+                        },
+                        {
+                            key: 'created_at',
+                            label: 'Fecha Registro',
+                            render: (user) => (
+                                <span className="text-variable-muted text-sm">
+                                    {new Date(user.created_at).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' })}
+                                </span>
+                            ),
+                        },
+                        {
+                            key: 'actions',
+                            label: 'Acciones',
+                            align: 'right',
+                            sortable: false,
+                            render: (user) => (
+                                <div className="flex justify-end gap-2">
+                                    <button className="p-2 text-variable-muted hover:text-primary transition-colors glass rounded-xl border-variable">
+                                        <Settings size={18} />
+                                    </button>
+                                    <button className="p-2 text-variable-muted hover:text-rose-500 transition-colors glass rounded-xl border-variable">
+                                        <Trash2 size={18} />
+                                    </button>
+                                </div>
+                            ),
+                        },
+                    ]}
+                />
             </main>
 
             <AnimatePresence>
@@ -341,11 +341,12 @@ export default function Users() {
                                     <div className="space-y-2">
                                         <label className="text-xs font-bold text-variable-muted uppercase tracking-widest ml-1">Teléfono</label>
                                         <div className="flex gap-2">
-                                            <select value={formData.phone_prefix} onChange={(e) => setFormData({ ...formData, phone_prefix: e.target.value })} className="bg-white/5 border border-variable rounded-2xl px-3 py-3 focus:outline-none focus:border-primary/50 text-variable-main transition-all w-[120px] appearance-none cursor-pointer">
-                                                {phonePrefixes.map((p) => (
-                                                    <option key={p.code} value={p.code}>{p.country} {p.code}</option>
-                                                ))}
-                                            </select>
+                                            <CustomSelect
+                                                value={formData.phone_prefix}
+                                                onChange={(val) => setFormData({ ...formData, phone_prefix: val })}
+                                                options={phonePrefixes.map((p) => ({ value: p.code, label: `${p.country} ${p.code}` }))}
+                                                width="160px"
+                                            />
                                             <div className="relative flex-1">
                                                 <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-variable-muted" size={18} />
                                                 <input type="tel" value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} className="w-full bg-white/5 border border-variable rounded-2xl pl-12 pr-4 py-3 focus:outline-none focus:border-primary/50 text-variable-main transition-all" placeholder="612 345 678" />
@@ -389,8 +390,8 @@ export default function Users() {
                                             {[{ value: 'active', label: 'Activo', color: 'emerald' }, { value: 'banned', label: 'Baneado', color: 'rose' }].map((s) => (
                                                 <button key={s.value} type="button" onClick={() => setFormData({ ...formData, status: s.value })}
                                                     className={`py-2.5 rounded-2xl font-bold text-[10px] uppercase transition-all border ${formData.status === s.value
-                                                            ? s.value === 'active' ? 'bg-emerald-500/20 border-emerald-500 text-emerald-500' : 'bg-rose-500/20 border-rose-500 text-rose-500'
-                                                            : 'bg-white/5 border-variable text-variable-muted hover:border-primary/30'
+                                                        ? s.value === 'active' ? 'bg-emerald-500/20 border-emerald-500 text-emerald-500' : 'bg-rose-500/20 border-rose-500 text-rose-500'
+                                                        : 'bg-white/5 border-variable text-variable-muted hover:border-primary/30'
                                                         }`}>
                                                     {s.label}
                                                 </button>
@@ -405,32 +406,37 @@ export default function Users() {
                                 <div className="grid grid-cols-2 gap-4">
                                     <div className="space-y-2">
                                         <label className="text-xs font-bold text-variable-muted uppercase tracking-widest ml-1">País</label>
-                                        <div className="relative">
-                                            <Globe className="absolute left-4 top-1/2 -translate-y-1/2 text-variable-muted" size={18} />
-                                            <select value={formData.country} onChange={(e) => setFormData({ ...formData, country: e.target.value, province: '' })} className="w-full bg-white/5 border border-variable rounded-2xl pl-12 pr-4 py-3 focus:outline-none focus:border-primary/50 text-variable-main transition-all appearance-none cursor-pointer">
-                                                <option value="España">🇪🇸 España</option>
-                                                <option value="Portugal">🇵🇹 Portugal</option>
-                                                <option value="Francia">🇫🇷 Francia</option>
-                                                <option value="Italia">🇮🇹 Italia</option>
-                                                <option value="Alemania">🇩🇪 Alemania</option>
-                                                <option value="Reino Unido">🇬🇧 Reino Unido</option>
-                                                <option value="México">🇲🇽 México</option>
-                                                <option value="Argentina">🇦🇷 Argentina</option>
-                                                <option value="Colombia">🇨🇴 Colombia</option>
-                                                <option value="Chile">🇨🇱 Chile</option>
-                                                <option value="Otro">🌍 Otro</option>
-                                            </select>
-                                        </div>
+                                        <CustomSelect
+                                            value={formData.country}
+                                            onChange={(val) => setFormData({ ...formData, country: val, province: '' })}
+                                            icon={Globe}
+                                            options={[
+                                                { value: 'España', label: '🇪🇸 España' },
+                                                { value: 'Portugal', label: '🇵🇹 Portugal' },
+                                                { value: 'Francia', label: '🇫🇷 Francia' },
+                                                { value: 'Italia', label: '🇮🇹 Italia' },
+                                                { value: 'Alemania', label: '🇩🇪 Alemania' },
+                                                { value: 'Reino Unido', label: '🇬🇧 Reino Unido' },
+                                                { value: 'México', label: '🇲🇽 México' },
+                                                { value: 'Argentina', label: '🇦🇷 Argentina' },
+                                                { value: 'Colombia', label: '🇨🇴 Colombia' },
+                                                { value: 'Chile', label: '🇨🇱 Chile' },
+                                                { value: 'Otro', label: '🌍 Otro' },
+                                            ]}
+                                        />
                                     </div>
                                     <div className="space-y-2">
                                         <label className="text-xs font-bold text-variable-muted uppercase tracking-widest ml-1">Provincia</label>
                                         {formData.country === 'España' ? (
-                                            <select value={formData.province} onChange={(e) => setFormData({ ...formData, province: e.target.value })} className="w-full bg-white/5 border border-variable rounded-2xl px-4 py-3 focus:outline-none focus:border-primary/50 text-variable-main transition-all appearance-none cursor-pointer">
-                                                <option value="">Seleccionar...</option>
-                                                {spanishProvinces.map((p) => (
-                                                    <option key={p} value={p}>{p}</option>
-                                                ))}
-                                            </select>
+                                            <CustomSelect
+                                                value={formData.province}
+                                                onChange={(val) => setFormData({ ...formData, province: val })}
+                                                placeholder="Seleccionar..."
+                                                options={[
+                                                    { value: '', label: 'Seleccionar...' },
+                                                    ...spanishProvinces.map((p) => ({ value: p, label: p }))
+                                                ]}
+                                            />
                                         ) : (
                                             <input value={formData.province} onChange={(e) => setFormData({ ...formData, province: e.target.value })} className="w-full bg-white/5 border border-variable rounded-2xl px-4 py-3 focus:outline-none focus:border-primary/50 text-variable-main transition-all" placeholder="Provincia / Estado" />
                                         )}

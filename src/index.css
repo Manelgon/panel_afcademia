@@ -65,55 +65,106 @@
 }
 
 /* ============================================= */
-/* SCROLLBARS — Ultra-thin, almost invisible     */
+/* SCROLLBARS — Slim, stylized & orange accent   */
 /* ============================================= */
 
-/* Webkit (Chrome, Safari, Edge) */
+/* ---- Global (Webkit: Chrome, Safari, Edge) ---- */
 ::-webkit-scrollbar {
-    width: 3px;
-    height: 3px;
+    width: 6px;
+    height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-    background: transparent;
+    background: rgba(243, 121, 27, 0.04);
+    border-radius: 99px;
 }
 
 ::-webkit-scrollbar-thumb {
-    background: rgba(243, 121, 27, 0.15);
+    background: linear-gradient(180deg, rgba(243, 121, 27, 0.35), rgba(243, 121, 27, 0.18));
     border-radius: 99px;
+    border: 1px solid rgba(243, 121, 27, 0.15);
     transition: background 0.3s ease;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-    background: rgba(243, 121, 27, 0.4);
+    background: linear-gradient(180deg, rgba(243, 121, 27, 0.65), rgba(243, 121, 27, 0.4));
+    border-color: rgba(243, 121, 27, 0.3);
 }
 
-/* Card/modal level — slightly wider on hover */
+::-webkit-scrollbar-corner {
+    background: transparent;
+}
+
+/* ---- Cards / Glass panels / Modals ---- */
 .glass::-webkit-scrollbar,
 .overflow-y-auto::-webkit-scrollbar,
-.overflow-x-auto::-webkit-scrollbar {
-    width: 3px;
+.overflow-x-auto::-webkit-scrollbar,
+[class*="max-h-"]::-webkit-scrollbar {
+    width: 5px;
+    height: 5px;
+}
+
+.glass::-webkit-scrollbar-track,
+.overflow-y-auto::-webkit-scrollbar-track,
+.overflow-x-auto::-webkit-scrollbar-track,
+[class*="max-h-"]::-webkit-scrollbar-track {
+    background: rgba(243, 121, 27, 0.03);
+    border-radius: 99px;
+    margin: 6px 0;
+}
+
+.glass::-webkit-scrollbar-thumb,
+.overflow-y-auto::-webkit-scrollbar-thumb,
+.overflow-x-auto::-webkit-scrollbar-thumb,
+[class*="max-h-"]::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, rgba(243, 121, 27, 0.4), rgba(243, 121, 27, 0.2));
+    border-radius: 99px;
+    border: 1px solid rgba(243, 121, 27, 0.12);
 }
 
 .glass:hover::-webkit-scrollbar,
 .overflow-y-auto:hover::-webkit-scrollbar,
-.overflow-x-auto:hover::-webkit-scrollbar {
-    width: 5px;
+.overflow-x-auto:hover::-webkit-scrollbar,
+[class*="max-h-"]:hover::-webkit-scrollbar {
+    width: 7px;
+    height: 7px;
 }
 
-/* Firefox */
+.glass:hover::-webkit-scrollbar-thumb,
+.overflow-y-auto:hover::-webkit-scrollbar-thumb,
+.overflow-x-auto:hover::-webkit-scrollbar-thumb,
+[class*="max-h-"]:hover::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, rgba(243, 121, 27, 0.6), rgba(243, 121, 27, 0.3));
+    border-color: rgba(243, 121, 27, 0.25);
+}
+
+/* ---- Firefox ---- */
 * {
     scrollbar-width: thin;
-    scrollbar-color: rgba(243, 121, 27, 0.15) transparent;
+    scrollbar-color: rgba(243, 121, 27, 0.3) rgba(243, 121, 27, 0.04);
+}
+
+/* Light mode scrollbar adjustments */
+.light ::-webkit-scrollbar-track {
+    background: rgba(243, 121, 27, 0.06);
+}
+
+.light ::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, rgba(243, 121, 27, 0.3), rgba(243, 121, 27, 0.15));
+    border-color: rgba(243, 121, 27, 0.1);
+}
+
+.light ::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, rgba(243, 121, 27, 0.55), rgba(243, 121, 27, 0.35));
 }
 
 /* ============================================= */
-/* SELECT / DROPDOWNS — Premium styled           */
+/* SELECT / DROPDOWNS — Orange rounded borders   */
 /* ============================================= */
 
 select {
     background-color: var(--glass-bg) !important;
-    border: 1.5px solid var(--glass-border) !important;
+    border: 1.5px solid rgba(243, 121, 27, 0.35) !important;
     border-radius: 1rem !important;
     padding: 0.65rem 2.5rem 0.65rem 0.85rem !important;
     color: var(--text-main) !important;
@@ -127,27 +178,29 @@ select {
     background-repeat: no-repeat !important;
     background-position: right 0.75rem center !important;
     background-size: 1rem !important;
-    transition: border-color 0.25s ease, box-shadow 0.25s ease !important;
+    transition: border-color 0.3s ease, box-shadow 0.3s ease, background-color 0.3s ease !important;
     outline: none !important;
 }
 
 select:focus {
     border-color: var(--primary) !important;
-    box-shadow: 0 0 0 2px rgba(243, 121, 27, 0.1), 0 0 12px rgba(243, 121, 27, 0.08) !important;
+    box-shadow: 0 0 0 3px rgba(243, 121, 27, 0.12), 0 0 16px rgba(243, 121, 27, 0.1) !important;
 }
 
 select:hover {
-    border-color: rgba(243, 121, 27, 0.4) !important;
+    border-color: rgba(243, 121, 27, 0.6) !important;
+    box-shadow: 0 0 0 1px rgba(243, 121, 27, 0.08) !important;
 }
 
-/* Style the native dropdown options */
+/* Native dropdown options */
 select option {
     background-color: #1a1225;
     color: #ffffff;
-    padding: 10px 12px;
+    padding: 10px 14px;
     font-family: "Outfit", sans-serif;
     font-size: 0.875rem;
     border: none;
+    border-radius: 0.5rem;
 }
 
 select option:hover,
@@ -157,7 +210,20 @@ select option:checked {
     color: #f3791b;
 }
 
-/* Light mode option overrides */
+/* Light mode select overrides */
+.light select {
+    border-color: rgba(243, 121, 27, 0.3) !important;
+}
+
+.light select:hover {
+    border-color: rgba(243, 121, 27, 0.55) !important;
+}
+
+.light select:focus {
+    border-color: var(--primary) !important;
+    box-shadow: 0 0 0 3px rgba(243, 121, 27, 0.1), 0 0 16px rgba(243, 121, 27, 0.08) !important;
+}
+
 .light select option {
     background-color: #ffffff;
     color: #1a1a1a;
@@ -168,7 +234,10 @@ select option:checked {
     color: #f3791b;
 }
 
-/* Input date picker styling */
+/* ============================================= */
+/* INPUT DATE PICKER                             */
+/* ============================================= */
+
 input[type="date"] {
     color-scheme: dark;
 }
@@ -186,4 +255,29 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 
 input[type="date"]::-webkit-calendar-picker-indicator:hover {
     opacity: 1;
+}
+
+/* ============================================= */
+/* CUSTOM SELECT DROPDOWN — Scrollbar            */
+/* ============================================= */
+
+.custom-select-list::-webkit-scrollbar {
+    width: 6px;
+}
+
+.custom-select-list::-webkit-scrollbar-track {
+    background: rgba(243, 121, 27, 0.06);
+    border-radius: 99px;
+    margin: 4px 0;
+}
+
+.custom-select-list::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, rgba(243, 121, 27, 0.5), rgba(243, 121, 27, 0.25));
+    border-radius: 99px;
+    border: 1px solid rgba(243, 121, 27, 0.15);
+}
+
+.custom-select-list::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, rgba(243, 121, 27, 0.7), rgba(243, 121, 27, 0.45));
+    border-color: rgba(243, 121, 27, 0.3);
 }
