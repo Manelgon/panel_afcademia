@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html class="dark" lang="es">
+
+<head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <title>Automatizatelo Premium Management Panel</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <!-- Google Fonts: Space Grotesk and Outfit -->
+    <link
+        href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&amp;family=Outfit:wght@300;400;500;600&amp;display=swap"
+        rel="stylesheet" />
+    <!-- Material Symbols -->
+    <link
+        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+        rel="stylesheet" />
+    <script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#f3791b",
+                        "background-light": "#f8f7f5",
+                        "background-dark": "#0F0716",
+                    },
+                    fontFamily: {
+                        "display": ["Space Grotesk", "sans-serif"],
+                        "body": ["Outfit", "sans-serif"]
+                    },
+                    borderRadius: {
+                        "DEFAULT": "1rem",
+                        "lg": "2rem",
+                        "xl": "1.5rem",
+                        "full": "9999px"
+                    },
+                },
+            },
+        }
+    </script>
+    <style>
+        .glass {
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .glow-violet {
+            position: absolute;
+            width: 400px;
+            height: 400px;
+            background: radial-gradient(circle, rgba(139, 92, 246, 0.15) 0%, rgba(15, 7, 22, 0) 70%);
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+        }
+
+        h1,
+        h2,
+        h3,
+        .font-display {
+            font-family: 'Space Grotesk', sans-serif;
+        }
+
+        /* Drag and Drop Styles */
+        .dragging {
+            opacity: 0.5;
+            background: rgba(243, 121, 27, 0.1) !important;
+            border: 1px dashed #f3791b !important;
+        }
+
+        .draggable-row {
+            cursor: grab;
+        }
+
+        .draggable-row:active {
+            cursor: grabbing;
+        }
+    </style>
+</head>
+
+<body
+    class="bg-background-light dark:bg-background-dark text-slate-900 dark:text-slate-100 min-h-screen overflow-x-hidden">
+    <div class="relative flex min-h-screen w-full">
+        <!-- Glow effects -->
+        <div class="glow-violet top-1/4 left-1/4"></div>
+        <div class="glow-violet bottom-1/4 right-1/4"></div>
+
+        <!-- SideNavBar -->
+        <aside class="w-24 flex flex-col items-center py-8 glass border-r border-white/5 z-10 sticky top-0 h-screen">
+            <div class="mb-12">
+                <div
+                    class="size-12 rounded-full bg-primary flex items-center justify-center text-white font-display font-bold text-xl">
+                    A</div>
+            </div>
+            <nav class="flex flex-col gap-8 flex-1">
+                <a class="p-3 rounded-full bg-primary text-white shadow-lg shadow-primary/20 transition-all" href="#">
+                    <span class="material-symbols-outlined">dashboard</span>
+                </a>
+                <a class="p-3 rounded-full text-slate-400 hover:text-primary hover:bg-white/5 transition-all" href="#">
+                    <span class="material-symbols-outlined">group</span>
+                </a>
+                <a class="p-3 rounded-full text-slate-400 hover:text-primary hover:bg-white/5 transition-all" href="#">
+                    <span class="material-symbols-outlined">folder_open</span>
+                </a>
+                <a class="p-3 rounded-full text-slate-400 hover:text-primary hover:bg-white/5 transition-all" href="#">
+                    <span class="material-symbols-outlined">request_quote</span>
+                </a>
+                <a class="p-3 rounded-full text-slate-400 hover:text-primary hover:bg-white/5 transition-all" href="#">
+                    <span class="material-symbols-outlined">monitoring</span>
+                </a>
+            </nav>
+            <div class="mt-auto flex flex-col gap-6">
+                <a class="p-3 rounded-full text-slate-400 hover:text-primary transition-all" href="#">
+                    <span class="material-symbols-outlined">settings</span>
+                </a>
+                <div class="size-10 rounded-full border border-primary/50 overflow-hidden">
+                    <img class="w-full h-full object-cover" alt="User Avatar"
+                        src="https://lh3.googleusercontent.com/aida-public/AB6AXuB2XDij5iRI1L8bTogE1zBJB7PAbEGHXuh5UebqbBYTjvNC2ZQpmnzUuw3DHxEXYlPUGBcG57ZOfQt96sxaDsXCKKYOY8slodzYQk_qrzqIfGNd1rg0ywzgkfk0hgfefgB97flrRjSX7qNVTN6CJLb4UxFwqM11PcRajMeQyq19hs9VH53bgGuG3KdBa9WTIyQNaJNEsgULZviKsowg8syaxPP-OVhVCOwelDTxH2vBp90TOHb-r7M_ZBXKF0iGWWpa0_kIqsqvFXHN" />
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="flex-1 p-8 lg:p-12 z-10">
+            <!-- Header -->
+            <header class="flex justify-between items-center mb-10">
+                <div>
+                    <h1 class="text-3xl font-bold font-display tracking-tight mb-1">Automatizatelo Premium</h1>
+                    <p class="text-slate-400 font-medium">Panel de Gestión Ejecutiva</p>
+                </div>
+                <div class="flex gap-4">
+                    <button
+                        class="px-6 py-2.5 rounded-full border border-white/10 hover:bg-white/5 transition-all font-medium text-sm">Descargar
+                        Informe</button>
+                    <button
+                        class="px-6 py-2.5 rounded-full bg-primary text-white hover:brightness-110 transition-all font-medium text-sm shadow-lg shadow-primary/20">Nuevo
+                        Proyecto</button>
+                </div>
+            </header>
+
+            <!-- 1. Top KPI Row -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
+                <div class="glass p-6 rounded-xl border-l-4 border-l-primary">
+                    <p class="text-slate-400 text-sm font-medium mb-2">Leads Totales</p>
+                    <div class="flex items-end justify-between">
+                        <h3 class="text-3xl font-bold font-display">742</h3>
+                        <span class="text-emerald-400 text-sm font-medium flex items-center gap-1">
+                            <span class="material-symbols-outlined text-xs">arrow_upward</span> 5.2%
+                        </span>
+                    </div>
+                </div>
+                <div class="glass p-6 rounded-xl border-l-4 border-l-primary/60">
+                    <p class="text-slate-400 text-sm font-medium mb-2">Tasa de Conversión</p>
+                    <div class="flex items-end justify-between">
+                        <h3 class="text-3xl font-bold font-display">12.4%</h3>
+                        <span class="text-emerald-400 text-sm font-medium flex items-center gap-1">
+                            <span class="material-symbols-outlined text-xs">arrow_upward</span> 1.1%
+                        </span>
+                    </div>
+                </div>
+                <div class="glass p-6 rounded-xl border-l-4 border-l-primary/30">
+                    <p class="text-slate-400 text-sm font-medium mb-2">Presupuestos Activos</p>
+                    <div class="flex items-end justify-between">
+                        <h3 class="text-3xl font-bold font-display">€42.5k</h3>
+                        <span class="text-rose-400 text-sm font-medium flex items-center gap-1">
+                            <span class="material-symbols-outlined text-xs">arrow_downward</span> 2.4%
+                        </span>
+                    </div>
+                </div>
+                <div class="glass p-6 rounded-xl border-l-4 border-l-primary/10">
+                    <p class="text-slate-400 text-sm font-medium mb-2">Proyectos en Curso</p>
+                    <div class="flex items-end justify-between">
+                        <h3 class="text-3xl font-bold font-display">8</h3>
+                        <span class="text-emerald-400 text-sm font-medium flex items-center gap-1">
+                            <span class="material-symbols-outlined text-xs">arrow_upward</span> 12%
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Main Content Grid -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-10">
+                <!-- 2. Lead Manager -->
+                <div class="lg:col-span-2 glass rounded-xl overflow-hidden flex flex-col">
+                    <div class="p-6 border-b border-white/5 flex justify-between items-center">
+                        <h2 class="text-xl font-bold font-display">Leads Recientes (Drag & Drop)</h2>
+                        <button class="text-primary text-sm font-medium hover:underline">Ver Todos</button>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left">
+                            <thead class="text-slate-400 text-xs uppercase tracking-wider bg-white/5">
+                                <tr>
+                                    <th class="px-6 py-4">Nombre</th>
+                                    <th class="px-6 py-4">Origen</th>
+                                    <th class="px-6 py-4">Puntuación</th>
+                                    <th class="px-6 py-4">Estado</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-white/5" id="leads-body">
+                                <tr class="hover:bg-white/5 transition-colors group draggable-row" draggable="true">
+                                    <td class="px-6 py-4 flex items-center gap-3">
+                                        <div
+                                            class="size-8 rounded-full bg-indigo-500/20 flex items-center justify-center text-indigo-400 font-bold text-xs">
+                                            AR</div>
+                                        <span class="font-medium">Alex Rivera</span>
+                                    </td>
+                                    <td class="px-6 py-4">
+                                        <div class="flex items-center gap-2">
+                                            <span
+                                                class="material-symbols-outlined text-slate-400 text-lg">language</span>
+                                            <span class="text-sm">Web</span>
+                                        </div>
+                                    </td>
+                                    <td class="px-6 py-4">
+                                        <div class="flex gap-1.5">
+                                            <div class="size-2 rounded-full bg-primary"></div>
+                                            <div class="size-2 rounded-full bg-primary"></div>
+                                            <div class="size-2 rounded-full bg-primary/20"></div>
+                                        </div>
+                                    </td>
+                                    <td class="px-6 py-4">
+                                        <span
+                                            class="px-3 py-1 rounded-full bg-white/5 text-white text-xs font-medium border border-white/10 group-hover:border-primary/50 transition-colors">Contactado</span>
+                                    </td>
+                                </tr>
+                                <tr class="hover:bg-white/5 transition-colors group draggable-row" draggable="true">
+                                    <td class="px-6 py-4 flex items-center gap-3">
+                                        <div
+                                            class="size-8 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold text-xs">
+                                            SC</div>
+                                        <span class="font-medium">Sarah Chen</span>
+                                    </td>
+                                    <td class="px-6 py-4">
+                                        <div class="flex items-center gap-2">
+                                            <span class="material-symbols-outlined text-indigo-400 text-lg">share</span>
+                                            <span class="text-sm">LinkedIn</span>
+                                        </div>
+                                    </td>
+                                    <td class="px-6 py-4">
+                                        <div class="flex gap-1.5">
+                                            <div class="size-2 rounded-full bg-primary"></div>
+                                            <div class="size-2 rounded-full bg-primary"></div>
+                                            <div class="size-2 rounded-full bg-primary"></div>
+                                        </div>
+                                    </td>
+                                    <td class="px-6 py-4">
+                                        <span
+                                            class="px-3 py-1 rounded-full bg-primary/20 text-primary text-xs font-medium border border-primary/30">En
+                                            Progreso</span>
+                                    </td>
+                                </tr>
+                                <tr class="hover:bg-white/5 transition-colors group draggable-row" draggable="true">
+                                    <td class="px-6 py-4 flex items-center gap-3">
+                                        <div
+                                            class="size-8 rounded-full bg-rose-500/20 flex items-center justify-center text-rose-400 font-bold text-xs">
+                                            MR</div>
+                                        <span class="font-medium">Marco Rossi</span>
+                                    </td>
+                                    <td class="px-6 py-4">
+                                        <div class="flex items-center gap-2">
+                                            <span
+                                                class="material-symbols-outlined text-pink-400 text-lg">photo_camera</span>
+                                            <span class="text-sm">Instagram</span>
+                                        </div>
+                                    </td>
+                                    <td class="px-6 py-4">
+                                        <div class="flex gap-1.5">
+                                            <div class="size-2 rounded-full bg-primary"></div>
+                                            <div class="size-2 rounded-full bg-primary/20"></div>
+                                            <div class="size-2 rounded-full bg-primary/20"></div>
+                                        </div>
+                                    </td>
+                                    <td class="px-6 py-4">
+                                        <span
+                                            class="px-3 py-1 rounded-full bg-white/5 text-white text-xs font-medium border border-white/10 group-hover:border-primary/50 transition-colors">Nuevo</span>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- 3. Open Projects -->
+                <div class="glass rounded-xl p-6 flex flex-col">
+                    <h2 class="text-xl font-bold font-display mb-6">Proyectos en Curso</h2>
+                    <div class="space-y-6">
+                        <!-- Project item -->
+                        <div class="flex items-center gap-4 group cursor-pointer"
+                            onclick="window.location.href='project-detail.html'">
+                            <div class="relative size-14 flex items-center justify-center">
+                                <svg class="size-full" viewbox="0 0 36 36">
+                                    <circle class="stroke-white/10" cx="18" cy="18" fill="none" r="16" stroke-width="3">
+                                    </circle>
+                                    <circle class="stroke-primary" cx="18" cy="18" fill="none" r="16"
+                                        stroke-dasharray="100" stroke-dashoffset="25" stroke-linecap="round"
+                                        stroke-width="3"></circle>
+                                </svg>
+                                <span class="absolute text-[10px] font-bold">75%</span>
+                            </div>
+                            <div class="flex-1">
+                                <h4 class="font-medium text-sm group-hover:text-primary transition-colors">
+                                    Automatización Flujo CRM</h4>
+                                <p class="text-xs text-slate-400">Entrega: 15 Nov</p>
+                            </div>
+                            <span
+                                class="material-symbols-outlined text-slate-400 group-hover:text-primary transition-all">chevron_right</span>
+                        </div>
+                    </div>
+                    <button
+                        class="mt-auto w-full py-3 rounded-full border border-white/10 text-slate-300 text-sm font-medium hover:bg-white/5 transition-all">
+                        Ver Pipeline Completo
+                    </button>
+                </div>
+            </div>
+
+            <!-- 4. Budget Summary -->
+            <div class="glass rounded-xl p-8">
+                <div class="flex flex-col md:flex-row items-center justify-between gap-8">
+                    <div class="flex-1 text-center md:text-left">
+                        <h2 class="text-xl font-bold font-display mb-1">Salud Financiera (Q4)</h2>
+                        <p class="text-slate-400 text-sm">Resumen de presupuestos y facturación</p>
+                    </div>
+                    <div class="flex flex-wrap justify-center md:justify-end gap-12 flex-[2]">
+                        <div class="text-center">
+                            <p class="text-slate-400 text-xs font-medium uppercase tracking-widest mb-2">Enviados</p>
+                            <div class="flex items-center gap-2">
+                                <div class="size-2 rounded-full bg-slate-400"></div>
+                                <span class="text-2xl font-bold font-display">€128.4k</span>
+                            </div>
+                        </div>
+                        <div class="text-center">
+                            <p class="text-slate-400 text-xs font-medium uppercase tracking-widest mb-2">Pendientes</p>
+                            <div class="flex items-center gap-2">
+                                <div class="size-2 rounded-full bg-primary/60"></div>
+                                <span class="text-2xl font-bold font-display text-primary/80">€42.5k</span>
+                            </div>
+                        </div>
+                        <div class="text-center">
+                            <p class="text-slate-400 text-xs font-medium uppercase tracking-widest mb-2">Aceptados</p>
+                            <div class="flex items-center gap-2">
+                                <div class="size-2 rounded-full bg-primary"></div>
+                                <span class="text-2xl font-bold font-display text-primary">€85.9k</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="h-12 w-px bg-white/10 hidden lg:block"></div>
+                    <div class="flex flex-col gap-2">
+                        <div class="h-3 w-48 bg-white/10 rounded-full overflow-hidden flex">
+                            <div class="h-full bg-primary" style="width: 60%"></div>
+                            <div class="h-full bg-primary/40" style="width: 25%"></div>
+                        </div>
+                        <p class="text-[10px] text-slate-500 text-right uppercase font-bold tracking-tighter">Índice de
+                            Asignación</p>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // Simple Drag and Drop Script
+        const tbody = document.getElementById('leads-body');
+        let draggingRow = null;
+
+        tbody.addEventListener('dragstart', e => {
+            draggingRow = e.target;
+            e.target.classList.add('dragging');
+        });
+
+        tbody.addEventListener('dragend', e => {
+            e.target.classList.remove('dragging');
+            draggingRow = null;
+        });
+
+        tbody.addEventListener('dragover', e => {
+            e.preventDefault();
+            const afterElement = getDragAfterElement(tbody, e.clientY);
+            if (afterElement == null) {
+                tbody.appendChild(draggingRow);
+            } else {
+                tbody.insertBefore(draggingRow, afterElement);
+            }
+        });
+
+        function getDragAfterElement(container, y) {
+            const draggableElements = [...container.querySelectorAll('.draggable-row:not(.dragging)')];
+
+            return draggableElements.reduce((closest, child) => {
+                const box = child.getBoundingClientRect();
+                const offset = y - box.top - box.height / 2;
+                if (offset < 0 && offset > closest.offset) {
+                    return { offset: offset, element: child };
+                } else {
+                    return closest;
+                }
+            }, { offset: Number.NEGATIVE_INFINITY }).element;
+        }
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,65 @@
+@import "tailwindcss";
+
+:root {
+    --primary: #f3791b;
+    --bg-main: #0F0716;
+    --bg-gradient: radial-gradient(circle at top right, #2a1f14, #0F0716);
+    --text-main: #ffffff;
+    --text-muted: #9ca3af;
+    --glass-bg: rgba(255, 255, 255, 0.03);
+    --glass-border: rgba(255, 255, 255, 0.1);
+    --sidebar-border: rgba(255, 255, 255, 0.05);
+}
+
+.light {
+    --bg-main: #f8f9fa;
+    --bg-gradient: radial-gradient(circle at top right, #ffffff, #f1f3f5);
+    --text-main: #1a1a1a;
+    --text-muted: #6b7280;
+    --glass-bg: rgba(255, 255, 255, 0.85);
+    /* Slightly more opaque for better readability in light mode */
+    --glass-border: rgba(0, 0, 0, 0.08);
+    --sidebar-border: rgba(0, 0, 0, 0.05);
+}
+
+@theme {
+    --color-primary: var(--primary);
+    --font-display: "Space Grotesk", sans-serif;
+    --font-body: "Outfit", sans-serif;
+}
+
+@layer base {
+    body {
+        background-color: var(--bg-main) !important;
+        background-image: var(--bg-gradient) !important;
+        color: var(--text-main);
+        font-family: "Outfit", sans-serif;
+        min-height: 100vh;
+        margin: 0;
+        transition: background-color 0.3s ease, background-image 0.3s ease, color 0.3s ease;
+    }
+}
+
+.glass {
+    background-color: var(--glass-bg);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid var(--glass-border);
+}
+
+/* Helper classes to ensure reactivity to theme variables */
+.text-variable-main {
+    color: var(--text-main);
+}
+
+.text-variable-muted {
+    color: var(--text-muted);
+}
+
+.border-variable {
+    border-color: var(--glass-border);
+}
+
+.bg-variable-main {
+    background-color: var(--bg-main);
+}

@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html class="dark" lang="es">
+
+<head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <title>Detalle de Proyecto - Automatizatelo</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&amp;display=swap"
+        rel="stylesheet" />
+    <link
+        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+        rel="stylesheet" />
+    <script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#f28b0d",
+                        "background-dark": "#120d08",
+                        "glass-border": "rgba(255, 255, 255, 0.08)",
+                    },
+                    fontFamily: {
+                        "display": ["Space Grotesk", "sans-serif"]
+                    },
+                },
+            },
+        }
+    </script>
+    <style>
+        body {
+            background: radial-gradient(circle at top right, #2a1f14, #120d08);
+            min-height: 100vh;
+            font-family: 'Space Grotesk', sans-serif;
+            color: #f1f5f9;
+        }
+
+        .glass-card {
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .glow-orange {
+            box-shadow: 0 0 15px rgba(242, 139, 13, 0.3);
+        }
+
+        .pulse-active {
+            animation: pulse-ring 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+
+        @keyframes pulse-ring {
+
+            0%,
+            100% {
+                opacity: 1;
+                transform: scale(1);
+            }
+
+            50% {
+                opacity: .5;
+                transform: scale(1.1);
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="relative flex min-h-screen w-full flex-col">
+        <header
+            class="flex items-center justify-between px-8 py-6 border-b border-glass-border sticky top-0 z-50 bg-background-dark/80 backdrop-blur-md">
+            <div class="flex items-center gap-4">
+                <div class="size-10 bg-primary/10 rounded-lg flex items-center justify-center border border-primary/20">
+                    <span class="material-symbols-outlined text-primary text-2xl">grid_view</span>
+                </div>
+                <h2 class="text-xl font-bold tracking-tight">Automatizatelo</h2>
+            </div>
+            <button onclick="window.location.href='dashboard.html'"
+                class="glass-card px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-medium hover:bg-white/5 transition-all">
+                <span class="material-symbols-outlined text-sm">arrow_back</span>
+                Volver al Dashboard
+            </button>
+        </header>
+
+        <main class="flex-1 max-w-[1440px] mx-auto w-full p-8 space-y-8">
+            <section class="flex flex-col md:flex-row md:items-end justify-between gap-6">
+                <div class="space-y-2">
+                    <div class="flex items-center gap-3">
+                        <span
+                            class="text-xs font-bold uppercase tracking-widest text-primary bg-primary/10 px-3 py-1 rounded-full border border-primary/20 glow-orange">
+                            En Progreso
+                        </span>
+                        <span class="text-slate-400 text-sm">• ID: PRJ-2024-082</span>
+                    </div>
+                    <h1 class="text-4xl md:text-5xl font-bold tracking-tight">Automatización Flujo CRM</h1>
+                    <p class="text-slate-400 text-lg flex items-center gap-2">
+                        <span class="material-symbols-outlined text-base">domain</span> Inmobiliaria Premium
+                    </p>
+                </div>
+            </section>
+
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                <!-- Timeline -->
+                <div class="lg:col-span-4 space-y-6">
+                    <div class="glass-card rounded-2xl p-6">
+                        <h3 class="text-lg font-bold mb-8 flex items-center gap-2">
+                            <span class="material-symbols-outlined text-primary">analytics</span> Hitos del Proyecto
+                        </h3>
+                        <div class="relative space-y-10 pl-2">
+                            <div
+                                class="absolute left-[17px] top-2 bottom-2 w-[1px] bg-gradient-to-b from-primary via-primary/50 to-white/5">
+                            </div>
+                            <div class="relative flex gap-4 items-start">
+                                <div
+                                    class="z-10 size-8 rounded-full bg-primary flex items-center justify-center text-background-dark shadow-lg shadow-primary/30">
+                                    <span class="material-symbols-outlined text-lg font-bold">check</span>
+                                </div>
+                                <div>
+                                    <p class="text-sm font-bold text-white">Reunion Inicial</p>
+                                    <p class="text-xs text-slate-500">12 Ene, 2024</p>
+                                </div>
+                            </div>
+                            <div class="relative flex gap-4 items-start">
+                                <div
+                                    class="z-10 size-8 rounded-full bg-primary/20 border-2 border-primary flex items-center justify-center text-primary pulse-active">
+                                    <div class="size-2 bg-primary rounded-full"></div>
+                                </div>
+                                <div>
+                                    <p class="text-sm font-bold text-primary">Desarrollo API</p>
+                                    <p class="text-xs text-primary/70">En curso</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tareas -->
+                <div class="lg:col-span-8 space-y-8">
+                    <div class="glass-card rounded-2xl p-8 flex flex-col items-center justify-center text-center">
+                        <h3 class="text-lg font-bold mb-8 self-start">Progreso de Tareas</h3>
+                        <div class="relative size-48 flex items-center justify-center mb-8">
+                            <svg class="size-full -rotate-90">
+                                <circle cx="96" cy="96" fill="transparent" r="88" stroke="rgba(255,255,255,0.05)"
+                                    stroke-width="12"></circle>
+                                <circle class="glow-orange" cx="96" cy="96" fill="transparent" r="88" stroke="#f28b0d"
+                                    stroke-dasharray="553" stroke-dashoffset="193" stroke-linecap="round"
+                                    stroke-width="12"></circle>
+                            </svg>
+                            <div class="absolute flex flex-col items-center">
+                                <span class="text-4xl font-bold">65%</span>
+                                <span class="text-xs text-slate-400 uppercase">Completado</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+</body>
+
+</html>

@@ -1,0 +1,27 @@
+{
+    "buildCommand": "npm run build",
+    "outputDirectory": "dist",
+    "framework": "vite",
+    "rewrites": [
+        {
+            "source": "/auth/:path*",
+            "destination": "https://ssdbss.automatizatelo.com/auth/:path*"
+        },
+        {
+            "source": "/rest/:path*",
+            "destination": "https://ssdbss.automatizatelo.com/rest/:path*"
+        },
+        {
+            "source": "/realtime/:path*",
+            "destination": "https://ssdbss.automatizatelo.com/realtime/:path*"
+        },
+        {
+            "source": "/storage/:path*",
+            "destination": "https://ssdbss.automatizatelo.com/storage/:path*"
+        },
+        {
+            "source": "/((?!auth|rest|realtime|storage|assets|_next).*)",
+            "destination": "/index.html"
+        }
+    ]
+}
