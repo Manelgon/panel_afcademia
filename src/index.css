@@ -63,3 +63,127 @@
 .bg-variable-main {
     background-color: var(--bg-main);
 }
+
+/* ============================================= */
+/* SCROLLBARS — Ultra-thin, almost invisible     */
+/* ============================================= */
+
+/* Webkit (Chrome, Safari, Edge) */
+::-webkit-scrollbar {
+    width: 3px;
+    height: 3px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: rgba(243, 121, 27, 0.15);
+    border-radius: 99px;
+    transition: background 0.3s ease;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: rgba(243, 121, 27, 0.4);
+}
+
+/* Card/modal level — slightly wider on hover */
+.glass::-webkit-scrollbar,
+.overflow-y-auto::-webkit-scrollbar,
+.overflow-x-auto::-webkit-scrollbar {
+    width: 3px;
+}
+
+.glass:hover::-webkit-scrollbar,
+.overflow-y-auto:hover::-webkit-scrollbar,
+.overflow-x-auto:hover::-webkit-scrollbar {
+    width: 5px;
+}
+
+/* Firefox */
+* {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(243, 121, 27, 0.15) transparent;
+}
+
+/* ============================================= */
+/* SELECT / DROPDOWNS — Premium styled           */
+/* ============================================= */
+
+select {
+    background-color: var(--glass-bg) !important;
+    border: 1.5px solid var(--glass-border) !important;
+    border-radius: 1rem !important;
+    padding: 0.65rem 2.5rem 0.65rem 0.85rem !important;
+    color: var(--text-main) !important;
+    font-family: "Outfit", sans-serif !important;
+    font-size: 0.875rem !important;
+    cursor: pointer !important;
+    appearance: none !important;
+    -webkit-appearance: none !important;
+    -moz-appearance: none !important;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23f3791b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E") !important;
+    background-repeat: no-repeat !important;
+    background-position: right 0.75rem center !important;
+    background-size: 1rem !important;
+    transition: border-color 0.25s ease, box-shadow 0.25s ease !important;
+    outline: none !important;
+}
+
+select:focus {
+    border-color: var(--primary) !important;
+    box-shadow: 0 0 0 2px rgba(243, 121, 27, 0.1), 0 0 12px rgba(243, 121, 27, 0.08) !important;
+}
+
+select:hover {
+    border-color: rgba(243, 121, 27, 0.4) !important;
+}
+
+/* Style the native dropdown options */
+select option {
+    background-color: #1a1225;
+    color: #ffffff;
+    padding: 10px 12px;
+    font-family: "Outfit", sans-serif;
+    font-size: 0.875rem;
+    border: none;
+}
+
+select option:hover,
+select option:focus,
+select option:checked {
+    background-color: rgba(243, 121, 27, 0.2);
+    color: #f3791b;
+}
+
+/* Light mode option overrides */
+.light select option {
+    background-color: #ffffff;
+    color: #1a1a1a;
+}
+
+.light select option:checked {
+    background-color: rgba(243, 121, 27, 0.1);
+    color: #f3791b;
+}
+
+/* Input date picker styling */
+input[type="date"] {
+    color-scheme: dark;
+}
+
+.light input[type="date"] {
+    color-scheme: light;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator {
+    filter: invert(0.5) sepia(1) saturate(5) hue-rotate(0deg);
+    cursor: pointer;
+    opacity: 0.6;
+    transition: opacity 0.2s ease;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator:hover {
+    opacity: 1;
+}
