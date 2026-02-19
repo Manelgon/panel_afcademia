@@ -51,36 +51,50 @@ export default function Sidebar() {
     };
 
     return (
-        <aside className="w-28 flex flex-col items-center py-8 glass border-r border-variable h-screen sticky top-0 shrink-0 z-50">
-            <div className="mb-12">
-                <div className="size-14 rounded-2xl bg-white/5 flex items-center justify-center p-2 shadow-xl border border-variable">
-                    <img src={logo} alt="Automatizatelo" className="w-full h-full object-contain" />
+        <>
+            {/* Desktop Sidebar */}
+            <aside className="hidden md:flex w-28 flex-col items-center py-8 glass border-r border-variable h-screen sticky top-0 shrink-0 z-50">
+                <div className="mb-12">
+                    <div className="size-14 rounded-2xl bg-white/5 flex items-center justify-center p-2 shadow-xl border border-variable">
+                        <img src={logo} alt="Automatizatelo" className="w-full h-full object-contain" />
+                    </div>
                 </div>
-            </div>
 
-            <div className="flex flex-col gap-6 flex-1 w-full px-4 items-center">
-                <SidebarItem icon={LayoutDashboard} to="/" label="Dashboard" />
-                <SidebarItem icon={Users} to="/users" label="Usuarios" />
-                <SidebarItem icon={Target} to="/leads" label="Leads" />
-                <SidebarItem icon={FolderOpen} to="/projects" label="Proyectos" />
-                <SidebarItem icon={FileText} label="Documentos" />
-            </div>
-
-            <div className="mt-auto flex flex-col gap-6 items-center w-full px-4">
-                <SidebarItem icon={Settings} label="Configuración" />
-
-                <button
-                    onClick={handleSignOut}
-                    className="p-4 rounded-2xl text-variable-muted hover:text-rose-500 hover:bg-rose-500/10 transition-all duration-300 flex items-center justify-center"
-                    title="Cerrar Sesión"
-                >
-                    <LogOut size={24} />
-                </button>
-
-                <div className="size-12 rounded-2xl border-2 border-primary/20 p-0.5 mt-2">
-                    <img className="rounded-xl w-full h-full object-cover" src="https://ui-avatars.com/api/?name=Admin&background=f3791b&color=fff" alt="User" />
+                <div className="flex flex-col gap-6 flex-1 w-full px-4 items-center">
+                    <SidebarItem icon={LayoutDashboard} to="/" label="Dashboard" />
+                    <SidebarItem icon={Users} to="/users" label="Usuarios" />
+                    <SidebarItem icon={Target} to="/leads" label="Leads" />
+                    <SidebarItem icon={FolderOpen} to="/projects" label="Proyectos" />
+                    <SidebarItem icon={FileText} label="Documentos" />
                 </div>
-            </div>
-        </aside>
+
+                <div className="mt-auto flex flex-col gap-6 items-center w-full px-4">
+                    <SidebarItem icon={Settings} label="Configuración" />
+
+                    <button
+                        onClick={handleSignOut}
+                        className="p-4 rounded-2xl text-variable-muted hover:text-rose-500 hover:bg-rose-500/10 transition-all duration-300 flex items-center justify-center"
+                        title="Cerrar Sesión"
+                    >
+                        <LogOut size={24} />
+                    </button>
+
+                    <div className="size-12 rounded-2xl border-2 border-primary/20 p-0.5 mt-2">
+                        <img className="rounded-xl w-full h-full object-cover" src="https://ui-avatars.com/api/?name=Admin&background=f3791b&color=fff" alt="User" />
+                    </div>
+                </div>
+            </aside>
+
+            {/* Mobile Bottom Navigation */}
+            <nav className="md:hidden fixed bottom-0 left-0 right-0 h-20 glass border-t border-variable z-[100] px-6 flex items-center justify-between">
+                <SidebarItem icon={LayoutDashboard} to="/" label="H" />
+                <SidebarItem icon={Users} to="/users" label="U" />
+                <div className="size-12 -mt-10 rounded-2xl bg-primary flex items-center justify-center shadow-lg shadow-primary/40 border-4 border-variable">
+                    <img src={logo} alt="L" className="size-6 object-contain brightness-0 invert" />
+                </div>
+                <SidebarItem icon={Target} to="/leads" label="L" />
+                <SidebarItem icon={FolderOpen} to="/projects" label="P" />
+            </nav>
+        </>
     );
 }

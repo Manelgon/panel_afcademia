@@ -53,13 +53,13 @@ export default function Dashboard() {
             <Sidebar />
 
             {/* Main Content */}
-            <main className="flex-1 p-10 overflow-y-auto">
-                <header className="flex justify-between items-center mb-12">
+            <main className="flex-1 p-4 sm:p-10 overflow-y-auto pb-32 md:pb-10">
+                <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6 mb-12">
                     <div>
-                        <h1 className="text-4xl font-bold font-display tracking-tight mb-2 text-variable-main">Dashboard <span className="text-primary italic">Premium</span></h1>
+                        <h1 className="text-2xl sm:text-4xl font-bold font-display tracking-tight mb-2 text-variable-main">Dashboard <span className="text-primary italic">Premium</span></h1>
                         <div className="flex items-center gap-2 text-variable-muted">
                             <Clock size={16} />
-                            <span className="text-sm">Última actualización: hace 5 minutos</span>
+                            <span className="text-xs sm:text-sm">Última actualización: hace 5 minutos</span>
                         </div>
                     </div>
                     <div className="flex gap-4">
@@ -69,9 +69,9 @@ export default function Dashboard() {
                         >
                             {darkMode ? <Sun size={20} /> : <Moon size={20} />}
                         </button>
-                        <div className="relative group">
+                        <div className="relative group flex-1 sm:flex-none">
                             <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-variable-muted group-hover:text-primary transition-colors" size={20} />
-                            <input type="text" placeholder="Buscar..." className="bg-white/5 border border-variable rounded-2xl pl-12 pr-6 py-3 text-sm focus:outline-none focus:border-primary/50 w-64 transition-all text-variable-main" />
+                            <input type="text" placeholder="Buscar..." className="bg-white/5 border border-variable rounded-2xl pl-12 pr-6 py-3 text-sm focus:outline-none focus:border-primary/50 w-full sm:w-64 transition-all text-variable-main" />
                         </div>
                         <button className="p-3 glass rounded-2xl text-variable-muted hover:text-primary relative">
                             <Bell size={24} />

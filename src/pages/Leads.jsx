@@ -116,10 +116,10 @@ export default function Leads() {
         <div className="flex min-h-screen transition-colors duration-300 overflow-hidden">
             <Sidebar />
 
-            <main className="flex-1 p-10 overflow-y-auto">
-                <header className="flex justify-between items-center mb-12">
+            <main className="flex-1 p-4 sm:p-10 overflow-y-auto pb-32 md:pb-10">
+                <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6 mb-8 sm:mb-12">
                     <div>
-                        <h1 className="text-4xl font-bold font-display tracking-tight mb-2 text-variable-main">Gestión de Leads</h1>
+                        <h1 className="text-2xl sm:text-4xl font-bold font-display tracking-tight mb-2 text-variable-main">Gestión de Leads</h1>
                         <p className="text-variable-muted">Administra los prospectos y oportunidades comerciales</p>
                         {fetchError && (
                             <div className="text-xs text-rose-500 mt-2 font-mono">
@@ -127,25 +127,25 @@ export default function Leads() {
                             </div>
                         )}
                     </div>
-                    <div className="flex gap-4">
+                    <div className="flex flex-wrap items-center gap-4 w-full xs:w-auto">
                         <button
                             onClick={fetchLeads}
-                            className="p-3 glass rounded-2xl text-variable-muted hover:text-primary transition-all flex items-center gap-2"
+                            className="p-3 glass rounded-2xl text-variable-muted hover:text-primary transition-all flex items-center justify-center"
                             title="Recargar Lista"
                         >
                             <Clock size={20} />
                         </button>
                         <button
                             onClick={toggleTheme}
-                            className="p-3 glass rounded-2xl text-variable-muted hover:text-primary transition-all flex items-center gap-2"
+                            className="p-3 glass rounded-2xl text-variable-muted hover:text-primary transition-all flex items-center justify-center"
                         >
                             {darkMode ? <Sun size={20} /> : <Moon size={20} />}
                         </button>
                         <button
                             onClick={() => setIsModalOpen(true)}
-                            className="bg-primary text-white px-6 py-3 rounded-2xl font-bold flex items-center gap-2 hover:brightness-110 transition-all shadow-lg shadow-primary/20"
+                            className="flex-1 xs:flex-none bg-primary text-white px-6 py-3 rounded-2xl font-bold flex items-center justify-center gap-2 hover:brightness-110 transition-all shadow-lg shadow-primary/20"
                         >
-                            <UserPlus size={20} /> Nuevo Lead
+                            <UserPlus size={20} /> <span className="whitespace-nowrap">Nuevo Lead</span>
                         </button>
                     </div>
                 </header>
@@ -243,49 +243,49 @@ export default function Leads() {
                             initial={{ scale: 0.9, opacity: 0, y: 20 }}
                             animate={{ scale: 1, opacity: 1, y: 0 }}
                             exit={{ scale: 0.9, opacity: 0, y: 20 }}
-                            className="relative w-full max-w-2xl glass rounded-[2.5rem] p-10 overflow-y-auto max-h-[90vh] shadow-2xl"
+                            className="relative w-full max-w-2xl glass rounded-[2rem] sm:rounded-[2.5rem] p-6 sm:p-10 overflow-y-auto max-h-[90vh] shadow-2xl"
                         >
-                            <button onClick={() => setIsModalOpen(false)} className="absolute top-8 right-8 text-variable-muted hover:text-primary transition-colors z-10">
+                            <button onClick={() => setIsModalOpen(false)} className="absolute top-6 right-6 sm:top-8 sm:right-8 text-variable-muted hover:text-primary transition-colors z-10">
                                 <X size={24} />
                             </button>
 
-                            <h2 className="text-3xl font-bold font-display mb-2 text-variable-main">Nuevo Lead</h2>
-                            <p className="text-variable-muted mb-8 italic">Introduce los detalles del nuevo prospecto comercial</p>
+                            <h2 className="text-2xl sm:text-3xl font-bold font-display mb-2 text-variable-main">Nuevo Lead</h2>
+                            <p className="text-variable-muted mb-8 italic text-sm sm:text-base">Introduce los detalles del nuevo prospecto comercial</p>
 
                             <form onSubmit={handleCreateLead} className="space-y-5">
                                 <p className="text-xs font-black text-primary uppercase tracking-[0.2em] border-b border-variable pb-2">Información de Contacto</p>
 
-                                <div className="grid grid-cols-2 gap-4">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                     <div className="space-y-2">
                                         <label className="text-xs font-bold text-variable-muted uppercase tracking-widest ml-1">Nombre</label>
-                                        <input required value={formData.first_name} onChange={(e) => setFormData({ ...formData, first_name: e.target.value })} className="w-full bg-white/5 border border-variable rounded-2xl px-4 py-3 focus:outline-none focus:border-primary/50 text-variable-main transition-all" placeholder="Nombre" />
+                                        <input required value={formData.first_name} onChange={(e) => setFormData({ ...formData, first_name: e.target.value })} className="w-full bg-white/5 border border-variable rounded-2xl px-4 py-3 focus:outline-none focus:border-primary/50 text-variable-main transition-all text-sm sm:text-base" placeholder="Nombre" />
                                     </div>
                                     <div className="space-y-2">
                                         <label className="text-xs font-bold text-variable-muted uppercase tracking-widest ml-1">Apellidos</label>
-                                        <input required value={formData.last_name} onChange={(e) => setFormData({ ...formData, last_name: e.target.value })} className="w-full bg-white/5 border border-variable rounded-2xl px-4 py-3 focus:outline-none focus:border-primary/50 text-variable-main transition-all" placeholder="Apellidos" />
+                                        <input required value={formData.last_name} onChange={(e) => setFormData({ ...formData, last_name: e.target.value })} className="w-full bg-white/5 border border-variable rounded-2xl px-4 py-3 focus:outline-none focus:border-primary/50 text-variable-main transition-all text-sm sm:text-base" placeholder="Apellidos" />
                                     </div>
                                 </div>
 
-                                <div className="grid grid-cols-2 gap-4">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                     <div className="space-y-2">
                                         <label className="text-xs font-bold text-variable-muted uppercase tracking-widest ml-1">Email</label>
                                         <div className="relative">
                                             <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-variable-muted" size={18} />
-                                            <input required type="email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} className="w-full bg-white/5 border border-variable rounded-2xl pl-12 pr-4 py-3 focus:outline-none focus:border-primary/50 text-variable-main transition-all" placeholder="email@ejemplo.com" />
+                                            <input required type="email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} className="w-full bg-white/5 border border-variable rounded-2xl pl-12 pr-4 py-3 focus:outline-none focus:border-primary/50 text-variable-main transition-all text-sm sm:text-base" placeholder="email@ejemplo.com" />
                                         </div>
                                     </div>
                                     <div className="space-y-2">
                                         <label className="text-xs font-bold text-variable-muted uppercase tracking-widest ml-1">Teléfono</label>
                                         <div className="relative">
                                             <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-variable-muted" size={18} />
-                                            <input type="tel" value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} className="w-full bg-white/5 border border-variable rounded-2xl pl-12 pr-4 py-3 focus:outline-none focus:border-primary/50 text-variable-main transition-all" placeholder="600 000 000" />
+                                            <input type="tel" value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} className="w-full bg-white/5 border border-variable rounded-2xl pl-12 pr-4 py-3 focus:outline-none focus:border-primary/50 text-variable-main transition-all text-sm sm:text-base" placeholder="600 000 000" />
                                         </div>
                                     </div>
                                 </div>
 
                                 <p className="text-xs font-black text-primary uppercase tracking-[0.2em] border-b border-variable pb-2 pt-2">Perfil y Calificación</p>
 
-                                <div className="grid grid-cols-2 gap-4">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                     <div className="space-y-2">
                                         <label className="text-xs font-bold text-variable-muted uppercase tracking-widest ml-1">Tipo de Cliente</label>
                                         <CustomSelect
@@ -308,13 +308,15 @@ export default function Leads() {
 
                                 <div className="space-y-2">
                                     <label className="text-xs font-bold text-variable-muted uppercase tracking-widest ml-1">Calificación (Score)</label>
-                                    <div className="flex gap-4 items-center bg-white/5 p-4 rounded-2xl border border-variable">
-                                        {[1, 2, 3, 4, 5].map((s) => (
-                                            <button key={s} type="button" onClick={() => setFormData({ ...formData, score: s })} className="transition-transform active:scale-90">
-                                                <Star size={24} className={s <= formData.score ? 'fill-primary text-primary' : 'text-variable-muted'} />
-                                            </button>
-                                        ))}
-                                        <span className="ml-auto text-xs font-black text-primary uppercase">{formData.score}/5 Puntos</span>
+                                    <div className="flex flex-wrap gap-4 items-center bg-white/5 p-4 rounded-2xl border border-variable">
+                                        <div className="flex gap-2">
+                                            {[1, 2, 3, 4, 5].map((s) => (
+                                                <button key={s} type="button" onClick={() => setFormData({ ...formData, score: s })} className="transition-transform active:scale-90">
+                                                    <Star size={24} className={s <= formData.score ? 'fill-primary text-primary' : 'text-variable-muted'} />
+                                                </button>
+                                            ))}
+                                        </div>
+                                        <span className="sm:ml-auto text-[10px] font-black text-primary uppercase">{formData.score}/5 Puntos</span>
                                     </div>
                                 </div>
 
@@ -322,7 +324,7 @@ export default function Leads() {
                                     <label className="text-xs font-bold text-variable-muted uppercase tracking-widest ml-1">Mensaje o Notas</label>
                                     <div className="relative">
                                         <MessageSquare className="absolute left-4 top-4 text-variable-muted" size={18} />
-                                        <textarea value={formData.message} onChange={(e) => setFormData({ ...formData, message: e.target.value })} className="w-full bg-white/5 border border-variable rounded-2xl pl-12 pr-4 py-3 focus:outline-none focus:border-primary/50 text-variable-main transition-all h-24 resize-none" placeholder="Observaciones adicionales..." />
+                                        <textarea value={formData.message} onChange={(e) => setFormData({ ...formData, message: e.target.value })} className="w-full bg-white/5 border border-variable rounded-2xl pl-12 pr-4 py-3 focus:outline-none focus:border-primary/50 text-variable-main transition-all h-24 resize-none text-sm" placeholder="Observaciones adicionales..." />
                                     </div>
                                 </div>
 

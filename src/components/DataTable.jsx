@@ -160,14 +160,18 @@ export default function DataTable({
     // RENDER
     // ================================================================
     return (
-        <div className="glass rounded-[2.5rem] p-8">
+        <div className="glass rounded-[1.5rem] sm:rounded-[2.5rem] p-4 sm:p-8">
             {/* ----- TOOLBAR (column selector) ----- */}
-            <div className="flex justify-end mb-4">
+            <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+                <div className="flex-1 min-w-0">
+                    {/* Optional: Add search or breadcrumbs here in the future */}
+                </div>
+
                 <div ref={colMenuRef} className="relative">
                     <button
                         type="button"
                         onClick={() => setColMenuOpen((v) => !v)}
-                        className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-widest transition-all border"
+                        className="inline-flex items-center gap-2 px-3 sm:px-4 py-2 rounded-xl text-[10px] sm:text-xs font-bold uppercase tracking-widest transition-all border"
                         style={{
                             borderColor: colMenuOpen ? 'var(--primary)' : 'rgba(243,121,27,0.25)',
                             backgroundColor: colMenuOpen ? 'rgba(243,121,27,0.1)' : 'rgba(255,255,255,0.03)',
@@ -176,23 +180,11 @@ export default function DataTable({
                                 ? '0 0 0 3px rgba(243,121,27,0.1), 0 0 12px rgba(243,121,27,0.08)'
                                 : 'none',
                         }}
-                        onMouseEnter={(e) => {
-                            if (!colMenuOpen) {
-                                e.currentTarget.style.borderColor = 'rgba(243,121,27,0.5)';
-                                e.currentTarget.style.color = 'var(--primary)';
-                            }
-                        }}
-                        onMouseLeave={(e) => {
-                            if (!colMenuOpen) {
-                                e.currentTarget.style.borderColor = 'rgba(243,121,27,0.25)';
-                                e.currentTarget.style.color = 'var(--text-muted)';
-                            }
-                        }}
                     >
                         <Columns3 size={15} />
-                        Columnas
+                        <span className="hidden xs:inline">Columnas</span>
                         <span
-                            className="ml-1 px-1.5 py-0.5 rounded-lg text-[10px] font-black"
+                            className="px-1.5 py-0.5 rounded-lg text-[10px] font-black"
                             style={{
                                 backgroundColor: 'rgba(243,121,27,0.15)',
                                 color: 'var(--primary)',
@@ -230,8 +222,6 @@ export default function DataTable({
                                     }}
                                     className="text-[10px] font-bold uppercase tracking-widest transition-colors"
                                     style={{ color: 'var(--text-muted)' }}
-                                    onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--primary)'; }}
-                                    onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-muted)'; }}
                                 >
                                     Mostrar todas
                                 </button>
@@ -258,14 +248,6 @@ export default function DataTable({
                                                             : 'var(--text-muted)',
                                                     opacity: !isHideable ? 0.5 : 1,
                                                     cursor: isHideable ? 'pointer' : 'not-allowed',
-                                                }}
-                                                onMouseEnter={(e) => {
-                                                    if (isHideable) {
-                                                        e.currentTarget.style.backgroundColor = 'rgba(243,121,27,0.08)';
-                                                    }
-                                                }}
-                                                onMouseLeave={(e) => {
-                                                    e.currentTarget.style.backgroundColor = 'transparent';
                                                 }}
                                             >
                                                 {/* Toggle icon */}
@@ -302,15 +284,15 @@ export default function DataTable({
             </div>
 
             {/* ----- TABLE ----- */}
-            <div className="overflow-x-auto">
-                <table className="w-full text-left">
+            <div className="overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
+                <table className="w-full text-left min-w-[600px] sm:min-w-full">
                     {/* HEAD */}
-                    <thead className="text-variable-muted text-xs uppercase tracking-[0.2em] font-bold border-b border-variable">
+                    <thead className="text-variable-muted text-[10px] sm:text-xs uppercase tracking-[0.2em] font-bold border-b border-variable">
                         <tr>
                             {visibleColumns.map((col) => (
                                 <th
                                     key={col.key}
-                                    className={`pb-6 ${col.align === 'center' ? 'text-center' : col.align === 'right' ? 'text-right' : ''} ${col.sortable !== false ? 'cursor-pointer select-none group' : ''}`}
+                                    className={`pb-4 sm:pb-6 ${col.align === 'center' ? 'text-center' : col.align === 'right' ? 'text-right' : ''} ${col.sortable !== false ? 'cursor-pointer select-none group' : ''}`}
                                     onClick={() => col.sortable !== false && handleSort(col.key)}
                                 >
                                     <span className="inline-flex items-center gap-1.5">
@@ -318,12 +300,12 @@ export default function DataTable({
                                         {col.sortable !== false && (
                                             <span className="inline-flex flex-col -space-y-1 opacity-40 group-hover:opacity-100 transition-opacity">
                                                 <ChevronUp
-                                                    size={12}
+                                                    size={10}
                                                     className={sortKey === col.key && sortDir === 'asc' ? 'text-primary !opacity-100' : ''}
                                                     style={sortKey === col.key && sortDir === 'asc' ? { opacity: 1 } : {}}
                                                 />
                                                 <ChevronDown
-                                                    size={12}
+                                                    size={10}
                                                     className={sortKey === col.key && sortDir === 'desc' ? 'text-primary !opacity-100' : ''}
                                                     style={sortKey === col.key && sortDir === 'desc' ? { opacity: 1 } : {}}
                                                 />
@@ -342,7 +324,7 @@ export default function DataTable({
                                 <td colSpan={visibleColumns.length} className="py-20 text-center">
                                     <div className="flex flex-col items-center gap-4">
                                         <div className="size-10 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
-                                        <p className="text-variable-muted font-medium">Conectando con Supabase...</p>
+                                        <p className="text-variable-muted font-medium">Cargando...</p>
                                     </div>
                                 </td>
                             </tr>
@@ -366,9 +348,11 @@ export default function DataTable({
                                     {visibleColumns.map((col) => (
                                         <td
                                             key={col.key}
-                                            className={`py-6 ${col.align === 'center' ? 'text-center' : col.align === 'right' ? 'text-right' : ''}`}
+                                            className={`py-4 sm:py-6 ${col.align === 'center' ? 'text-center' : col.align === 'right' ? 'text-right' : ''}`}
                                         >
-                                            {col.render ? col.render(row) : row[col.key]}
+                                            <div className="min-h-[1.5rem] flex items-center">
+                                                {col.render ? col.render(row) : row[col.key]}
+                                            </div>
                                         </td>
                                     ))}
                                 </tr>
@@ -380,17 +364,17 @@ export default function DataTable({
 
             {/* ----- PAGINATION BAR ----- */}
             {data.length > 0 && (
-                <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6 pt-6 border-t border-variable">
-                    {/* Left: rows per page */}
+                <div className="flex flex-col items-center justify-between gap-6 mt-6 pt-6 border-t border-variable lg:flex-row">
+                    {/* Rows per page */}
                     <div className="flex items-center gap-3">
-                        <span className="text-xs text-variable-muted font-bold uppercase tracking-widest">Mostrar</span>
+                        <span className="text-[10px] text-variable-muted font-bold uppercase tracking-widest">Mostrar</span>
                         <div className="flex gap-1">
                             {pageSizeOptions.map((n) => (
                                 <button
                                     key={n}
                                     onClick={() => { setPageSize(n); setCurrentPage(1); }}
                                     className={`
-                                        px-3 py-1.5 rounded-xl text-xs font-bold transition-all border
+                                        px-3 py-1.5 rounded-xl text-[10px] font-bold transition-all border
                                         ${pageSize === n
                                             ? 'bg-primary/20 border-primary text-primary shadow-sm shadow-primary/10'
                                             : 'bg-white/5 border-variable text-variable-muted hover:border-primary/30 hover:text-primary'
@@ -405,45 +389,47 @@ export default function DataTable({
                     </div>
 
                     {/* Center: info */}
-                    <span className="text-xs text-variable-muted font-medium tracking-wide">
+                    <span className="text-[10px] sm:text-xs text-variable-muted font-medium tracking-wide order-last lg:order-none">
                         {(safePage - 1) * pageSize + 1}–{Math.min(safePage * pageSize, sortedData.length)} de <strong className="text-variable-main">{sortedData.length}</strong>
                     </span>
 
-                    {/* Right: page navigation */}
-                    <div className="flex items-center gap-1">
+                    {/* Page navigation */}
+                    <div className="flex items-center gap-1 overflow-x-auto pb-1 max-w-full">
                         <PageBtn onClick={() => goTo(1)} disabled={safePage === 1} title="Primera">
-                            <ChevronsLeft size={16} />
+                            <ChevronsLeft size={14} />
                         </PageBtn>
                         <PageBtn onClick={() => goTo(safePage - 1)} disabled={safePage === 1} title="Anterior">
-                            <ChevronLeft size={16} />
+                            <ChevronLeft size={14} />
                         </PageBtn>
 
-                        {getPageNumbers(safePage, totalPages).map((p, i) =>
-                            p === '...' ? (
-                                <span key={`dots-${i}`} className="px-1 text-variable-muted text-xs">…</span>
-                            ) : (
-                                <button
-                                    key={p}
-                                    onClick={() => goTo(p)}
-                                    className={`
-                                        size-8 rounded-xl text-xs font-bold transition-all border
-                                        ${p === safePage
-                                            ? 'bg-primary text-white border-primary shadow-md shadow-primary/20'
-                                            : 'bg-white/5 border-variable text-variable-muted hover:border-primary/30 hover:text-primary'
-                                        }
-                                    `}
-                                    style={p === safePage ? { borderColor: 'var(--primary)' } : {}}
-                                >
-                                    {p}
-                                </button>
-                            )
-                        )}
+                        <div className="flex items-center gap-1 mx-1">
+                            {getPageNumbers(safePage, totalPages).map((p, i) =>
+                                p === '...' ? (
+                                    <span key={`dots-${i}`} className="px-1 text-variable-muted text-xs">…</span>
+                                ) : (
+                                    <button
+                                        key={p}
+                                        onClick={() => goTo(p)}
+                                        className={`
+                                            size-8 min-w-[2rem] rounded-xl text-[10px] font-bold transition-all border
+                                            ${p === safePage
+                                                ? 'bg-primary text-white border-primary shadow-md shadow-primary/20'
+                                                : 'bg-white/5 border-variable text-variable-muted hover:border-primary/30 hover:text-primary'
+                                            }
+                                        `}
+                                        style={p === safePage ? { borderColor: 'var(--primary)' } : {}}
+                                    >
+                                        {p}
+                                    </button>
+                                )
+                            )}
+                        </div>
 
                         <PageBtn onClick={() => goTo(safePage + 1)} disabled={safePage === totalPages} title="Siguiente">
-                            <ChevronRight size={16} />
+                            <ChevronRight size={14} />
                         </PageBtn>
                         <PageBtn onClick={() => goTo(totalPages)} disabled={safePage === totalPages} title="Última">
-                            <ChevronsRight size={16} />
+                            <ChevronsRight size={14} />
                         </PageBtn>
                     </div>
                 </div>

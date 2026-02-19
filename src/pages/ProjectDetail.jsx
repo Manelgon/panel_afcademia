@@ -33,9 +33,9 @@ export default function ProjectDetail() {
             <Sidebar />
 
             {/* Main Content */}
-            <main className="flex-1 p-10 overflow-y-auto">
-                <div className="flex justify-between items-start">
-                    <Link to="/" className="inline-flex items-center gap-2 text-variable-muted hover:text-primary transition-colors mb-8 group">
+            <main className="flex-1 p-4 sm:p-10 overflow-y-auto pb-32 md:pb-10">
+                <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
+                    <Link to="/" className="inline-flex items-center gap-2 text-variable-muted hover:text-primary transition-colors mb-6 sm:mb-8 group">
                         <ArrowLeft size={20} className="group-hover:-translate-x-1 transition-transform" />
                         <span className="font-medium">Volver al Dashboard</span>
                     </Link>
@@ -51,24 +51,24 @@ export default function ProjectDetail() {
                     </button>
                 </div>
 
-                <section className="flex flex-col lg:flex-row lg:items-end justify-between gap-8 mb-12">
+                <section className="flex flex-col lg:flex-row lg:items-end justify-between gap-8 mb-8 sm:mb-12">
                     <div className="space-y-4">
-                        <div className="flex items-center gap-3">
+                        <div className="flex flex-wrap items-center gap-3">
                             <span className="text-[10px] font-black uppercase tracking-widest text-white bg-primary px-3 py-1 rounded-lg">
                                 En Progreso
                             </span>
-                            <span className="text-variable-muted text-xs font-bold tracking-widest uppercase">ID: PRJ-2024-082</span>
+                            <span className="text-variable-muted text-[10px] sm:text-xs font-bold tracking-widest uppercase">ID: PRJ-2024-082</span>
                         </div>
-                        <h1 className="text-5xl font-bold font-display tracking-tight text-variable-main">Automatización Flujo CRM</h1>
-                        <p className="text-variable-muted text-lg flex items-center gap-2">
+                        <h1 className="text-3xl sm:text-5xl font-bold font-display tracking-tight text-variable-main">Automatización Flujo CRM</h1>
+                        <p className="text-variable-muted text-base sm:text-lg flex items-center gap-2 flex-wrap">
                             Cliente: <span className="text-variable-main font-bold">Inmobiliaria Premium</span>
                         </p>
                     </div>
-                    <div className="flex gap-4">
-                        <button className="glass flex items-center gap-2 px-6 py-4 rounded-2xl font-bold text-sm text-variable-main hover:brightness-110 transition-all shadow-sm">
+                    <div className="flex flex-col xs:flex-row gap-4 w-full sm:w-auto">
+                        <button className="glass flex items-center justify-center gap-2 px-6 py-4 rounded-2xl font-bold text-sm text-variable-main hover:brightness-110 transition-all shadow-sm">
                             <Share2 size={18} /> Compartir
                         </button>
-                        <button className="bg-primary text-white flex items-center gap-2 px-8 py-4 rounded-2xl font-bold text-sm hover:brightness-110 transition-all shadow-xl shadow-primary/20">
+                        <button className="bg-primary text-white flex items-center justify-center gap-2 px-8 py-4 rounded-2xl font-bold text-sm hover:brightness-110 transition-all shadow-xl shadow-primary/20">
                             <Edit3 size={18} /> Editar Proyecto
                         </button>
                     </div>
