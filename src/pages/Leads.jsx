@@ -1,0 +1,343 @@
+import React, { useState, useEffect } from 'react';
+import {
+    Users as UsersIcon,
+    UserPlus,
+    Search,
+    Clock,
+    Sun,
+    Moon,
+    X,
+    ShieldCheck,
+    Mail,
+    Phone,
+    Briefcase,
+    MessageSquare,
+    Star,
+    Target
+} from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { useTheme } from '../context/ThemeContext';
+import { supabase } from '../lib/supabase';
+import Sidebar from '../components/Sidebar';
+import CustomSelect from '../components/CustomSelect';
+import DataTable from '../components/DataTable';
+import { useAuth } from '../context/AuthContext';
+
+export default function Leads() {
+    const { darkMode, toggleTheme } = useTheme();
+    const { profile: currentProfile } = useAuth();
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [loading, setLoading] = useState(false);
+    const [leadsList, setLeadsList] = useState([]);
+    const [fetchError, setFetchError] = useState(null);
+
+    const defaultForm = {
+        first_name: '',
+        last_name: '',
+        email: '',
+        phone: '',
+        client_type: 'particular',
+        service_interest: 'automatizacion',
+        message: '',
+        source: 'panel_admin',
+        score: 3,
+        privacy_accepted: true
+    };
+    const [formData, setFormData] = useState(defaultForm);
+
+    const clientTypes = [
+        { value: 'particular', label: 'Particular' },
+        { value: 'empresa', label: 'Empresa' },
+        { value: 'agencia', label: 'Agencia' },
+        { value: 'otro', label: 'Otro' }
+    ];
+
+    const serviceInterests = [
+        { value: 'automatizacion', label: 'Automatización' },
+        { value: 'crm', label: 'CRM' },
+        { value: 'web', label: 'Desarrollo Web' },
+        { value: 'ia', label: 'Inteligencia Artificial' },
+        { value: 'otro', label: 'Otro' }
+    ];
+
+    const fetchLeads = async () => {
+        setFetchError(null);
+        const { data, error } = await supabase
+            .from('leads')
+            .select('*')
+            .order('created_at', { ascending: false });
+
+        if (error) {
+            console.error('Error fetching leads:', error);
+            setFetchError(error);
+        } else if (data) {
+            setLeadsList(data);
+        }
+        setLoading(false);
+    };
+
+    const handleCreateLead = async (e) => {
+        e.preventDefault();
+        setLoading(true);
+        try {
+            const { error } = await supabase
+                .from('leads')
+                .insert([formData]);
+
+            if (error) throw error;
+
+            setFormData(defaultForm);
+            setIsModalOpen(false);
+            fetchLeads();
+        } catch (err) {
+            console.error('Error creating lead:', err);
+            alert(`Error al crear lead: ${err.message}`);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchLeads();
+
+        const channel = supabase
+            .channel('leads-db-changes')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'leads' }, () => {
+                fetchLeads();
+            })
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
+    }, []);
+
+    return (
+        <div className="flex min-h-screen transition-colors duration-300 overflow-hidden">
+            <Sidebar />
+
+            <main className="flex-1 p-10 overflow-y-auto">
+                <header className="flex justify-between items-center mb-12">
+                    <div>
+                        <h1 className="text-4xl font-bold font-display tracking-tight mb-2 text-variable-main">Gestión de Leads</h1>
+                        <p className="text-variable-muted">Administra los prospectos y oportunidades comerciales</p>
+                        {fetchError && (
+                            <div className="text-xs text-rose-500 mt-2 font-mono">
+                                Error DB: {fetchError.message}
+                            </div>
+                        )}
+                    </div>
+                    <div className="flex gap-4">
+                        <button
+                            onClick={fetchLeads}
+                            className="p-3 glass rounded-2xl text-variable-muted hover:text-primary transition-all flex items-center gap-2"
+                            title="Recargar Lista"
+                        >
+                            <Clock size={20} />
+                        </button>
+                        <button
+                            onClick={toggleTheme}
+                            className="p-3 glass rounded-2xl text-variable-muted hover:text-primary transition-all flex items-center gap-2"
+                        >
+                            {darkMode ? <Sun size={20} /> : <Moon size={20} />}
+                        </button>
+                        <button
+                            onClick={() => setIsModalOpen(true)}
+                            className="bg-primary text-white px-6 py-3 rounded-2xl font-bold flex items-center gap-2 hover:brightness-110 transition-all shadow-lg shadow-primary/20"
+                        >
+                            <UserPlus size={20} /> Nuevo Lead
+                        </button>
+                    </div>
+                </header>
+
+                <DataTable
+                    tableId="leads"
+                    loading={loading}
+                    data={leadsList}
+                    rowKey="id"
+                    defaultSort={{ key: 'created_at', dir: 'desc' }}
+                    emptyIcon={<UsersIcon size={40} className="opacity-20" />}
+                    emptyTitle="No se encontraron leads en la base de datos"
+                    emptySub="Los leads aparecerán aquí cuando se registren o importen"
+                    columns={[
+                        {
+                            key: 'first_name',
+                            label: 'Lead',
+                            hideable: false,
+                            render: (lead) => (
+                                <div className="flex items-center gap-4">
+                                    <div className="size-10 rounded-2xl bg-primary/10 text-primary flex items-center justify-center font-bold">
+                                        {lead.first_name[0]}{lead.last_name[0]}
+                                    </div>
+                                    <div>
+                                        <p className="font-bold text-variable-main">{lead.first_name} {lead.last_name}</p>
+                                        <p className="text-[10px] text-variable-muted uppercase font-black tracking-widest">{lead.email}</p>
+                                    </div>
+                                </div>
+                            ),
+                        },
+                        {
+                            key: 'phone',
+                            label: 'Teléfono',
+                            render: (lead) => <span className="text-variable-muted text-sm">{lead.phone || '—'}</span>,
+                        },
+                        {
+                            key: 'client_type',
+                            label: 'Tipo',
+                            render: (lead) => (
+                                <span className="px-3 py-1 rounded-lg bg-white/5 border border-variable text-[10px] uppercase font-black text-variable-muted">
+                                    {lead.client_type}
+                                </span>
+                            ),
+                        },
+                        {
+                            key: 'service_interest',
+                            label: 'Interés',
+                            render: (lead) => (
+                                <span className="px-3 py-1 rounded-lg bg-primary/10 border border-primary/20 text-[10px] uppercase font-black text-primary">
+                                    {lead.service_interest}
+                                </span>
+                            ),
+                        },
+                        {
+                            key: 'score',
+                            label: 'Calidad',
+                            align: 'center',
+                            render: (lead) => (
+                                <div className="flex gap-1 justify-center">
+                                    {[...Array(5)].map((_, i) => (
+                                        <Star key={i} size={12} className={i < (lead.score || 0) ? 'fill-primary text-primary' : 'text-white/10'} />
+                                    ))}
+                                </div>
+                            ),
+                        },
+                        {
+                            key: 'source',
+                            label: 'Origen',
+                            render: (lead) => <span className="text-variable-muted text-[10px] uppercase font-bold">{lead.source}</span>,
+                        },
+                        {
+                            key: 'created_at',
+                            label: 'Fecha',
+                            render: (lead) => (
+                                <span className="text-variable-muted text-sm">
+                                    {new Date(lead.created_at).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })}
+                                </span>
+                            ),
+                        },
+                    ]}
+                />
+            </main>
+
+            <AnimatePresence>
+                {isModalOpen && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            onClick={() => setIsModalOpen(false)}
+                            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+                        />
+                        <motion.div
+                            initial={{ scale: 0.9, opacity: 0, y: 20 }}
+                            animate={{ scale: 1, opacity: 1, y: 0 }}
+                            exit={{ scale: 0.9, opacity: 0, y: 20 }}
+                            className="relative w-full max-w-2xl glass rounded-[2.5rem] p-10 overflow-y-auto max-h-[90vh] shadow-2xl"
+                        >
+                            <button onClick={() => setIsModalOpen(false)} className="absolute top-8 right-8 text-variable-muted hover:text-primary transition-colors z-10">
+                                <X size={24} />
+                            </button>
+
+                            <h2 className="text-3xl font-bold font-display mb-2 text-variable-main">Nuevo Lead</h2>
+                            <p className="text-variable-muted mb-8 italic">Introduce los detalles del nuevo prospecto comercial</p>
+
+                            <form onSubmit={handleCreateLead} className="space-y-5">
+                                <p className="text-xs font-black text-primary uppercase tracking-[0.2em] border-b border-variable pb-2">Información de Contacto</p>
+
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-2">
+                                        <label className="text-xs font-bold text-variable-muted uppercase tracking-widest ml-1">Nombre</label>
+                                        <input required value={formData.first_name} onChange={(e) => setFormData({ ...formData, first_name: e.target.value })} className="w-full bg-white/5 border border-variable rounded-2xl px-4 py-3 focus:outline-none focus:border-primary/50 text-variable-main transition-all" placeholder="Nombre" />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-xs font-bold text-variable-muted uppercase tracking-widest ml-1">Apellidos</label>
+                                        <input required value={formData.last_name} onChange={(e) => setFormData({ ...formData, last_name: e.target.value })} className="w-full bg-white/5 border border-variable rounded-2xl px-4 py-3 focus:outline-none focus:border-primary/50 text-variable-main transition-all" placeholder="Apellidos" />
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-2">
+                                        <label className="text-xs font-bold text-variable-muted uppercase tracking-widest ml-1">Email</label>
+                                        <div className="relative">
+                                            <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-variable-muted" size={18} />
+                                            <input required type="email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} className="w-full bg-white/5 border border-variable rounded-2xl pl-12 pr-4 py-3 focus:outline-none focus:border-primary/50 text-variable-main transition-all" placeholder="email@ejemplo.com" />
+                                        </div>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-xs font-bold text-variable-muted uppercase tracking-widest ml-1">Teléfono</label>
+                                        <div className="relative">
+                                            <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-variable-muted" size={18} />
+                                            <input type="tel" value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} className="w-full bg-white/5 border border-variable rounded-2xl pl-12 pr-4 py-3 focus:outline-none focus:border-primary/50 text-variable-main transition-all" placeholder="600 000 000" />
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <p className="text-xs font-black text-primary uppercase tracking-[0.2em] border-b border-variable pb-2 pt-2">Perfil y Calificación</p>
+
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-2">
+                                        <label className="text-xs font-bold text-variable-muted uppercase tracking-widest ml-1">Tipo de Cliente</label>
+                                        <CustomSelect
+                                            value={formData.client_type}
+                                            onChange={(val) => setFormData({ ...formData, client_type: val })}
+                                            icon={Target}
+                                            options={clientTypes}
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-xs font-bold text-variable-muted uppercase tracking-widest ml-1">Interés</label>
+                                        <CustomSelect
+                                            value={formData.service_interest}
+                                            onChange={(val) => setFormData({ ...formData, service_interest: val })}
+                                            icon={Briefcase}
+                                            options={serviceInterests}
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="space-y-2">
+                                    <label className="text-xs font-bold text-variable-muted uppercase tracking-widest ml-1">Calificación (Score)</label>
+                                    <div className="flex gap-4 items-center bg-white/5 p-4 rounded-2xl border border-variable">
+                                        {[1, 2, 3, 4, 5].map((s) => (
+                                            <button key={s} type="button" onClick={() => setFormData({ ...formData, score: s })} className="transition-transform active:scale-90">
+                                                <Star size={24} className={s <= formData.score ? 'fill-primary text-primary' : 'text-variable-muted'} />
+                                            </button>
+                                        ))}
+                                        <span className="ml-auto text-xs font-black text-primary uppercase">{formData.score}/5 Puntos</span>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-2">
+                                    <label className="text-xs font-bold text-variable-muted uppercase tracking-widest ml-1">Mensaje o Notas</label>
+                                    <div className="relative">
+                                        <MessageSquare className="absolute left-4 top-4 text-variable-muted" size={18} />
+                                        <textarea value={formData.message} onChange={(e) => setFormData({ ...formData, message: e.target.value })} className="w-full bg-white/5 border border-variable rounded-2xl pl-12 pr-4 py-3 focus:outline-none focus:border-primary/50 text-variable-main transition-all h-24 resize-none" placeholder="Observaciones adicionales..." />
+                                    </div>
+                                </div>
+
+                                <button
+                                    disabled={loading}
+                                    type="submit"
+                                    className="w-full py-4 bg-primary text-white rounded-2xl font-bold hover:brightness-110 active:scale-[0.98] transition-all shadow-xl shadow-primary/30 mt-4 flex items-center justify-center gap-2"
+                                >
+                                    {loading ? 'Procesando...' : <><ShieldCheck size={20} /> Crear Lead</>}
+                                </button>
+                            </form>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
+        </div>
+    );
+}

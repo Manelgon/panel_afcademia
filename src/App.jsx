@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import Dashboard from './pages/Dashboard';
 import ProjectDetail from './pages/ProjectDetail';
 import Users from './pages/Users';
+import Leads from './pages/Leads';
 import Login from './pages/Login';
 import { ThemeProvider } from './context/ThemeContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
@@ -55,6 +56,12 @@ function App() {
                         <Route path="/users" element={
                             <ProtectedRoute>
                                 <Users />
+                            </ProtectedRoute>
+                        } />
+
+                        <Route path="/leads" element={
+                            <ProtectedRoute>
+                                <Leads />
                             </ProtectedRoute>
                         } />
 

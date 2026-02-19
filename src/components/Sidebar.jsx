@@ -6,7 +6,8 @@ import {
     FolderOpen,
     FileText,
     Settings,
-    LogOut
+    LogOut,
+    Target
 } from 'lucide-react';
 import logo from '../assets/logo.png';
 import { useAuth } from '../context/AuthContext';
@@ -60,6 +61,7 @@ export default function Sidebar() {
             <div className="flex flex-col gap-6 flex-1 w-full px-4 items-center">
                 <SidebarItem icon={LayoutDashboard} to="/" label="Dashboard" />
                 <SidebarItem icon={Users} to="/users" label="Usuarios" />
+                <SidebarItem icon={Target} to="/leads" label="Leads" />
                 <SidebarItem icon={FolderOpen} to="/projects" label="Proyectos" />
                 <SidebarItem icon={FileText} label="Documentos" />
             </div>
