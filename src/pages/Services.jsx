@@ -40,6 +40,7 @@ export default function Services() {
         is_active: true
     };
     const [formData, setFormData] = useState(defaultForm);
+    const [editingServiceId, setEditingServiceId] = useState(null);
 
     const fetchServices = async () => {
         setLoading(true);
@@ -65,7 +66,7 @@ export default function Services() {
         }
     };
 
-    const handleCreateService = async (e) => {
+    const handleSaveService = async (e) => {
         e.preventDefault();
         setLoading(true);
         try {
@@ -73,23 +74,69 @@ export default function Services() {
                 ...formData,
                 price: formData.price ? parseFloat(formData.price) : null
             };
-            const { error } = await supabase
-                .from('services')
-                .insert([serviceData]);
 
-            if (error) throw error;
+            if (editingServiceId) {
+                const { error } = await supabase
+                    .from('services')
+                    .update(serviceData)
+                    .eq('id', editingServiceId);
+                if (error) throw error;
+            } else {
+                const { error } = await supabase
+                    .from('services')
+                    .insert([serviceData]);
+                if (error) throw error;
+            }
 
             setFormData(defaultForm);
+            setEditingServiceId(null);
             setIsModalOpen(false);
             fetchServices();
         } catch (err) {
-            console.error('Error creating service:', err);
+            console.error('Error saving service:', err);
             const msg = err.message || (typeof err === 'string' ? err : 'Error desconocido');
             const details = err.details ? ` (${err.details})` : '';
-            alert(`Error al crear servicio: ${msg}${details}`);
+            alert(`Error al guardar servicio: ${msg}${details}`);
         } finally {
             setLoading(false);
         }
+    };
+
+    const handleEditClick = (service) => {
+        setFormData({
+            name: service.name || '',
+            description: service.description || '',
+            price: service.price || '',
+            is_active: service.is_active
+        });
+        setEditingServiceId(service.id);
+        setIsModalOpen(true);
+    };
+
+    const handleDeleteService = async (id) => {
+        if (!window.confirm('¿Estás seguro de que deseas eliminar este servicio definitivamente?')) return;
+
+        setLoading(true);
+        try {
+            const { error } = await supabase
+                .from('services')
+                .delete()
+                .eq('id', id);
+
+            if (error) throw error;
+            fetchServices();
+        } catch (err) {
+            console.error('Error deleting service:', err);
+            alert(`Error al eliminar: ${err.message}`);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleCloseModal = () => {
+        setIsModalOpen(false);
+        setEditingServiceId(null);
+        setFormData(defaultForm);
     };
 
     const toggleServiceStatus = async (id, currentStatus) => {
@@ -209,6 +256,29 @@ export default function Services() {
                                     {new Date(service.created_at).toLocaleDateString()}
                                 </span>
                             ),
+                        },
+                        {
+                            key: 'actions',
+                            label: 'Acciones',
+                            align: 'right',
+                            render: (service) => (
+                                <div className="flex gap-2 justify-end">
+                                    <button
+                                        onClick={() => handleEditClick(service)}
+                                        className="p-2 glass rounded-xl text-variable-muted hover:text-primary transition-all"
+                                        title="Editar Servicio"
+                                    >
+                                        <Edit size={16} />
+                                    </button>
+                                    <button
+                                        onClick={() => handleDeleteService(service.id)}
+                                        className="p-2 glass rounded-xl text-variable-muted hover:text-rose-500 transition-all"
+                                        title="Eliminar Servicio"
+                                    >
+                                        <Trash2 size={16} />
+                                    </button>
+                                </div>
+                            ),
                         }
                     ]}
                 />
@@ -221,7 +291,7 @@ export default function Services() {
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
                             exit={{ opacity: 0 }}
-                            onClick={() => setIsModalOpen(false)}
+                            onClick={handleCloseModal}
                             className="absolute inset-0 bg-black/60 backdrop-blur-sm"
                         />
                         <motion.div
@@ -230,14 +300,18 @@ export default function Services() {
                             exit={{ scale: 0.9, opacity: 0, y: 20 }}
                             className="relative w-full max-w-xl glass rounded-[2rem] sm:rounded-[2.5rem] p-6 sm:p-10 overflow-y-auto max-h-[90vh] shadow-2xl"
                         >
-                            <button onClick={() => setIsModalOpen(false)} className="absolute top-6 right-6 sm:top-8 sm:right-8 text-variable-muted hover:text-primary transition-colors z-10">
+                            <button onClick={handleCloseModal} className="absolute top-6 right-6 sm:top-8 sm:right-8 text-variable-muted hover:text-primary transition-colors z-10">
                                 <X size={24} />
                             </button>
 
-                            <h2 className="text-2xl sm:text-3xl font-bold font-display mb-2 text-variable-main">Nuevo Servicio</h2>
-                            <p className="text-variable-muted mb-8 italic text-sm sm:text-base">Define un nuevo servicio para tu catálogo comercial</p>
+                            <h2 className="text-2xl sm:text-3xl font-bold font-display mb-2 text-variable-main">
+                                {editingServiceId ? 'Editar Servicio' : 'Nuevo Servicio'}
+                            </h2>
+                            <p className="text-variable-muted mb-8 italic text-sm sm:text-base">
+                                {editingServiceId ? 'Actualiza los detalles del servicio seleccionado' : 'Define un nuevo servicio para tu catálogo comercial'}
+                            </p>
 
-                            <form onSubmit={handleCreateService} className="space-y-6">
+                            <form onSubmit={handleSaveService} className="space-y-6">
                                 <div className="space-y-2">
                                     <label className="text-xs font-black text-primary uppercase tracking-[0.2em] ml-1">Nombre del Servicio</label>
                                     <div className="relative">
