@@ -127,15 +127,7 @@ export default function Leads() {
     const handleConvertToProject = async (lead) => {
         try {
             setLoading(true);
-            // 1. Update status to 'ganado' immediately
-            const { error } = await supabase
-                .from('leads')
-                .update({ status: 'ganado' })
-                .eq('id', lead.id);
-
-            if (error) throw error;
-
-            // 2. Redirect to projects
+            // Redirect to projects immediately. Status update will happen upon successful project creation.
             navigate(`/projects?convert=${lead.id}`);
         } catch (err) {
             alert(`Error al convertir: ${err.message}`);
@@ -234,8 +226,8 @@ export default function Leads() {
                             key={tab.id}
                             onClick={() => setActiveTab(tab.id)}
                             className={`px-6 py-2.5 rounded-2xl text-[10px] sm:text-xs font-black uppercase tracking-widest transition-all flex items-center gap-3 ${activeTab === tab.id
-                                    ? 'bg-primary text-white shadow-lg shadow-primary/20 scale-[1.02]'
-                                    : 'text-variable-muted hover:text-variable-main hover:bg-white/5'
+                                ? 'bg-primary text-white shadow-lg shadow-primary/20 scale-[1.02]'
+                                : 'text-variable-muted hover:text-variable-main hover:bg-white/5'
                                 }`}
                         >
                             {tab.label}

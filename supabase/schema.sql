@@ -418,6 +418,12 @@ CREATE POLICY "projects_all_admin"
         )
     );
 
+-- INSERT Projects: Usuarios autenticados pueden crear proyectos
+CREATE POLICY "projects_insert_authenticated"
+    ON public.projects FOR INSERT
+    TO authenticated
+    WITH CHECK (true);
+
 -- Políticas para hitos, tareas y archivos
 CREATE POLICY "milestones_select_member" ON public.project_milestones FOR SELECT TO authenticated
 USING (EXISTS (SELECT 1 FROM public.projects p WHERE p.id = project_id));
@@ -436,6 +442,38 @@ USING (EXISTS (SELECT 1 FROM public.projects p WHERE p.id = project_id));
 
 CREATE POLICY "files_all_admin" ON public.project_files FOR ALL TO authenticated
 USING (EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND role = 'admin'));
+
+-- Políticas para project_members
+-- SELECT: Ver miembros si eres miembro o admin
+CREATE POLICY "members_select" 
+    ON public.project_members FOR SELECT 
+    TO authenticated 
+    USING (
+        EXISTS (
+            SELECT 1 FROM public.projects p 
+            WHERE p.id = project_members.project_id
+        ) OR EXISTS (
+            SELECT 1 FROM public.users u 
+            WHERE u.id = auth.uid() AND u.role = 'admin'
+        )
+    );
+
+-- INSERT: Permitir auto-asignación al crear proyecto
+CREATE POLICY "members_insert_self" 
+    ON public.project_members FOR INSERT 
+    TO authenticated 
+    WITH CHECK (auth.uid() = user_id);
+
+-- ALL: Admin gestiona todo
+CREATE POLICY "members_all_admin" 
+    ON public.project_members FOR ALL 
+    TO authenticated 
+    USING (
+        EXISTS (
+            SELECT 1 FROM public.users 
+            WHERE id = auth.uid() AND role = 'admin'
+        )
+    );
 
 
 -- =============================================
