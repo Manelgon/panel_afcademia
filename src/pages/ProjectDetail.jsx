@@ -21,7 +21,12 @@ import {
     ShieldCheck,
     Briefcase,
     Target,
-    Trash2
+    Trash2,
+    Receipt,
+    ChevronDown,
+    ChevronUp,
+    DollarSign,
+    Percent
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Link, useParams, useNavigate } from 'react-router-dom';
@@ -53,6 +58,13 @@ export default function ProjectDetail() {
     const [newTask, setNewTask] = useState({ title: '', priority: 'Media', assigned_to: '' });
     const [users, setUsers] = useState([]);
     const [formLoading, setFormLoading] = useState(false);
+
+    // Budget / Services state
+    const [projectServices, setProjectServices] = useState([]);
+    const [budgetLines, setBudgetLines] = useState([]);
+    const [budgetExpanded, setBudgetExpanded] = useState(true);
+    const [budgetLineModal, setBudgetLineModal] = useState(false);
+    const [newBudgetLine, setNewBudgetLine] = useState({ description: '', unit_price: '', quantity: 1, iva_percent: 21 });
 
     const fetchProjectData = async () => {
         try {
@@ -103,14 +115,32 @@ export default function ProjectDetail() {
     };
 
     const fetchUsers = async () => {
-        const { data } = await supabase.from('users').select('id, first_name, last_name').order('first_name');
+        const { data } = await supabase.from('users').select('id, first_name, second_name').order('first_name');
         setUsers(data || []);
+    };
+
+    const fetchBudgetData = async () => {
+        // Fetch services linked to this project
+        const { data: svcData } = await supabase
+            .from('project_services')
+            .select('*, services:service_id(name, description, price)')
+            .eq('project_id', id);
+        setProjectServices(svcData || []);
+
+        // Fetch manual budget lines
+        const { data: lineData } = await supabase
+            .from('project_budget_lines')
+            .select('*')
+            .eq('project_id', id)
+            .order('created_at', { ascending: true });
+        setBudgetLines(lineData || []);
     };
 
     useEffect(() => {
         if (id) {
             fetchProjectData();
             fetchUsers();
+            fetchBudgetData();
 
             // Subscriptions
             const channel = supabase.channel(`project-${id}`)
@@ -118,6 +148,8 @@ export default function ProjectDetail() {
                 .on('postgres_changes', { event: '*', schema: 'public', table: 'project_milestones', filter: `project_id=eq.${id}` }, fetchProjectData)
                 .on('postgres_changes', { event: '*', schema: 'public', table: 'project_tasks', filter: `project_id=eq.${id}` }, fetchProjectData)
                 .on('postgres_changes', { event: '*', schema: 'public', table: 'project_files', filter: `project_id=eq.${id}` }, fetchProjectData)
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'project_services', filter: `project_id=eq.${id}` }, fetchBudgetData)
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'project_budget_lines', filter: `project_id=eq.${id}` }, fetchBudgetData)
                 .subscribe();
 
             return () => { supabase.removeChannel(channel); };
@@ -161,6 +193,58 @@ export default function ProjectDetail() {
             setFormLoading(false);
         }
     };
+
+    const handleAddBudgetLine = async (e) => {
+        e.preventDefault();
+        setFormLoading(true);
+        try {
+            const { error } = await supabase
+                .from('project_budget_lines')
+                .insert([{
+                    project_id: id,
+                    description: newBudgetLine.description,
+                    unit_price: parseFloat(newBudgetLine.unit_price) || 0,
+                    quantity: parseInt(newBudgetLine.quantity) || 1,
+                    iva_percent: parseFloat(newBudgetLine.iva_percent) || 21
+                }]);
+            if (error) throw error;
+            setBudgetLineModal(false);
+            setNewBudgetLine({ description: '', unit_price: '', quantity: 1, iva_percent: 21 });
+            showNotification('Línea de presupuesto añadida');
+            fetchBudgetData();
+        } catch (error) {
+            showNotification(`Error: ${error.message}`, 'error');
+        } finally {
+            setFormLoading(false);
+        }
+    };
+
+    const handleDeleteBudgetLine = async (lineId) => {
+        const { error } = await supabase.from('project_budget_lines').delete().eq('id', lineId);
+        if (error) showNotification(`Error: ${error.message}`, 'error');
+        else fetchBudgetData();
+    };
+
+    const handleRemoveProjectService = async (psId) => {
+        const { error } = await supabase.from('project_services').delete().eq('id', psId);
+        if (error) showNotification(`Error: ${error.message}`, 'error');
+        else fetchBudgetData();
+    };
+
+    // Cálculos de presupuesto
+    const serviceLines = projectServices.map(ps => {
+        const price = parseFloat(ps.services?.price) || 0;
+        return { description: ps.services?.name || 'Servicio', base: price, iva: price * 0.21, total: price * 1.21, isService: true, id: ps.id };
+    });
+    const manualLines = budgetLines.map(bl => {
+        const base = (parseFloat(bl.unit_price) || 0) * (parseInt(bl.quantity) || 1);
+        const iva = base * ((parseFloat(bl.iva_percent) || 0) / 100);
+        return { description: bl.description, base, iva, total: base + iva, isService: false, id: bl.id, quantity: bl.quantity, unit_price: bl.unit_price, iva_percent: bl.iva_percent };
+    });
+    const allBudgetLines = [...serviceLines, ...manualLines];
+    const budgetSubtotal = allBudgetLines.reduce((sum, l) => sum + l.base, 0);
+    const budgetIVA = allBudgetLines.reduce((sum, l) => sum + l.iva, 0);
+    const budgetTotal = allBudgetLines.reduce((sum, l) => sum + l.total, 0);
 
     if (loading && !project) {
         return (
@@ -400,6 +484,126 @@ export default function ProjectDetail() {
                         </div>
                     </div>
                 </div>
+
+                {/* ═══════════════════════════════════════════════ */}
+                {/* SECCIÓN PRESUPUESTO / SERVICIOS                */}
+                {/* ═══════════════════════════════════════════════ */}
+                <section className="mt-10">
+                    <div className="glass rounded-[2.5rem] p-8 sm:p-10">
+                        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-8">
+                            <button onClick={() => setBudgetExpanded(!budgetExpanded)} className="flex items-center gap-3 group">
+                                <div className="p-3 bg-primary/10 rounded-2xl text-primary">
+                                    <Receipt size={22} />
+                                </div>
+                                <div>
+                                    <h3 className="text-xl font-bold text-variable-main flex items-center gap-2">
+                                        Presupuesto / Servicios
+                                        {budgetExpanded ? <ChevronUp size={18} className="text-variable-muted" /> : <ChevronDown size={18} className="text-variable-muted" />}
+                                    </h3>
+                                    <p className="text-xs text-variable-muted italic">Líneas de servicio contratadas y extras manuales</p>
+                                </div>
+                            </button>
+                            <div className="flex items-center gap-3">
+                                <button onClick={() => setBudgetLineModal(true)} className="flex items-center gap-2 px-4 py-2.5 bg-primary/10 text-primary rounded-xl text-xs font-bold hover:bg-primary/20 transition-all">
+                                    <Plus size={14} /> Añadir Línea Manual
+                                </button>
+                                <button onClick={() => showNotification('Funcionalidad de factura próximamente', 'info')} className="flex items-center gap-2 px-4 py-2.5 bg-primary text-white rounded-xl text-xs font-bold hover:brightness-110 transition-all shadow-lg shadow-primary/20">
+                                    <Receipt size={14} /> Generar Factura
+                                </button>
+                            </div>
+                        </div>
+
+                        {budgetExpanded && (
+                            <div className="space-y-4">
+                                {/* Header de la tabla */}
+                                <div className="hidden sm:grid grid-cols-12 gap-4 px-5 py-3 text-[10px] font-black uppercase tracking-widest text-variable-muted">
+                                    <div className="col-span-5">Concepto</div>
+                                    <div className="col-span-1 text-right">Cant.</div>
+                                    <div className="col-span-2 text-right">Precio Unit.</div>
+                                    <div className="col-span-1 text-right">IVA %</div>
+                                    <div className="col-span-2 text-right">Total</div>
+                                    <div className="col-span-1"></div>
+                                </div>
+
+                                {allBudgetLines.length === 0 && (
+                                    <div className="py-12 text-center border-2 border-dashed border-variable rounded-3xl">
+                                        <Receipt size={32} className="mx-auto text-variable-muted mb-3 opacity-50" />
+                                        <p className="text-sm text-variable-muted">No hay líneas de presupuesto.</p>
+                                        <p className="text-xs text-variable-muted italic mt-1">Añade servicios al crear el proyecto o agrega líneas manuales.</p>
+                                    </div>
+                                )}
+
+                                {/* Servicios contratados */}
+                                {serviceLines.map((line) => (
+                                    <div key={`svc-${line.id}`} className="grid grid-cols-1 sm:grid-cols-12 gap-2 sm:gap-4 items-center px-5 py-4 rounded-2xl bg-white/5 border border-variable hover:bg-white/[0.08] transition-colors">
+                                        <div className="sm:col-span-5 flex items-center gap-3">
+                                            <div className="size-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+                                                <Briefcase size={14} className="text-primary" />
+                                            </div>
+                                            <div>
+                                                <p className="text-sm font-bold text-variable-main">{line.description}</p>
+                                                <p className="text-[9px] text-primary font-bold uppercase tracking-widest">Servicio contratado</p>
+                                            </div>
+                                        </div>
+                                        <div className="sm:col-span-1 text-right text-xs text-variable-muted font-bold">1</div>
+                                        <div className="sm:col-span-2 text-right text-xs text-variable-main font-bold">€{line.base.toFixed(2)}</div>
+                                        <div className="sm:col-span-1 text-right text-xs text-variable-muted font-bold">21%</div>
+                                        <div className="sm:col-span-2 text-right text-sm font-black text-variable-main">€{line.total.toFixed(2)}</div>
+                                        <div className="sm:col-span-1 flex justify-end">
+                                            <button onClick={() => handleRemoveProjectService(line.id)} className="p-1.5 text-variable-muted hover:text-rose-500 transition-colors rounded-lg hover:bg-rose-500/10" title="Quitar servicio">
+                                                <Trash2 size={14} />
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))}
+
+                                {/* Líneas manuales */}
+                                {manualLines.map((line) => (
+                                    <div key={`man-${line.id}`} className="grid grid-cols-1 sm:grid-cols-12 gap-2 sm:gap-4 items-center px-5 py-4 rounded-2xl bg-white/5 border border-variable hover:bg-white/[0.08] transition-colors">
+                                        <div className="sm:col-span-5 flex items-center gap-3">
+                                            <div className="size-8 rounded-lg bg-emerald-500/10 flex items-center justify-center flex-shrink-0">
+                                                <DollarSign size={14} className="text-emerald-500" />
+                                            </div>
+                                            <div>
+                                                <p className="text-sm font-bold text-variable-main">{line.description}</p>
+                                                <p className="text-[9px] text-emerald-500 font-bold uppercase tracking-widest">Línea manual</p>
+                                            </div>
+                                        </div>
+                                        <div className="sm:col-span-1 text-right text-xs text-variable-muted font-bold">{line.quantity}</div>
+                                        <div className="sm:col-span-2 text-right text-xs text-variable-main font-bold">€{parseFloat(line.unit_price).toFixed(2)}</div>
+                                        <div className="sm:col-span-1 text-right text-xs text-variable-muted font-bold">{line.iva_percent}%</div>
+                                        <div className="sm:col-span-2 text-right text-sm font-black text-variable-main">€{line.total.toFixed(2)}</div>
+                                        <div className="sm:col-span-1 flex justify-end">
+                                            <button onClick={() => handleDeleteBudgetLine(line.id)} className="p-1.5 text-variable-muted hover:text-rose-500 transition-colors rounded-lg hover:bg-rose-500/10" title="Eliminar línea">
+                                                <Trash2 size={14} />
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))}
+
+                                {/* Totales */}
+                                {allBudgetLines.length > 0 && (
+                                    <div className="mt-6 pt-6 border-t border-variable">
+                                        <div className="flex flex-col items-end gap-2">
+                                            <div className="flex justify-between w-full sm:w-72 text-sm">
+                                                <span className="text-variable-muted font-bold">Subtotal (Base)</span>
+                                                <span className="text-variable-main font-bold">€{budgetSubtotal.toFixed(2)}</span>
+                                            </div>
+                                            <div className="flex justify-between w-full sm:w-72 text-sm">
+                                                <span className="text-variable-muted font-bold">IVA Total</span>
+                                                <span className="text-variable-main font-bold">€{budgetIVA.toFixed(2)}</span>
+                                            </div>
+                                            <div className="flex justify-between w-full sm:w-72 text-lg pt-2 border-t border-variable">
+                                                <span className="text-primary font-black uppercase tracking-widest text-sm">Total</span>
+                                                <span className="text-primary font-black">€{budgetTotal.toFixed(2)}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                </section>
             </main>
 
             {/* MODALS */}
@@ -452,13 +656,64 @@ export default function ProjectDetail() {
                                         <select value={newTask.assigned_to} onChange={e => setNewTask({ ...newTask, assigned_to: e.target.value })} className="w-full bg-[#1a1321] border border-variable rounded-2xl px-4 py-4 text-variable-main focus:outline-none text-sm">
                                             <option value="">Sin asignar</option>
                                             {users.map(u => (
-                                                <option key={u.id} value={u.id}>{u.first_name} {u.last_name}</option>
+                                                <option key={u.id} value={u.id}>{u.first_name} {u.second_name}</option>
                                             ))}
                                         </select>
                                     </div>
                                 </div>
                                 <button disabled={formLoading} type="submit" className="w-full py-4 bg-primary text-white rounded-2xl font-bold shadow-xl shadow-primary/30 hover:brightness-110 transition-all">
                                     {formLoading ? 'Crear Tarea' : 'Crear Tarea'}
+                                </button>
+                            </form>
+                        </motion.div>
+                    </div>
+                )}
+
+                {/* MODAL: NUEVA LÍNEA DE PRESUPUESTO */}
+                {budgetLineModal && (
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+                        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setBudgetLineModal(false)} className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+                        <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="relative w-full max-w-md glass rounded-[2.5rem] p-10 shadow-2xl overflow-visible">
+                            <h2 className="text-2xl font-bold mb-2 text-variable-main text-center">Nueva Línea de Presupuesto</h2>
+                            <p className="text-xs text-variable-muted text-center mb-8 italic">Añade un concepto manual con precio e IVA individual</p>
+                            <form onSubmit={handleAddBudgetLine} className="space-y-6">
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black text-primary uppercase tracking-widest ml-1">Concepto / Descripción</label>
+                                    <input required value={newBudgetLine.description} onChange={e => setNewBudgetLine({ ...newBudgetLine, description: e.target.value })} className="w-full bg-white/5 border border-variable rounded-2xl px-5 py-4 text-variable-main focus:outline-none focus:border-primary/50" placeholder="Ej: Diseño landing page extra" />
+                                </div>
+                                <div className="grid grid-cols-3 gap-4">
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] font-black text-primary uppercase tracking-widest ml-1">Precio Unit. (€)</label>
+                                        <input required type="number" step="0.01" min="0" value={newBudgetLine.unit_price} onChange={e => setNewBudgetLine({ ...newBudgetLine, unit_price: e.target.value })} className="w-full bg-white/5 border border-variable rounded-2xl px-4 py-4 text-variable-main focus:outline-none focus:border-primary/50 text-sm" placeholder="0.00" />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] font-black text-primary uppercase tracking-widest ml-1">Cantidad</label>
+                                        <input required type="number" min="1" value={newBudgetLine.quantity} onChange={e => setNewBudgetLine({ ...newBudgetLine, quantity: e.target.value })} className="w-full bg-white/5 border border-variable rounded-2xl px-4 py-4 text-variable-main focus:outline-none focus:border-primary/50 text-sm" />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] font-black text-primary uppercase tracking-widest ml-1">IVA %</label>
+                                        <input required type="number" step="0.5" min="0" max="100" value={newBudgetLine.iva_percent} onChange={e => setNewBudgetLine({ ...newBudgetLine, iva_percent: e.target.value })} className="w-full bg-white/5 border border-variable rounded-2xl px-4 py-4 text-variable-main focus:outline-none focus:border-primary/50 text-sm" />
+                                    </div>
+                                </div>
+                                {/* Preview */}
+                                {newBudgetLine.unit_price && (
+                                    <div className="p-4 rounded-2xl bg-primary/5 border border-primary/20 text-sm">
+                                        <div className="flex justify-between text-variable-muted">
+                                            <span>Base:</span>
+                                            <span className="font-bold text-variable-main">€{((parseFloat(newBudgetLine.unit_price) || 0) * (parseInt(newBudgetLine.quantity) || 1)).toFixed(2)}</span>
+                                        </div>
+                                        <div className="flex justify-between text-variable-muted mt-1">
+                                            <span>IVA ({newBudgetLine.iva_percent}%):</span>
+                                            <span className="font-bold text-variable-main">€{(((parseFloat(newBudgetLine.unit_price) || 0) * (parseInt(newBudgetLine.quantity) || 1)) * ((parseFloat(newBudgetLine.iva_percent) || 0) / 100)).toFixed(2)}</span>
+                                        </div>
+                                        <div className="flex justify-between text-primary font-black mt-2 pt-2 border-t border-primary/20">
+                                            <span>Total:</span>
+                                            <span>€{(((parseFloat(newBudgetLine.unit_price) || 0) * (parseInt(newBudgetLine.quantity) || 1)) * (1 + (parseFloat(newBudgetLine.iva_percent) || 0) / 100)).toFixed(2)}</span>
+                                        </div>
+                                    </div>
+                                )}
+                                <button disabled={formLoading} type="submit" className="w-full py-4 bg-primary text-white rounded-2xl font-bold shadow-xl shadow-primary/30 hover:brightness-110 transition-all">
+                                    {formLoading ? 'Guardando...' : 'Añadir Línea'}
                                 </button>
                             </form>
                         </motion.div>

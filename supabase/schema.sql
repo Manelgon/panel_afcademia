@@ -360,6 +360,36 @@ CREATE TRIGGER set_updated_at_project_tasks
     BEFORE UPDATE ON public.project_tasks
     FOR EACH ROW EXECUTE FUNCTION public.update_updated_at();
 
+-- Servicios vinculados a un Proyecto
+CREATE TABLE IF NOT EXISTS public.project_services (
+    id            uuid          PRIMARY KEY DEFAULT gen_random_uuid(),
+    project_id    uuid          REFERENCES public.projects(id) ON DELETE CASCADE,
+    service_id    uuid          REFERENCES public.services(id) ON DELETE CASCADE,
+    created_at    timestamptz   DEFAULT now(),
+    UNIQUE(project_id, service_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_project_services_project ON public.project_services(project_id);
+
+-- Líneas de presupuesto manuales
+CREATE TABLE IF NOT EXISTS public.project_budget_lines (
+    id            uuid          PRIMARY KEY DEFAULT gen_random_uuid(),
+    project_id    uuid          REFERENCES public.projects(id) ON DELETE CASCADE,
+    description   text          NOT NULL,
+    unit_price    decimal(10,2) DEFAULT 0,
+    quantity      integer       DEFAULT 1,
+    iva_percent   decimal(5,2)  DEFAULT 21,
+    created_at    timestamptz   DEFAULT now(),
+    updated_at    timestamptz   DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_budget_lines_project ON public.project_budget_lines(project_id);
+
+DROP TRIGGER IF EXISTS set_updated_at_budget_lines ON public.project_budget_lines;
+CREATE TRIGGER set_updated_at_budget_lines
+    BEFORE UPDATE ON public.project_budget_lines
+    FOR EACH ROW EXECUTE FUNCTION public.update_updated_at();
+
 
 -- =============================================
 -- 15. FUNCIONES RPC (Para crear proyectos de forma segura)
@@ -448,6 +478,7 @@ ALTER TABLE public.project_tasks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.project_files ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.project_members ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.project_services ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.project_budget_lines ENABLE ROW LEVEL SECURITY;
 
 -- Limpiar políticas existentes
 DROP POLICY IF EXISTS "projects_select_member" ON public.projects;
@@ -515,6 +546,12 @@ CREATE POLICY "project_services_select" ON public.project_services FOR SELECT TO
 DROP POLICY IF EXISTS "project_services_all" ON public.project_services;
 CREATE POLICY "project_services_all" ON public.project_services FOR ALL TO authenticated USING (true);
 
+-- Políticas para project_budget_lines
+DROP POLICY IF EXISTS "budget_lines_select" ON public.project_budget_lines;
+CREATE POLICY "budget_lines_select" ON public.project_budget_lines FOR SELECT TO authenticated USING (true);
+DROP POLICY IF EXISTS "budget_lines_all" ON public.project_budget_lines;
+CREATE POLICY "budget_lines_all" ON public.project_budget_lines FOR ALL TO authenticated USING (true);
+
 -- Políticas para project_members
 -- Limpiar políticas existentes de miembros
 DROP POLICY IF EXISTS "members_select" ON public.project_members;
@@ -577,6 +614,12 @@ BEGIN
     IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'project_tasks') THEN
         ALTER PUBLICATION supabase_realtime ADD TABLE public.project_tasks;
     END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'project_services') THEN
+        ALTER PUBLICATION supabase_realtime ADD TABLE public.project_services;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'project_budget_lines') THEN
+        ALTER PUBLICATION supabase_realtime ADD TABLE public.project_budget_lines;
+    END IF;
 END $$;
 
 
@@ -601,6 +644,7 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON public.project_milestones TO authenticat
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.project_tasks TO authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.project_files TO authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.project_services TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.project_budget_lines TO authenticated;
 
 -- Función RPC create_project (8 parámetros)
 GRANT EXECUTE ON FUNCTION public.create_project(text, text, text, text, int, uuid, uuid[], uuid[]) TO authenticated;

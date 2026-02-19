@@ -66,7 +66,7 @@ export default function Projects() {
         try {
             const { data, error } = await supabase
                 .from('projects')
-                .select('*, leads(first_name, last_name, company)')
+                .select('*, leads(first_name, last_name, company), project_members(user_id, role, users:user_id(first_name, second_name, avatar_url))')
                 .order('created_at', { ascending: false });
 
             if (error) throw error;
@@ -301,6 +301,34 @@ export default function Projects() {
                                     {project.status}
                                 </span>
                             ),
+                        },
+                        {
+                            key: 'team',
+                            label: 'Equipo',
+                            render: (project) => {
+                                const members = project.project_members || [];
+                                const shown = members.slice(0, 3);
+                                const extra = members.length - 3;
+                                return (
+                                    <div className="flex items-center -space-x-2">
+                                        {shown.map((m, i) => {
+                                            const u = m.users;
+                                            const initials = u ? `${(u.first_name || '?')[0]}${(u.second_name || '?')[0]}` : '??';
+                                            return (
+                                                <div key={i} title={u ? `${u.first_name} ${u.second_name}` : 'Usuario'} className="size-8 rounded-full bg-primary/15 border-2 border-[var(--bg-card,#fff)] flex items-center justify-center text-[10px] font-black text-primary uppercase">
+                                                    {initials}
+                                                </div>
+                                            );
+                                        })}
+                                        {extra > 0 && (
+                                            <div className="size-8 rounded-full bg-white/10 border-2 border-[var(--bg-card,#fff)] flex items-center justify-center text-[10px] font-bold text-variable-muted">
+                                                +{extra}
+                                            </div>
+                                        )}
+                                        {members.length === 0 && <span className="text-[10px] text-variable-muted italic">Sin equipo</span>}
+                                    </div>
+                                );
+                            },
                         },
                         {
                             key: 'progress',
