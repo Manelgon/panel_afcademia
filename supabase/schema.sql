@@ -419,6 +419,7 @@ CREATE POLICY "projects_all_admin"
     );
 
 -- INSERT Projects: Usuarios autenticados pueden crear proyectos
+DROP POLICY IF EXISTS "projects_insert_authenticated" ON public.projects;
 CREATE POLICY "projects_insert_authenticated"
     ON public.projects FOR INSERT
     TO authenticated
@@ -444,6 +445,11 @@ CREATE POLICY "files_all_admin" ON public.project_files FOR ALL TO authenticated
 USING (EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND role = 'admin'));
 
 -- Políticas para project_members
+-- Limpiar políticas existentes de miembros
+DROP POLICY IF EXISTS "members_select" ON public.project_members;
+DROP POLICY IF EXISTS "members_insert_self" ON public.project_members;
+DROP POLICY IF EXISTS "members_all_admin" ON public.project_members;
+
 -- SELECT: Ver miembros si eres miembro o admin
 CREATE POLICY "members_select" 
     ON public.project_members FOR SELECT 
