@@ -36,15 +36,54 @@ export default function Users() {
     const [loading, setLoading] = useState(false);
     const [usersList, setUsersList] = useState([]);
 
-    // ... existing formData state ...
+    const [formData, setFormData] = useState({
+        name: '',
+        first_name: '',
+        second_name: '',
+        email: '',
+        password: '',
+        role: 'user'
+    });
 
     const [fetchError, setFetchError] = useState(null);
 
-    // ... existing useEffect ...
+    const handleCreateUser = async (e) => {
+        e.preventDefault();
+        setLoading(true);
+        try {
+            // 1. Create auth user via Supabase Auth
+            const { data: authData, error: authError } = await supabase.auth.signUp({
+                email: formData.email,
+                password: formData.password,
+            });
 
-    // ... existing fetchUsers ...
+            if (authError) throw authError;
 
-    // ... existing handleCreateUser ...
+            // 2. Insert profile into public.users table
+            const { error: profileError } = await supabase
+                .from('users')
+                .insert({
+                    id: authData.user.id,
+                    email: formData.email,
+                    name: formData.name,
+                    first_name: formData.first_name,
+                    second_name: formData.second_name,
+                    role: formData.role,
+                });
+
+            if (profileError) throw profileError;
+
+            // 3. Reset form and close modal
+            setFormData({ name: '', first_name: '', second_name: '', email: '', password: '', role: 'user' });
+            setIsModalOpen(false);
+            fetchUsers(); // Refresh the list
+        } catch (err) {
+            console.error('Error creating user:', err);
+            alert(`Error al crear usuario: ${err.message}`);
+        } finally {
+            setLoading(false);
+        }
+    };
 
     const fetchUsers = async () => {
         // setLoading(true); // Don't show full loading spinner on background updates
