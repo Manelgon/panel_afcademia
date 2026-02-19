@@ -151,12 +151,6 @@ export default function Projects() {
             if (rpcError) throw rpcError;
 
             // 3. Update lead status if applicable
-            if (formData.lead_id) {
-                await supabase
-                    .from('leads')
-                    .update({ status: 'ganado' })
-                    .eq('id', formData.lead_id);
-            }
 
             setFormData(defaultForm);
             setIsModalOpen(false);
