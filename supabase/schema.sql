@@ -150,6 +150,10 @@ DROP POLICY IF EXISTS "Users can delete own record" ON public.users;
 DROP POLICY IF EXISTS "Allow read access" ON public.users;
 DROP POLICY IF EXISTS "Enable read access for authenticated users" ON public.users;
 DROP POLICY IF EXISTS "Allow authenticated users to read users" ON public.users;
+DROP POLICY IF EXISTS "users_select_authenticated" ON public.users;
+DROP POLICY IF EXISTS "users_insert_authenticated" ON public.users;
+DROP POLICY IF EXISTS "users_update_own" ON public.users;
+DROP POLICY IF EXISTS "users_delete_own" ON public.users;
 
 -- SELECT: Usuarios autenticados pueden ver todos los perfiles
 -- (no causa recursión porque usa auth.uid() directo, sin sub-query a users)
@@ -189,6 +193,7 @@ DROP POLICY IF EXISTS "leads_insert_authenticated" ON public.leads;
 DROP POLICY IF EXISTS "leads_insert_anon" ON public.leads;
 DROP POLICY IF EXISTS "leads_update_authenticated" ON public.leads;
 DROP POLICY IF EXISTS "leads_delete_authenticated" ON public.leads;
+DROP POLICY IF EXISTS "leads_insert_anon" ON public.leads;
 
 -- SELECT: Solo usuarios autenticados pueden ver leads
 CREATE POLICY "leads_select_authenticated"
@@ -216,21 +221,75 @@ CREATE POLICY "leads_delete_authenticated"
 
 
 -- =============================================
--- 7. HABILITAR REALTIME
+-- 9. TABLA: services (Catálogo de Servicios)
 -- =============================================
--- Activar publicación de cambios en tiempo real
 
-ALTER PUBLICATION supabase_realtime ADD TABLE public.users;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.leads;
+CREATE TABLE IF NOT EXISTS public.services (
+    id            uuid          PRIMARY KEY DEFAULT gen_random_uuid(),
+    name          text          NOT NULL,
+    description   text,
+    price         decimal(10,2),
+    is_active     boolean       DEFAULT true,
+    created_at    timestamptz   DEFAULT now(),
+    updated_at    timestamptz   DEFAULT now()
+);
+
+-- Índices
+CREATE INDEX IF NOT EXISTS idx_services_name ON public.services(name);
+CREATE INDEX IF NOT EXISTS idx_services_active ON public.services(is_active);
+
+-- Trigger updated_at
+DROP TRIGGER IF EXISTS set_updated_at_services ON public.services;
+CREATE TRIGGER set_updated_at_services
+    BEFORE UPDATE ON public.services
+    FOR EACH ROW
+    EXECUTE FUNCTION public.update_updated_at();
 
 
 -- =============================================
--- 8. PERMISOS DE STORAGE (opcional, para avatares)
+-- 10. POLÍTICAS RLS - TABLA services
 -- =============================================
--- Crear bucket para avatares si no existe
--- INSERT INTO storage.buckets (id, name, public)
--- VALUES ('avatars', 'avatars', true)
--- ON CONFLICT (id) DO NOTHING;
+ALTER TABLE public.services ENABLE ROW LEVEL SECURITY;
+
+-- Limpiar políticas existentes
+DROP POLICY IF EXISTS "services_select_authenticated" ON public.services;
+DROP POLICY IF EXISTS "services_all_admin" ON public.services;
+
+-- SELECT: Todos los usuarios autenticados pueden ver servicios
+CREATE POLICY "services_select_authenticated"
+    ON public.services FOR SELECT
+    TO authenticated
+    USING (true);
+
+-- ALL: Solo administradores pueden insertar, actualizar o eliminar servicios
+CREATE POLICY "services_all_admin"
+    ON public.services FOR ALL
+    TO authenticated
+    USING (
+        EXISTS (
+            SELECT 1 FROM public.users 
+            WHERE id = auth.uid() AND role = 'admin'
+        )
+    );
+
+
+-- =============================================
+-- 11. HABILITAR REALTIME (Actualizado)
+-- =============================================
+-- Asegurar que las tablas están en la publicación de realtime
+
+DO $$ 
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'users') THEN
+        ALTER PUBLICATION supabase_realtime ADD TABLE public.users;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'leads') THEN
+        ALTER PUBLICATION supabase_realtime ADD TABLE public.leads;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'services') THEN
+        ALTER PUBLICATION supabase_realtime ADD TABLE public.services;
+    END IF;
+END $$;
 
 
 -- =============================================

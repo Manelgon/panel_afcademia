@@ -64,6 +64,7 @@ export default function Sidebar() {
                     <SidebarItem icon={LayoutDashboard} to="/" label="Dashboard" />
                     <SidebarItem icon={Users} to="/users" label="Usuarios" />
                     <SidebarItem icon={Target} to="/leads" label="Leads" />
+                    <SidebarItem icon={Briefcase} to="/services" label="Servicios" />
                     <SidebarItem icon={FolderOpen} to="/projects" label="Proyectos" />
                     <SidebarItem icon={FileText} label="Documentos" />
                 </div>
@@ -93,6 +94,7 @@ export default function Sidebar() {
                     <img src={logo} alt="L" className="size-6 object-contain brightness-0 invert" />
                 </div>
                 <SidebarItem icon={Target} to="/leads" label="L" />
+                <SidebarItem icon={Briefcase} to="/services" label="S" />
                 <SidebarItem icon={FolderOpen} to="/projects" label="P" />
             </nav>
         </>

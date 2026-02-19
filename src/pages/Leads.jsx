@@ -29,6 +29,7 @@ export default function Leads() {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [loading, setLoading] = useState(false);
     const [leadsList, setLeadsList] = useState([]);
+    const [services, setServices] = useState([]);
     const [fetchError, setFetchError] = useState(null);
 
     const defaultForm = {
@@ -52,13 +53,29 @@ export default function Leads() {
         { value: 'otro', label: 'Otro' }
     ];
 
-    const serviceInterests = [
-        { value: 'automatizacion', label: 'Automatización' },
-        { value: 'crm', label: 'CRM' },
-        { value: 'web', label: 'Desarrollo Web' },
-        { value: 'ia', label: 'Inteligencia Artificial' },
-        { value: 'otro', label: 'Otro' }
-    ];
+    const fetchServices = async () => {
+        const { data, error } = await supabase
+            .from('services')
+            .select('*')
+            .eq('is_active', true)
+            .order('name', { ascending: true });
+
+        if (error) {
+            console.error('Error fetching services:', error);
+        } else if (data) {
+            setServices(data || []);
+        }
+    };
+
+    const serviceInterests = services.map(s => ({
+        value: s.name,
+        label: s.name
+    }));
+
+    // If no services yet, provide some defaults or empty list
+    const finalServiceInterests = serviceInterests.length > 0
+        ? serviceInterests
+        : [{ value: 'otro', label: 'Otro' }];
 
     const fetchLeads = async () => {
         setFetchError(null);
@@ -99,16 +116,25 @@ export default function Leads() {
 
     useEffect(() => {
         fetchLeads();
+        fetchServices();
 
-        const channel = supabase
+        const leadsChannel = supabase
             .channel('leads-db-changes')
             .on('postgres_changes', { event: '*', schema: 'public', table: 'leads' }, () => {
                 fetchLeads();
             })
             .subscribe();
 
+        const servicesChannel = supabase
+            .channel('services-leads-changes')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'services' }, () => {
+                fetchServices();
+            })
+            .subscribe();
+
         return () => {
-            supabase.removeChannel(channel);
+            supabase.removeChannel(leadsChannel);
+            supabase.removeChannel(servicesChannel);
         };
     }, []);
 
@@ -243,7 +269,7 @@ export default function Leads() {
                             initial={{ scale: 0.9, opacity: 0, y: 20 }}
                             animate={{ scale: 1, opacity: 1, y: 0 }}
                             exit={{ scale: 0.9, opacity: 0, y: 20 }}
-                            className="relative w-full max-w-2xl glass rounded-[2rem] sm:rounded-[2.5rem] p-6 sm:p-10 overflow-y-auto max-h-[90vh] shadow-2xl"
+                            className="relative w-full max-w-2xl glass rounded-[2rem] sm:rounded-[3rem] p-8 sm:p-12 overflow-y-auto max-h-[90vh] min-h-[600px] shadow-2xl flex flex-col"
                         >
                             <button onClick={() => setIsModalOpen(false)} className="absolute top-6 right-6 sm:top-8 sm:right-8 text-variable-muted hover:text-primary transition-colors z-10">
                                 <X size={24} />
@@ -301,7 +327,7 @@ export default function Leads() {
                                             value={formData.service_interest}
                                             onChange={(val) => setFormData({ ...formData, service_interest: val })}
                                             icon={Briefcase}
-                                            options={serviceInterests}
+                                            options={finalServiceInterests}
                                         />
                                     </div>
                                 </div>

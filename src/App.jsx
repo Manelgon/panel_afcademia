@@ -4,6 +4,7 @@ import Dashboard from './pages/Dashboard';
 import ProjectDetail from './pages/ProjectDetail';
 import Users from './pages/Users';
 import Leads from './pages/Leads';
+import Services from './pages/Services';
 import Login from './pages/Login';
 import { ThemeProvider } from './context/ThemeContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
@@ -62,6 +63,12 @@ function App() {
                         <Route path="/leads" element={
                             <ProtectedRoute>
                                 <Leads />
+                            </ProtectedRoute>
+                        } />
+
+                        <Route path="/services" element={
+                            <ProtectedRoute>
+                                <Services />
                             </ProtectedRoute>
                         } />
 
