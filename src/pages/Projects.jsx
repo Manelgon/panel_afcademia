@@ -16,7 +16,8 @@ import {
     Type,
     FileText,
     Briefcase,
-    X
+    X,
+    ChevronDown
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
@@ -43,6 +44,8 @@ export default function Projects() {
     const [users, setUsers] = useState([]);
     const [services, setServices] = useState([]);
     const [fetchError, setFetchError] = useState(null);
+    const [servicesDropdownOpen, setServicesDropdownOpen] = useState(false);
+    const [usersDropdownOpen, setUsersDropdownOpen] = useState(false);
 
     const defaultForm = {
         name: '',
@@ -439,6 +442,7 @@ export default function Projects() {
                                     </div>
                                 </div>
 
+                                {/* ── SERVICIOS DROPDOWN ── */}
                                 <div className="space-y-3">
                                     <label className="text-xs font-black text-primary uppercase tracking-[0.2em] ml-1 flex items-center justify-between">
                                         <div className="flex items-center gap-2"><Briefcase size={14} /> Servicios Incluidos</div>
@@ -449,74 +453,93 @@ export default function Projects() {
                                                 .toLocaleString('es-ES', { minimumFractionDigits: 2 })}
                                         </div>
                                     </label>
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 bg-white/5 border border-variable rounded-2xl p-4 max-h-48 overflow-y-auto custom-scrollbar">
-                                        {services.length === 0 && <p className="text-[10px] text-variable-muted italic col-span-2 text-center py-2">No hay servicios activos en el catálogo.</p>}
-                                        {services.map(service => (
-                                            <label key={service.id} className="flex items-center justify-between p-2 rounded-xl hover:bg-white/5 cursor-pointer transition-colors group">
-                                                <div className="flex items-center gap-3">
-                                                    <div className="relative flex items-center">
-                                                        <input
-                                                            type="checkbox"
-                                                            className="peer size-5 opacity-0 absolute"
-                                                            checked={formData.selected_services.includes(service.id)}
-                                                            onChange={(e) => {
-                                                                const isChecked = e.target.checked;
-                                                                setFormData(prev => ({
-                                                                    ...prev,
-                                                                    selected_services: isChecked
-                                                                        ? [...prev.selected_services, service.id]
-                                                                        : prev.selected_services.filter(id => id !== service.id)
-                                                                }));
-                                                            }}
-                                                        />
-                                                        <div className={`size-5 rounded-md border-2 transition-all flex items-center justify-center ${formData.selected_services.includes(service.id) ? 'bg-primary border-primary' : 'border-variable group-hover:border-primary/50'}`}>
-                                                            {formData.selected_services.includes(service.id) && <CheckCircle2 size={12} className="text-white" />}
+                                    <div className="relative">
+                                        <button type="button" onClick={() => { setServicesDropdownOpen(!servicesDropdownOpen); setUsersDropdownOpen(false); }} className="w-full flex items-center justify-between bg-white/5 border border-variable rounded-2xl px-4 py-3 text-sm text-variable-muted hover:border-primary/50 transition-all">
+                                            <span>{formData.selected_services.length === 0 ? 'Seleccionar servicios...' : `${formData.selected_services.length} servicio(s) seleccionado(s)`}</span>
+                                            <ChevronDown size={16} className={`transition-transform ${servicesDropdownOpen ? 'rotate-180' : ''}`} />
+                                        </button>
+                                        {servicesDropdownOpen && (
+                                            <div className="absolute z-50 w-full mt-2 bg-[var(--bg-card,#1a1321)] border border-variable rounded-2xl shadow-2xl max-h-52 overflow-y-auto custom-scrollbar">
+                                                {services.length === 0 && <p className="text-[10px] text-variable-muted italic text-center py-4">No hay servicios activos.</p>}
+                                                {services.map(service => {
+                                                    const isSelected = formData.selected_services.includes(service.id);
+                                                    return (
+                                                        <div key={service.id} onClick={() => setFormData(prev => ({ ...prev, selected_services: isSelected ? prev.selected_services.filter(id => id !== service.id) : [...prev.selected_services, service.id] }))} className={`flex items-center justify-between px-4 py-3 cursor-pointer transition-colors hover:bg-white/10 ${isSelected ? 'bg-primary/10' : ''}`}>
+                                                            <div className="flex items-center gap-3">
+                                                                <div className={`size-5 rounded-md border-2 flex items-center justify-center transition-all ${isSelected ? 'bg-primary border-primary' : 'border-variable'}`}>
+                                                                    {isSelected && <CheckCircle2 size={12} className="text-white" />}
+                                                                </div>
+                                                                <span className="text-xs font-bold text-variable-main">{service.name}</span>
+                                                            </div>
+                                                            <span className="text-[10px] text-variable-muted font-bold">€{parseFloat(service.price || 0).toFixed(2)}</span>
                                                         </div>
-                                                    </div>
-                                                    <div className="flex flex-col">
-                                                        <span className="text-xs font-bold text-variable-main leading-tight truncate max-w-[120px]">{service.name}</span>
-                                                        <span className="text-[9px] text-variable-muted font-bold italic">€{parseFloat(service.price || 0).toFixed(2)}</span>
-                                                    </div>
-                                                </div>
-                                            </label>
-                                        ))}
+                                                    );
+                                                })}
+                                            </div>
+                                        )}
                                     </div>
+                                    {/* Chips de servicios seleccionados */}
+                                    {formData.selected_services.length > 0 && (
+                                        <div className="flex flex-wrap items-center gap-2 mt-1">
+                                            {services.filter(s => formData.selected_services.includes(s.id)).slice(0, 2).map(s => (
+                                                <span key={s.id} className="inline-flex items-center gap-1.5 bg-primary/15 text-primary text-[10px] font-bold px-3 py-1.5 rounded-full">
+                                                    {s.name}
+                                                    <X size={10} className="cursor-pointer hover:text-red-400 transition-colors" onClick={() => setFormData(prev => ({ ...prev, selected_services: prev.selected_services.filter(id => id !== s.id) }))} />
+                                                </span>
+                                            ))}
+                                            {formData.selected_services.length > 2 && (
+                                                <span className="text-[10px] text-variable-muted font-bold bg-white/10 px-2.5 py-1.5 rounded-full">+{formData.selected_services.length - 2} más</span>
+                                            )}
+                                        </div>
+                                    )}
                                 </div>
 
+                                {/* ── USUARIOS DROPDOWN ── */}
                                 <div className="space-y-3">
                                     <label className="text-xs font-black text-primary uppercase tracking-[0.2em] ml-1 flex items-center gap-2">
                                         <UsersIcon size={14} /> Asignar Miembros al Equipo
                                     </label>
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 bg-white/5 border border-variable rounded-2xl p-4 max-h-40 overflow-y-auto custom-scrollbar">
-                                        {users.length === 0 && <p className="text-[10px] text-variable-muted italic col-span-2 text-center py-2">No se encontraron miembros de equipo.</p>}
-                                        {users.map(user => (
-                                            <label key={user.id} className="flex items-center gap-3 p-2 rounded-xl hover:bg-white/5 cursor-pointer transition-colors group">
-                                                <div className="relative flex items-center">
-                                                    <input
-                                                        type="checkbox"
-                                                        className="peer size-5 opacity-0 absolute"
-                                                        checked={formData.assigned_users.includes(user.id)}
-                                                        onChange={(e) => {
-                                                            const isChecked = e.target.checked;
-                                                            setFormData(prev => ({
-                                                                ...prev,
-                                                                assigned_users: isChecked
-                                                                    ? [...prev.assigned_users, user.id]
-                                                                    : prev.assigned_users.filter(id => id !== user.id)
-                                                            }));
-                                                        }}
-                                                    />
-                                                    <div className={`size-5 rounded-md border-2 transition-all flex items-center justify-center ${formData.assigned_users.includes(user.id) ? 'bg-primary border-primary' : 'border-variable group-hover:border-primary/50'}`}>
-                                                        {formData.assigned_users.includes(user.id) && <CheckCircle2 size={12} className="text-white" />}
-                                                    </div>
-                                                </div>
-                                                <div className="flex flex-col">
-                                                    <span className="text-xs font-bold text-variable-main leading-tight">{user.first_name} {user.second_name}</span>
-                                                    <span className={`text-[8px] uppercase font-black tracking-widest ${user.role === 'admin' ? 'text-rose-500' : 'text-variable-muted'}`}>{user.role}</span>
-                                                </div>
-                                            </label>
-                                        ))}
+                                    <div className="relative">
+                                        <button type="button" onClick={() => { setUsersDropdownOpen(!usersDropdownOpen); setServicesDropdownOpen(false); }} className="w-full flex items-center justify-between bg-white/5 border border-variable rounded-2xl px-4 py-3 text-sm text-variable-muted hover:border-primary/50 transition-all">
+                                            <span>{formData.assigned_users.length === 0 ? 'Seleccionar miembros...' : `${formData.assigned_users.length} miembro(s) seleccionado(s)`}</span>
+                                            <ChevronDown size={16} className={`transition-transform ${usersDropdownOpen ? 'rotate-180' : ''}`} />
+                                        </button>
+                                        {usersDropdownOpen && (
+                                            <div className="absolute z-50 w-full mt-2 bg-[var(--bg-card,#1a1321)] border border-variable rounded-2xl shadow-2xl max-h-52 overflow-y-auto custom-scrollbar">
+                                                {users.length === 0 && <p className="text-[10px] text-variable-muted italic text-center py-4">No se encontraron miembros.</p>}
+                                                {users.map(user => {
+                                                    const isSelected = formData.assigned_users.includes(user.id);
+                                                    return (
+                                                        <div key={user.id} onClick={() => setFormData(prev => ({ ...prev, assigned_users: isSelected ? prev.assigned_users.filter(id => id !== user.id) : [...prev.assigned_users, user.id] }))} className={`flex items-center justify-between px-4 py-3 cursor-pointer transition-colors hover:bg-white/10 ${isSelected ? 'bg-primary/10' : ''}`}>
+                                                            <div className="flex items-center gap-3">
+                                                                <div className={`size-5 rounded-md border-2 flex items-center justify-center transition-all ${isSelected ? 'bg-primary border-primary' : 'border-variable'}`}>
+                                                                    {isSelected && <CheckCircle2 size={12} className="text-white" />}
+                                                                </div>
+                                                                <div className="flex flex-col">
+                                                                    <span className="text-xs font-bold text-variable-main">{user.first_name} {user.second_name}</span>
+                                                                    <span className={`text-[8px] uppercase font-black tracking-widest ${user.role === 'admin' ? 'text-rose-500' : 'text-variable-muted'}`}>{user.role}</span>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        )}
                                     </div>
+                                    {/* Chips de usuarios seleccionados */}
+                                    {formData.assigned_users.length > 0 && (
+                                        <div className="flex flex-wrap items-center gap-2 mt-1">
+                                            {users.filter(u => formData.assigned_users.includes(u.id)).slice(0, 2).map(u => (
+                                                <span key={u.id} className="inline-flex items-center gap-1.5 bg-primary/15 text-primary text-[10px] font-bold px-3 py-1.5 rounded-full">
+                                                    {u.first_name} {u.second_name}
+                                                    <X size={10} className="cursor-pointer hover:text-red-400 transition-colors" onClick={() => setFormData(prev => ({ ...prev, assigned_users: prev.assigned_users.filter(id => id !== u.id) }))} />
+                                                </span>
+                                            ))}
+                                            {formData.assigned_users.length > 2 && (
+                                                <span className="text-[10px] text-variable-muted font-bold bg-white/10 px-2.5 py-1.5 rounded-full">+{formData.assigned_users.length - 2} más</span>
+                                            )}
+                                        </div>
+                                    )}
                                     <p className="text-[10px] text-variable-muted italic ml-1">* El creador del proyecto se asigna automáticamente como administrador del mismo.</p>
                                 </div>
 
