@@ -7,7 +7,8 @@ import {
     FileText,
     Settings,
     LogOut,
-    Target
+    Target,
+    Briefcase
 } from 'lucide-react';
 import logo from '../assets/logo.png';
 import { useAuth } from '../context/AuthContext';
