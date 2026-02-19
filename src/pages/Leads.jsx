@@ -13,9 +13,11 @@ import {
     Briefcase,
     MessageSquare,
     Star,
-    Target
+    Target,
+    Rocket
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../context/ThemeContext';
 import { supabase } from '../lib/supabase';
 import Sidebar from '../components/Sidebar';
@@ -24,6 +26,7 @@ import DataTable from '../components/DataTable';
 import { useAuth } from '../context/AuthContext';
 
 export default function Leads() {
+    const navigate = useNavigate();
     const { darkMode, toggleTheme } = useTheme();
     const { profile: currentProfile } = useAuth();
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -242,9 +245,18 @@ export default function Leads() {
                             ),
                         },
                         {
-                            key: 'source',
-                            label: 'Origen',
-                            render: (lead) => <span className="text-variable-muted text-[10px] uppercase font-bold">{lead.source}</span>,
+                            key: 'status',
+                            label: 'Estado',
+                            render: (lead) => (
+                                <span className={`px-3 py-1 rounded-lg text-[10px] uppercase font-black border ${lead.status === 'ganado'
+                                    ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'
+                                    : lead.status === 'perdido'
+                                        ? 'bg-rose-500/10 text-rose-500 border-rose-500/20'
+                                        : 'bg-primary/10 text-primary border-primary/20'
+                                    }`}>
+                                    {lead.status || 'pendiente'}
+                                </span>
+                            ),
                         },
                         {
                             key: 'created_at',
@@ -255,6 +267,23 @@ export default function Leads() {
                                 </span>
                             ),
                         },
+                        {
+                            key: 'actions',
+                            label: 'Acciones',
+                            align: 'right',
+                            render: (lead) => (
+                                <div className="flex gap-2 justify-end">
+                                    <button
+                                        onClick={() => navigate(`/projects?convert=${lead.id}`)}
+                                        className="p-2 glass rounded-xl text-primary hover:bg-primary/10 transition-all flex items-center gap-2 pr-4 shadow-lg shadow-primary/5"
+                                        title="Convertir a Proyecto"
+                                    >
+                                        <div className="bg-primary/20 p-1 rounded-lg"><Rocket size={14} /></div>
+                                        <span className="text-[10px] font-black uppercase tracking-tighter">Convertir</span>
+                                    </button>
+                                </div>
+                            ),
+                        }
                     ]}
                 />
             </main>

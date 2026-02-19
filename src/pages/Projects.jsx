@@ -19,7 +19,7 @@ import {
     X
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useTheme } from '../context/ThemeContext';
 import { supabase } from '../lib/supabase';
 import Sidebar from '../components/Sidebar';
@@ -30,9 +30,14 @@ export default function Projects() {
     const { darkMode } = useTheme();
     const { profile: currentProfile } = useAuth();
     const navigate = useNavigate();
+    const { search } = useLocation();
+    const query = new URLSearchParams(search);
+    const convertLeadId = query.get('convert');
+
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [loading, setLoading] = useState(false);
     const [projectsList, setProjectsList] = useState([]);
+    const [leads, setLeads] = useState([]);
     const [fetchError, setFetchError] = useState(null);
 
     const defaultForm = {
@@ -41,7 +46,8 @@ export default function Projects() {
         description: '',
         status: 'En Progreso',
         total_hours: 0,
-        id_alias: ''
+        id_alias: '',
+        lead_id: ''
     };
     const [formData, setFormData] = useState(defaultForm);
 
@@ -49,10 +55,9 @@ export default function Projects() {
         setLoading(true);
         setFetchError(null);
         try {
-            // Note: RLS handles filtering by membership or admin status
             const { data, error } = await supabase
                 .from('projects')
-                .select('*')
+                .select('*, leads(first_name, last_name, company)')
                 .order('created_at', { ascending: false });
 
             if (error) throw error;
@@ -65,8 +70,40 @@ export default function Projects() {
         }
     };
 
+    const fetchLeads = async () => {
+        const { data } = await supabase
+            .from('leads')
+            .select('id, first_name, last_name, company, service_interest')
+            .order('created_at', { ascending: false });
+        setLeads(data || []);
+        return data || [];
+    };
+
     useEffect(() => {
-        fetchProjects();
+        const init = async () => {
+            await fetchProjects();
+            const leadsData = await fetchLeads();
+
+            if (convertLeadId) {
+                const lead = leadsData.find(l => l.id === convertLeadId);
+                if (lead) {
+                    const firstInitial = (lead.first_name || '').charAt(0).toUpperCase();
+                    const lastInitial = (lead.last_name || '').charAt(0).toUpperCase();
+                    const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+                    const randomDigits = Math.floor(1000 + Math.random() * 9000);
+
+                    setFormData({
+                        ...defaultForm,
+                        lead_id: lead.id,
+                        name: `Proyecto ${lead.service_interest || ''}`,
+                        client: lead.company || `${lead.first_name} ${lead.last_name}`,
+                        id_alias: `${firstInitial}${lastInitial}-${dateStr}-${randomDigits}`
+                    });
+                    setIsModalOpen(true);
+                }
+            }
+        };
+        init();
 
         const channel = supabase
             .channel('projects-db-changes')
@@ -80,16 +117,22 @@ export default function Projects() {
         return () => {
             supabase.removeChannel(channel);
         };
-    }, []);
+    }, [convertLeadId]);
 
     const handleCreateProject = async (e) => {
         e.preventDefault();
         setLoading(true);
         try {
+            // Prepare data - ensure lead_id is null if empty string
+            const insertData = {
+                ...formData,
+                lead_id: formData.lead_id || null
+            };
+
             // 1. Create the project
             const { data: project, error: projectError } = await supabase
                 .from('projects')
-                .insert([formData])
+                .insert([insertData])
                 .select()
                 .single();
 
@@ -106,10 +149,24 @@ export default function Projects() {
 
             if (memberError) throw memberError;
 
+            // 3. Update lead status if applicable
+            if (formData.lead_id) {
+                await supabase
+                    .from('leads')
+                    .update({ status: 'ganado' })
+                    .eq('id', formData.lead_id);
+            }
+
             setFormData(defaultForm);
             setIsModalOpen(false);
             fetchProjects();
-            alert('Proyecto creado con éxito');
+
+            // Clean URL if we were converting
+            if (convertLeadId) {
+                navigate('/projects', { replace: true });
+            }
+
+            alert('Proyecto creado con éxito y Lead convertido');
         } catch (err) {
             console.error('Error creating project:', err);
             alert(`Error al crear proyecto: ${err.message}`);
@@ -186,6 +243,14 @@ export default function Projects() {
                             render: (project) => (
                                 <div className="flex flex-col">
                                     <span className="text-sm font-medium text-variable-main">{project.client}</span>
+                                    {project.leads && (
+                                        <div className="flex items-center gap-1 mt-1">
+                                            <span className="text-[10px] font-bold text-primary uppercase tracking-tighter bg-primary/10 px-1.5 py-0.5 rounded">ORIGEN: LEAD</span>
+                                            <span className="text-[10px] text-variable-muted italic truncate max-w-[120px]">
+                                                {project.leads.company || `${project.leads.first_name} ${project.leads.last_name}`}
+                                            </span>
+                                        </div>
+                                    )}
                                 </div>
                             ),
                         },
@@ -194,8 +259,8 @@ export default function Projects() {
                             label: 'Estado',
                             render: (project) => (
                                 <span className={`text-[10px] font-black px-3 py-1 rounded-lg border uppercase ${project.status === 'Completado'
-                                        ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'
-                                        : 'bg-primary/10 text-primary border-primary/20'
+                                    ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'
+                                    : 'bg-primary/10 text-primary border-primary/20'
                                     }`}>
                                     {project.status}
                                 </span>
@@ -307,6 +372,44 @@ export default function Projects() {
                                             <Clock className="absolute left-4 top-1/2 -translate-y-1/2 text-variable-muted" size={18} />
                                             <input type="number" value={formData.total_hours} onChange={(e) => setFormData({ ...formData, total_hours: parseInt(e.target.value) || 0 })} className="w-full bg-white/5 border border-variable rounded-2xl pl-12 pr-4 py-3 focus:outline-none focus:border-primary/50 text-variable-main transition-all text-sm sm:text-base" placeholder="0" />
                                         </div>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-2">
+                                    <label className="text-xs font-black text-primary uppercase tracking-[0.2em] ml-1">Lead Relacionado (Opcional)</label>
+                                    <div className="relative">
+                                        <UsersIcon className="absolute left-4 top-1/2 -translate-y-1/2 text-variable-muted" size={18} />
+                                        <select
+                                            value={formData.lead_id}
+                                            onChange={(e) => {
+                                                const leadId = e.target.value;
+                                                const selectedLead = leads.find(l => l.id === leadId);
+
+                                                let newAlias = formData.id_alias;
+                                                if (selectedLead) {
+                                                    const firstInitial = (selectedLead.first_name || '').charAt(0).toUpperCase();
+                                                    const lastInitial = (selectedLead.last_name || '').charAt(0).toUpperCase();
+                                                    const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+                                                    const randomDigits = Math.floor(1000 + Math.random() * 9000); // 4 digitos
+                                                    newAlias = `${firstInitial}${lastInitial}-${dateStr}-${randomDigits}`;
+                                                }
+
+                                                setFormData({
+                                                    ...formData,
+                                                    lead_id: leadId,
+                                                    client: selectedLead ? (selectedLead.company || `${selectedLead.first_name} ${selectedLead.last_name}`) : formData.client,
+                                                    id_alias: newAlias
+                                                });
+                                            }}
+                                            className="w-full bg-[#1a1321] border border-variable rounded-2xl pl-12 pr-4 py-3 focus:outline-none focus:border-primary/50 text-variable-main transition-all text-sm sm:text-base appearance-none"
+                                        >
+                                            <option value="">-- Seleccionar Lead --</option>
+                                            {leads.map(lead => (
+                                                <option key={lead.id} value={lead.id}>
+                                                    {lead.company ? `${lead.company} (${lead.first_name})` : `${lead.first_name} ${lead.last_name}`}
+                                                </option>
+                                            ))}
+                                        </select>
                                     </div>
                                 </div>
 

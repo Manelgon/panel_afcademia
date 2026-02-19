@@ -98,6 +98,8 @@ CREATE TABLE IF NOT EXISTS public.leads (
     service_interest  text,
     message           text,
     privacy_accepted  boolean     DEFAULT false,
+    company           text,
+    status            text        DEFAULT 'pendiente', -- pendiente, contactado, ganado, perdido
     source            text,
     score             int4        DEFAULT 0,
     created_at        timestamptz DEFAULT now(),
@@ -306,6 +308,7 @@ CREATE TABLE IF NOT EXISTS public.projects (
     id_alias      text          UNIQUE, -- e.g., PRJ-2024-001
     total_hours   integer       DEFAULT 0,
     actual_hours  integer       DEFAULT 0,
+    lead_id       uuid          REFERENCES public.leads(id) ON DELETE SET NULL,
     created_at    timestamptz   DEFAULT now(),
     updated_at    timestamptz   DEFAULT now()
 );
@@ -382,6 +385,12 @@ ALTER TABLE public.project_members ENABLE ROW LEVEL SECURITY;
 -- Limpiar políticas existentes
 DROP POLICY IF EXISTS "projects_select_member" ON public.projects;
 DROP POLICY IF EXISTS "projects_all_admin" ON public.projects;
+DROP POLICY IF EXISTS "milestones_select_member" ON public.project_milestones;
+DROP POLICY IF EXISTS "milestones_all_admin" ON public.project_milestones;
+DROP POLICY IF EXISTS "tasks_select_member" ON public.project_tasks;
+DROP POLICY IF EXISTS "tasks_all_admin" ON public.project_tasks;
+DROP POLICY IF EXISTS "files_select_member" ON public.project_files;
+DROP POLICY IF EXISTS "files_all_admin" ON public.project_files;
 
 -- SELECT Projects: El usuario puede ver si es miembro o es admin global
 CREATE POLICY "projects_select_member"
@@ -408,15 +417,24 @@ CREATE POLICY "projects_all_admin"
         )
     );
 
--- Políticas similares para hitos, tareas y archivos (heredan de project_id)
+-- Políticas para hitos, tareas y archivos
 CREATE POLICY "milestones_select_member" ON public.project_milestones FOR SELECT TO authenticated
 USING (EXISTS (SELECT 1 FROM public.projects p WHERE p.id = project_id));
+
+CREATE POLICY "milestones_all_admin" ON public.project_milestones FOR ALL TO authenticated
+USING (EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND role = 'admin'));
 
 CREATE POLICY "tasks_select_member" ON public.project_tasks FOR SELECT TO authenticated
 USING (EXISTS (SELECT 1 FROM public.projects p WHERE p.id = project_id));
 
+CREATE POLICY "tasks_all_admin" ON public.project_tasks FOR ALL TO authenticated
+USING (EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND role = 'admin'));
+
 CREATE POLICY "files_select_member" ON public.project_files FOR SELECT TO authenticated
 USING (EXISTS (SELECT 1 FROM public.projects p WHERE p.id = project_id));
+
+CREATE POLICY "files_all_admin" ON public.project_files FOR ALL TO authenticated
+USING (EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND role = 'admin'));
 
 
 -- =============================================

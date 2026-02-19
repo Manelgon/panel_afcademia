@@ -59,7 +59,7 @@ export default function ProjectDetail() {
             // Fetch project
             const { data: proj, error: projErr } = await supabase
                 .from('projects')
-                .select('*')
+                .select('*, leads(*)')
                 .eq('id', id)
                 .single();
             if (projErr) throw projErr;
@@ -206,9 +206,17 @@ export default function ProjectDetail() {
                             <span className="text-variable-muted text-[10px] sm:text-xs font-bold tracking-widest uppercase">ID: {project.id_alias || project.id.slice(0, 8)}</span>
                         </div>
                         <h1 className="text-3xl sm:text-5xl font-bold font-display tracking-tight text-variable-main">{project.name}</h1>
-                        <p className="text-variable-muted text-base sm:text-lg flex items-center gap-2 flex-wrap">
-                            Cliente: <span className="text-variable-main font-bold">{project.client}</span>
-                        </p>
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-6 text-variable-muted text-base sm:text-lg">
+                            <p className="flex items-center gap-2">
+                                Cliente: <span className="text-variable-main font-bold">{project.client}</span>
+                            </p>
+                            {project.leads && (
+                                <p className="flex items-center gap-2 bg-primary/10 px-3 py-1 rounded-xl text-xs font-bold text-primary border border-primary/20">
+                                    <Target size={14} />
+                                    Lead: <Link to="/leads" className="hover:underline">{project.leads.company || `${project.leads.first_name} ${project.leads.last_name}`}</Link>
+                                </p>
+                            )}
+                        </div>
                     </div>
                     <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
                         <button className="glass flex items-center justify-center gap-2 px-6 py-4 rounded-2xl font-bold text-sm text-variable-main hover:brightness-110 transition-all shadow-sm">
