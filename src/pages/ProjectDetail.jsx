@@ -75,6 +75,7 @@ export default function ProjectDetail() {
     const [budgetLineModal, setBudgetLineModal] = useState(false);
     const [newBudgetLine, setNewBudgetLine] = useState({ description: '', unit_price: '', quantity: 1, iva_percent: 21 });
     const [invoices, setInvoices] = useState([]);
+    const [budgets, setBudgets] = useState([]);
     const [invoiceLoading, setInvoiceLoading] = useState(false);
 
     // Payments state
@@ -82,6 +83,8 @@ export default function ProjectDetail() {
     const [paymentModal, setPaymentModal] = useState(false);
     const [newPayment, setNewPayment] = useState({ amount: '', payment_method: 'transferencia', notes: '' });
     const [paymentsExpanded, setPaymentsExpanded] = useState(true);
+    const [editingLineId, setEditingLineId] = useState(null);
+    const [tempLine, setTempLine] = useState(null);
 
     const fetchProjectData = async () => {
         try {
@@ -160,6 +163,14 @@ export default function ProjectDetail() {
             .order('created_at', { ascending: false });
         setInvoices(invData || []);
 
+        // Fetch budgets
+        const { data: budData } = await supabase
+            .from('project_budgets')
+            .select('*')
+            .eq('project_id', id)
+            .order('created_at', { ascending: false });
+        setBudgets(budData || []);
+
         // Fetch payments
         const { data: payData } = await supabase
             .from('project_payments')
@@ -183,6 +194,8 @@ export default function ProjectDetail() {
                 .on('postgres_changes', { event: '*', schema: 'public', table: 'project_files', filter: `project_id=eq.${id}` }, fetchProjectData)
                 .on('postgres_changes', { event: '*', schema: 'public', table: 'project_services', filter: `project_id=eq.${id}` }, fetchBudgetData)
                 .on('postgres_changes', { event: '*', schema: 'public', table: 'project_budget_lines', filter: `project_id=eq.${id}` }, fetchBudgetData)
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'project_invoices', filter: `project_id=eq.${id}` }, fetchBudgetData)
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'project_budgets', filter: `project_id=eq.${id}` }, fetchBudgetData)
                 .on('postgres_changes', { event: '*', schema: 'public', table: 'project_payments', filter: `project_id=eq.${id}` }, fetchBudgetData)
                 .subscribe();
 
@@ -265,15 +278,76 @@ export default function ProjectDetail() {
         else fetchBudgetData();
     };
 
+    const handleSaveLine = async (id, isService) => {
+        try {
+            const table = isService ? 'project_services' : 'project_budget_lines';
+            const { error } = await supabase
+                .from(table)
+                .update({
+                    unit_price: parseFloat(tempLine.unit_price) || 0,
+                    quantity: parseInt(tempLine.quantity) || 1,
+                    iva_percent: parseFloat(tempLine.iva_percent) || 0
+                })
+                .eq('id', id);
+
+            if (error) throw error;
+            showNotification('Línea actualizada');
+            setEditingLineId(null);
+            setTempLine(null);
+            fetchBudgetData();
+        } catch (error) {
+            showNotification(`Error al guardar: ${error.message}`, 'error');
+        }
+    };
+
+    const handleEditLine = (line) => {
+        if (line.invoiced) {
+            showNotification('No se puede editar una línea ya facturada', 'error');
+            return;
+        }
+        setEditingLineId(line.id);
+        setTempLine({
+            unit_price: line.unit_price,
+            quantity: line.quantity,
+            iva_percent: line.iva_percent
+        });
+    };
+
     // Cálculos de presupuesto — separar facturadas vs pendientes
     const serviceLines = projectServices.map(ps => {
-        const price = parseFloat(ps.services?.price) || 0;
-        return { description: ps.services?.name || 'Servicio', base: price, iva: price * 0.21, total: price * 1.21, isService: true, id: ps.id, invoiced: !!ps.invoice_id, quantity: 1, unit_price: price, iva_percent: 21 };
+        const unitPrice = parseFloat(ps.unit_price !== null ? ps.unit_price : ps.services?.price) || 0;
+        const quantity = parseInt(ps.quantity) || 1;
+        const ivaPercent = parseFloat(ps.iva_percent) || 21;
+        const base = unitPrice * quantity;
+        const iva = base * (ivaPercent / 100);
+        return {
+            description: ps.services?.name || 'Servicio',
+            base,
+            iva,
+            total: base + iva,
+            isService: true,
+            id: ps.id,
+            invoiced: !!ps.invoice_id,
+            quantity,
+            unit_price: unitPrice,
+            iva_percent: ivaPercent
+        };
     });
     const manualLines = budgetLines.map(bl => {
         const base = (parseFloat(bl.unit_price) || 0) * (parseInt(bl.quantity) || 1);
         const iva = base * ((parseFloat(bl.iva_percent) || 0) / 100);
-        return { description: bl.description, base, iva, total: base + iva, isService: false, id: bl.id, quantity: bl.quantity, unit_price: bl.unit_price, iva_percent: bl.iva_percent, invoiced: !!bl.invoice_id };
+        return {
+            description: bl.description,
+            base,
+            iva,
+            total: base + iva,
+            isService: false,
+            id: bl.id,
+            quantity: bl.quantity,
+            unit_price: bl.unit_price,
+            iva_percent: bl.iva_percent,
+            invoiced: !!bl.invoice_id
+        };
     });
     const allBudgetLines = [...serviceLines, ...manualLines];
     const uninvoicedLines = allBudgetLines.filter(l => !l.invoiced);
@@ -484,6 +558,288 @@ export default function ProjectDetail() {
         const alias = project?.id_alias || project?.id?.substring(0, 8).toUpperCase() || '';
         const dateStr = new Date(inv.invoice_date).toLocaleDateString('es-ES').replace(/\//g, '-');
         doc.save(`Factura - ${project?.name} - ${alias} - ${dateStr}.pdf`);
+    };
+
+    const handleGenerateBudgetPDF = async () => {
+        setInvoiceLoading(true);
+        try {
+            const doc = new jsPDF();
+            const pName = project?.name || 'Proyecto';
+            const pAlias = project?.id_alias || '';
+            const pClient = project?.client || 'Cliente';
+            const today = new Date().toLocaleDateString('es-ES');
+
+            // Header
+            doc.setFillColor(30, 30, 40);
+            doc.rect(0, 0, 220, 42, 'F');
+            doc.setTextColor(255, 140, 50);
+            doc.setFontSize(22);
+            doc.setFont('helvetica', 'bold');
+            doc.text('PRESUPUESTO', 15, 22);
+            doc.setFontSize(10);
+            doc.setTextColor(180, 180, 190);
+            doc.text(`Fecha: ${today}`, 15, 32);
+
+            // Project / Client info
+            doc.setTextColor(60, 60, 70);
+            doc.setFontSize(10);
+            doc.setFont('helvetica', 'bold');
+            doc.text('PROYECTO:', 15, 55);
+            doc.setFont('helvetica', 'normal');
+            doc.text(`${pName}${pAlias ? ` (${pAlias})` : ''}`, 50, 55);
+            doc.setFont('helvetica', 'bold');
+            doc.text('CLIENTE:', 15, 62);
+            doc.setFont('helvetica', 'normal');
+            doc.text(pClient, 50, 62);
+
+            // Table
+            const tableRows = allBudgetLines.map(l => [
+                l.description,
+                l.quantity?.toString() || '1',
+                `€${parseFloat(l.unit_price || 0).toFixed(2)}`,
+                `${l.iva_percent || 21}%`,
+                `€${parseFloat(l.base || 0).toFixed(2)}`,
+                `€${parseFloat(l.total || 0).toFixed(2)}`
+            ]);
+
+            doc.autoTable({
+                startY: 72,
+                head: [['Concepto', 'Cant.', 'Precio Unit.', 'IVA', 'Base', 'Total']],
+                body: tableRows,
+                headStyles: { fillColor: [255, 140, 50], textColor: 255, fontSize: 9, fontStyle: 'bold' },
+                bodyStyles: { fontSize: 9, textColor: [50, 50, 60] },
+                alternateRowStyles: { fillColor: [245, 245, 248] },
+                columnStyles: {
+                    0: { cellWidth: 60 },
+                    1: { halign: 'center', cellWidth: 18 },
+                    2: { halign: 'right', cellWidth: 28 },
+                    3: { halign: 'center', cellWidth: 18 },
+                    4: { halign: 'right', cellWidth: 28 },
+                    5: { halign: 'right', cellWidth: 28 },
+                },
+                margin: { left: 15, right: 15 },
+            });
+
+            const finalY = doc.lastAutoTable.finalY + 10;
+
+            // Totals
+            doc.setFontSize(10);
+            doc.setFont('helvetica', 'bold');
+            doc.setTextColor(80, 80, 90);
+            doc.text('Subtotal (Base):', 120, finalY + 8);
+            doc.text(`€${budgetSubtotal.toFixed(2)}`, 195, finalY + 8, { align: 'right' });
+            doc.text('IVA Total:', 120, finalY + 16);
+            doc.text(`€${budgetIVA.toFixed(2)}`, 195, finalY + 16, { align: 'right' });
+            doc.setFontSize(13);
+            doc.setTextColor(255, 140, 50);
+            doc.text('TOTAL:', 120, finalY + 28);
+            doc.text(`€${budgetTotal.toFixed(2)}`, 195, finalY + 28, { align: 'right' });
+
+            // Save Snapshot
+            const budgetCount = budgets.length + 1;
+            const bAlias = project?.id_alias || project?.id?.substring(0, 8).toUpperCase() || '';
+            const budgetNumber = `PRE-${bAlias}-${String(budgetCount).padStart(3, '0')}`;
+
+            const lineItemsSnapshot = allBudgetLines.map(l => ({
+                description: l.description,
+                quantity: l.quantity || 1,
+                unit_price: l.unit_price,
+                iva_percent: l.iva_percent,
+                base: l.base,
+                iva: l.iva,
+                total: l.total,
+                type: l.isService ? 'servicio' : 'manual'
+            }));
+
+            const { data: newBudget, error: budErr } = await supabase
+                .from('project_budgets')
+                .insert([{
+                    project_id: id,
+                    budget_number: budgetNumber,
+                    budget_date: new Date().toISOString().split('T')[0],
+                    subtotal: budgetSubtotal,
+                    iva_total: budgetIVA,
+                    total: budgetTotal,
+                    line_items: lineItemsSnapshot,
+                    status: 'pendiente'
+                }])
+                .select()
+                .single();
+
+            if (budErr) throw budErr;
+
+            const fileName = `Presupuesto - ${pName} - ${pAlias} - ${today.replace(/\//g, '-')}`;
+
+            await supabase.from('project_files').insert([{
+                project_id: id,
+                name: fileName,
+                size: `${allBudgetLines.length} líneas`,
+                file_type: 'PRESUPUESTO',
+                url: `budget:${newBudget.id}`
+            }]);
+
+            doc.save(`${fileName}.pdf`);
+            showNotification('Presupuesto generado y guardado ✅');
+            fetchProjectData();
+            fetchBudgetData();
+        } catch (error) {
+            showNotification(`Error: ${error.message}`, 'error');
+        } finally {
+            setInvoiceLoading(false);
+        }
+    };
+
+    const handleRedownloadBudget = (budgetId) => {
+        const bud = budgets.find(b => b.id === budgetId);
+        if (!bud) { showNotification('Presupuesto no encontrado', 'error'); return; }
+
+        const doc = new jsPDF();
+        const pName = project?.name || 'Proyecto';
+        const pAlias = project?.id_alias || '';
+        const pClient = project?.client || 'Cliente';
+        const bDate = new Date(bud.budget_date).toLocaleDateString('es-ES');
+
+        // Header
+        doc.setFillColor(30, 30, 40);
+        doc.rect(0, 0, 220, 42, 'F');
+        doc.setTextColor(255, 140, 50);
+        doc.setFontSize(22);
+        doc.setFont('helvetica', 'bold');
+        doc.text('PRESUPUESTO', 15, 22);
+        doc.setFontSize(10);
+        doc.setTextColor(180, 180, 190);
+        doc.text(`N.º ${bud.budget_number}`, 15, 32);
+        doc.text(`Fecha: ${bDate}`, 15, 38);
+
+        // Project / Client info
+        doc.setTextColor(60, 60, 70);
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'bold');
+        doc.text('PROYECTO:', 15, 55);
+        doc.setFont('helvetica', 'normal');
+        doc.text(`${pName}${pAlias ? ` (${pAlias})` : ''}`, 50, 55);
+        doc.setFont('helvetica', 'bold');
+        doc.text('CLIENTE:', 15, 62);
+        doc.setFont('helvetica', 'normal');
+        doc.text(pClient, 50, 62);
+
+        // Table
+        const tableRows = (bud.line_items || []).map(l => [
+            l.description,
+            l.quantity?.toString() || '1',
+            `€${parseFloat(l.unit_price || 0).toFixed(2)}`,
+            `${l.iva_percent || 21}%`,
+            `€${parseFloat(l.base || 0).toFixed(2)}`,
+            `€${parseFloat(l.total || 0).toFixed(2)}`
+        ]);
+
+        doc.autoTable({
+            startY: 72,
+            head: [['Concepto', 'Cant.', 'Precio Unit.', 'IVA', 'Base', 'Total']],
+            body: tableRows,
+            headStyles: { fillColor: [255, 140, 50], textColor: 255, fontSize: 9, fontStyle: 'bold' },
+            bodyStyles: { fontSize: 9, textColor: [50, 50, 60] },
+            alternateRowStyles: { fillColor: [245, 245, 248] },
+            columnStyles: {
+                0: { cellWidth: 60 },
+                1: { halign: 'center', cellWidth: 18 },
+                2: { halign: 'right', cellWidth: 28 },
+                3: { halign: 'center', cellWidth: 18 },
+                4: { halign: 'right', cellWidth: 28 },
+                5: { halign: 'right', cellWidth: 28 },
+            },
+            margin: { left: 15, right: 15 },
+        });
+
+        const finalY = doc.lastAutoTable.finalY + 10;
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(80, 80, 90);
+        doc.text('Subtotal (Base):', 120, finalY + 8);
+        doc.text(`€${parseFloat(bud.subtotal).toFixed(2)}`, 195, finalY + 8, { align: 'right' });
+        doc.text('IVA Total:', 120, finalY + 16);
+        doc.text(`€${parseFloat(bud.iva_total).toFixed(2)}`, 195, finalY + 16, { align: 'right' });
+        doc.setFontSize(13);
+        doc.setTextColor(255, 140, 50);
+        doc.text('TOTAL:', 120, finalY + 28);
+        doc.text(`€${parseFloat(bud.total).toFixed(2)}`, 195, finalY + 28, { align: 'right' });
+
+        const fileName = `Presupuesto - ${pName} - ${pAlias} - ${bDate.replace(/\//g, '-')}`;
+        doc.save(`${fileName}.pdf`);
+    };
+
+    const handleUpdateBudgetStatus = async (budgetId, newStatus) => {
+        try {
+            const bud = budgets.find(b => b.id === budgetId);
+            if (!bud) throw new Error('Presupuesto no encontrado');
+
+            // Update status in project_budgets
+            const { error } = await supabase
+                .from('project_budgets')
+                .update({ status: newStatus })
+                .eq('id', budgetId);
+
+            if (error) throw error;
+
+            if (newStatus === 'confirmado') {
+                // Logic to convert to invoice
+                // 1. Generate invoice number
+                const invoiceCount = invoices.length + 1;
+                const alias = project.id_alias || project.id.substring(0, 8).toUpperCase();
+                const invoiceNumber = `FAC-${alias}-${String(invoiceCount).padStart(3, '0')}`;
+                const today = new Date().toISOString().split('T')[0];
+
+                // 2. Create invoice in DB using snapshot lines
+                const { data: invoice, error: invErr } = await supabase
+                    .from('project_invoices')
+                    .insert([{
+                        project_id: id,
+                        invoice_number: invoiceNumber,
+                        invoice_date: today,
+                        subtotal: bud.subtotal,
+                        iva_total: bud.iva_total,
+                        total: bud.total,
+                        line_items: bud.line_items,
+                        status: 'emitida'
+                    }])
+                    .select()
+                    .single();
+
+                if (invErr) throw invErr;
+
+                // 3. Mark current project lines as invoiced (if any match the confirmed budget)
+                // To keep it simple, we mark all current uninvoiced lines as belonging to this invoice
+                // as confirming a budget implies invoicing those items.
+                const uninvoicedServiceIds = projectServices.filter(ps => !ps.invoice_id).map(ps => ps.id);
+                if (uninvoicedServiceIds.length > 0) {
+                    await supabase.from('project_services').update({ invoice_id: invoice.id }).in('id', uninvoicedServiceIds);
+                }
+                const uninvoicedBudgetIds = budgetLines.filter(bl => !bl.invoice_id).map(bl => bl.id);
+                if (uninvoicedBudgetIds.length > 0) {
+                    await supabase.from('project_budget_lines').update({ invoice_id: invoice.id }).in('id', uninvoicedBudgetIds);
+                }
+
+                // 4. Create file record for the invoice
+                const dateStr = new Date().toLocaleDateString('es-ES').replace(/\//g, '-');
+                const fileName = `Factura - ${project.name} - ${alias} - ${dateStr}`;
+                await supabase.from('project_files').insert([{
+                    project_id: id,
+                    name: fileName,
+                    size: `${(bud.line_items || []).length} líneas`,
+                    file_type: 'FACTURA',
+                    url: `invoice:${invoice.id}`
+                }]);
+
+                showNotification('¡Presupuesto confirmado y factura generada! 🚀');
+            } else if (newStatus === 'denegado') {
+                showNotification('Presupuesto marcado como denegado ✖️');
+            }
+
+            fetchBudgetData();
+            fetchProjectData();
+        } catch (error) {
+            showNotification(`Error: ${error.message}`, 'error');
+        }
     };
 
     // ═══════════════════════════════════════
@@ -922,30 +1278,65 @@ export default function ProjectDetail() {
                                 {files.map((file) => {
                                     const isInvoice = file.file_type === 'FACTURA' && file.url?.startsWith('invoice:');
                                     const isReceipt = file.file_type === 'RECIBO' && file.url?.startsWith('payment:');
+                                    const isBudget = file.file_type === 'PRESUPUESTO' && file.url?.startsWith('budget:');
                                     const invoiceId = isInvoice ? file.url.replace('invoice:', '') : null;
                                     const paymentId = isReceipt ? file.url.replace('payment:', '') : null;
+                                    const budgetId = isBudget ? file.url.replace('budget:', '') : null;
+                                    const budgetObj = isBudget ? budgets.find(b => b.id === budgetId) : null;
+
                                     return (
-                                        <div key={file.id} className="flex items-center gap-4 group cursor-pointer text-variable-main" onClick={() => {
-                                            if (isInvoice) handleRedownloadInvoice(invoiceId);
-                                            else if (isReceipt) handleRedownloadReceipt(paymentId);
-                                            else if (file.url) window.open(file.url, '_blank');
-                                        }}>
-                                            <div className={`p-3 border rounded-2xl transition-colors ${isInvoice
-                                                ? 'bg-primary/10 border-primary/30 text-primary group-hover:bg-primary/20'
-                                                : isReceipt
-                                                    ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-500 group-hover:bg-emerald-500/20'
-                                                    : 'bg-white/5 border-variable group-hover:text-primary'
-                                                }`}>
-                                                {isInvoice ? <Receipt size={20} /> : isReceipt ? <Banknote size={20} /> : <Download size={20} />}
+                                        <div key={file.id} className="group relative">
+                                            <div className="flex items-center gap-4 cursor-pointer text-variable-main" onClick={() => {
+                                                if (isInvoice) handleRedownloadInvoice(invoiceId);
+                                                else if (isReceipt) handleRedownloadReceipt(paymentId);
+                                                else if (isBudget) handleRedownloadBudget(budgetId);
+                                                else if (file.url) window.open(file.url, '_blank');
+                                            }}>
+                                                <div className={`p-3 border rounded-2xl transition-colors ${isInvoice || isBudget
+                                                    ? 'bg-primary/10 border-primary/30 text-primary group-hover:bg-primary/20'
+                                                    : isReceipt
+                                                        ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-500 group-hover:bg-emerald-500/20'
+                                                        : 'bg-white/5 border-variable group-hover:text-primary'
+                                                    }`}>
+                                                    {isInvoice || isBudget ? <Receipt size={20} /> : isReceipt ? <Banknote size={20} /> : <Download size={20} />}
+                                                </div>
+                                                <div className="flex-1 overflow-hidden">
+                                                    <p className="text-sm font-bold truncate">{file.name}</p>
+                                                    <div className="flex items-center gap-2">
+                                                        <p className={`text-[10px] font-bold uppercase ${isInvoice || isBudget ? 'text-primary' : isReceipt ? 'text-emerald-500' : 'text-variable-muted'
+                                                            }`}>{file.size || '---'} • {file.file_type || 'FILE'}</p>
+                                                        {isBudget && budgetObj && (
+                                                            <span className={`text-[8px] font-black px-1.5 py-0.5 rounded uppercase border ${budgetObj.status === 'confirmado' ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' : (budgetObj.status === 'denegado' ? 'bg-rose-500/10 text-rose-500 border-rose-500/20' : 'bg-primary/10 text-primary border-primary/20')
+                                                                }`}>
+                                                                {budgetObj.status}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                                {(isInvoice || isReceipt || isBudget) && (
+                                                    <div className={`p-2 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity ${isReceipt ? 'bg-emerald-500/10 text-emerald-500' : 'bg-primary/10 text-primary'}`} title="Descargar PDF">
+                                                        <Download size={14} />
+                                                    </div>
+                                                )}
                                             </div>
-                                            <div className="flex-1 overflow-hidden">
-                                                <p className="text-sm font-bold truncate">{file.name}</p>
-                                                <p className={`text-[10px] font-bold uppercase ${isInvoice ? 'text-primary' : isReceipt ? 'text-emerald-500' : 'text-variable-muted'
-                                                    }`}>{file.size || '---'} • {file.file_type || 'FILE'}</p>
-                                            </div>
-                                            {(isInvoice || isReceipt) && (
-                                                <div className={`p-2 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity ${isReceipt ? 'bg-emerald-500/10 text-emerald-500' : 'bg-primary/10 text-primary'}`} title="Descargar PDF">
-                                                    <Download size={14} />
+
+                                            {/* Acciones de Presupuesto */}
+                                            {isBudget && budgetObj && budgetObj.status === 'pendiente' && (
+                                                <div className="absolute right-0 top-1/2 -translate-y-1/2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all bg-dark/80 backdrop-blur-md p-1 rounded-xl border border-variable shadow-xl mr-10">
+                                                    <button
+                                                        onClick={(e) => { e.stopPropagation(); handleUpdateBudgetStatus(budgetId, 'confirmado'); }}
+                                                        className="p-1.5 text-emerald-500 hover:bg-emerald-500/10 rounded-lg transition-colors"
+                                                        title="Confirmar Presupuesto (Generar Factura)"
+                                                    >
+                                                        <CheckCircle2 size={14} />
+                                                    </button>
+                                                    <button
+                                                        onClick={(e) => { e.stopPropagation(); handleUpdateBudgetStatus(budgetId, 'denegado'); }}
+                                                        className="p-1.5 text-rose-500 hover:bg-rose-500/10 rounded-lg transition-colors"
+                                                        title="Denegar Presupuesto"
+                                                    >
+                                                        <X size={14} />
+                                                    </button>
                                                 </div>
                                             )}
                                         </div>
@@ -975,6 +1366,9 @@ export default function ProjectDetail() {
                                 </div>
                             </button>
                             <div className="flex items-center gap-3">
+                                <button onClick={handleGenerateBudgetPDF} className="flex items-center gap-2 px-4 py-2.5 glass text-variable-muted rounded-xl text-xs font-bold hover:text-primary transition-all">
+                                    <FileText size={14} /> Presupuesto PDF
+                                </button>
                                 <button onClick={() => setBudgetLineModal(true)} className="flex items-center gap-2 px-4 py-2.5 bg-primary/10 text-primary rounded-xl text-xs font-bold hover:bg-primary/20 transition-all">
                                     <Plus size={14} /> Añadir Línea Manual
                                 </button>
@@ -1005,37 +1399,77 @@ export default function ProjectDetail() {
                                 )}
 
                                 {/* Todas las líneas — con badge de estado */}
-                                {allBudgetLines.map((line) => (
-                                    <div key={`${line.isService ? 'svc' : 'man'}-${line.id}`} className={`grid grid-cols-1 sm:grid-cols-12 gap-2 sm:gap-4 items-center px-5 py-4 rounded-2xl border transition-colors ${line.invoiced ? 'bg-emerald-500/5 border-emerald-500/20 opacity-70' : 'bg-white/5 border-variable hover:bg-white/[0.08]'}`}>
-                                        <div className="sm:col-span-5 flex items-center gap-3">
-                                            <div className={`size-8 rounded-lg flex items-center justify-center flex-shrink-0 ${line.isService ? 'bg-primary/10' : 'bg-emerald-500/10'}`}>
-                                                {line.isService ? <Briefcase size={14} className="text-primary" /> : <DollarSign size={14} className="text-emerald-500" />}
-                                            </div>
-                                            <div>
-                                                <p className="text-sm font-bold text-variable-main">{line.description}</p>
-                                                <div className="flex items-center gap-2">
-                                                    <p className={`text-[9px] font-bold uppercase tracking-widest ${line.isService ? 'text-primary' : 'text-emerald-500'}`}>
-                                                        {line.isService ? 'Servicio contratado' : 'Línea manual'}
-                                                    </p>
-                                                    {line.invoiced && (
-                                                        <span className="text-[8px] font-black bg-emerald-500/20 text-emerald-600 px-2 py-0.5 rounded-md uppercase">Facturada ✓</span>
-                                                    )}
+                                {allBudgetLines.map((line) => {
+                                    const isEditing = editingLineId === line.id;
+                                    return (
+                                        <div key={`${line.isService ? 'svc' : 'man'}-${line.id}`} className={`grid grid-cols-1 sm:grid-cols-12 gap-2 sm:gap-4 items-center px-5 py-4 rounded-2xl border transition-colors ${line.invoiced ? 'bg-emerald-500/5 border-emerald-500/20 opacity-70' : isEditing ? 'bg-primary/5 border-primary/50' : 'bg-white/5 border-variable hover:bg-white/[0.08]'}`}>
+                                            <div className="sm:col-span-5 flex items-center gap-3">
+                                                <div className={`size-8 rounded-lg flex items-center justify-center flex-shrink-0 ${line.isService ? 'bg-primary/10' : 'bg-emerald-500/10'}`}>
+                                                    {line.isService ? <Briefcase size={14} className="text-primary" /> : <DollarSign size={14} className="text-emerald-500" />}
+                                                </div>
+                                                <div>
+                                                    <p className="text-sm font-bold text-variable-main">{line.description}</p>
+                                                    <div className="flex items-center gap-2">
+                                                        <p className={`text-[9px] font-bold uppercase tracking-widest ${line.isService ? 'text-primary' : 'text-emerald-500'}`}>
+                                                            {line.isService ? 'Servicio contratado' : 'Línea manual'}
+                                                        </p>
+                                                        {line.invoiced && (
+                                                            <span className="text-[8px] font-black bg-emerald-500/20 text-emerald-600 px-2 py-0.5 rounded-md uppercase">Facturada ✓</span>
+                                                        )}
+                                                    </div>
                                                 </div>
                                             </div>
+                                            <div className="sm:col-span-1 text-right">
+                                                {isEditing ? (
+                                                    <input type="number" value={tempLine.quantity} onChange={e => setTempLine({ ...tempLine, quantity: e.target.value })} className="w-full bg-white/10 border border-primary/30 rounded-lg px-2 py-1 text-xs text-variable-main focus:outline-none focus:border-primary" />
+                                                ) : (
+                                                    <span className="text-xs text-variable-muted font-bold">{line.quantity || 1}</span>
+                                                )}
+                                            </div>
+                                            <div className="sm:col-span-2 text-right">
+                                                {isEditing ? (
+                                                    <div className="relative">
+                                                        <span className="absolute left-1 top-1/2 -translate-y-1/2 text-[10px] text-variable-muted">€</span>
+                                                        <input type="number" step="0.01" value={tempLine.unit_price} onChange={e => setTempLine({ ...tempLine, unit_price: e.target.value })} className="w-full bg-white/10 border border-primary/30 rounded-lg pl-4 pr-1 py-1 text-xs text-variable-main focus:outline-none focus:border-primary" />
+                                                    </div>
+                                                ) : (
+                                                    <span className="text-xs text-variable-main font-bold">€{parseFloat(line.unit_price || 0).toFixed(2)}</span>
+                                                )}
+                                            </div>
+                                            <div className="sm:col-span-1 text-right">
+                                                {isEditing ? (
+                                                    <input type="number" value={tempLine.iva_percent} onChange={e => setTempLine({ ...tempLine, iva_percent: e.target.value })} className="w-full bg-white/10 border border-primary/30 rounded-lg px-2 py-1 text-xs text-variable-main focus:outline-none focus:border-primary" />
+                                                ) : (
+                                                    <span className="text-xs text-variable-muted font-bold">{line.iva_percent}%</span>
+                                                )}
+                                            </div>
+                                            <div className="sm:col-span-2 text-right text-sm font-black text-variable-main">€{line.total.toFixed(2)}</div>
+                                            <div className="sm:col-span-1 flex justify-end gap-2">
+                                                {!line.invoiced && (
+                                                    isEditing ? (
+                                                        <>
+                                                            <button onClick={() => handleSaveLine(line.id, line.isService)} className="p-1.5 text-emerald-500 hover:bg-emerald-500/10 transition-colors rounded-lg" title="Guardar">
+                                                                <CheckCircle2 size={16} />
+                                                            </button>
+                                                            <button onClick={() => { setEditingLineId(null); setTempLine(null); }} className="p-1.5 text-rose-500 hover:bg-rose-500/10 transition-colors rounded-lg" title="Cancelar">
+                                                                <X size={16} />
+                                                            </button>
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <button onClick={() => handleEditLine(line)} className="p-1.5 text-variable-muted hover:text-primary transition-colors rounded-lg hover:bg-primary/10" title="Editar">
+                                                                <Edit3 size={14} />
+                                                            </button>
+                                                            <button onClick={() => line.isService ? handleRemoveProjectService(line.id) : handleDeleteBudgetLine(line.id)} className="p-1.5 text-variable-muted hover:text-rose-500 transition-colors rounded-lg hover:bg-rose-500/10" title="Eliminar">
+                                                                <Trash2 size={14} />
+                                                            </button>
+                                                        </>
+                                                    )
+                                                )}
+                                            </div>
                                         </div>
-                                        <div className="sm:col-span-1 text-right text-xs text-variable-muted font-bold">{line.quantity || 1}</div>
-                                        <div className="sm:col-span-2 text-right text-xs text-variable-main font-bold">€{parseFloat(line.unit_price || 0).toFixed(2)}</div>
-                                        <div className="sm:col-span-1 text-right text-xs text-variable-muted font-bold">{line.iva_percent}%</div>
-                                        <div className="sm:col-span-2 text-right text-sm font-black text-variable-main">€{line.total.toFixed(2)}</div>
-                                        <div className="sm:col-span-1 flex justify-end">
-                                            {!line.invoiced && (
-                                                <button onClick={() => line.isService ? handleRemoveProjectService(line.id) : handleDeleteBudgetLine(line.id)} className="p-1.5 text-variable-muted hover:text-rose-500 transition-colors rounded-lg hover:bg-rose-500/10" title="Eliminar">
-                                                    <Trash2 size={14} />
-                                                </button>
-                                            )}
-                                        </div>
-                                    </div>
-                                ))}
+                                    );
+                                })}
 
                                 {/* Facturas anteriores */}
                                 {invoices.length > 0 && (

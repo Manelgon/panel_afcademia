@@ -362,16 +362,19 @@ CREATE TRIGGER set_updated_at_project_tasks
 
 -- Servicios vinculados a un Proyecto
 CREATE TABLE IF NOT EXISTS public.project_services (
-    id            uuid          PRIMARY KEY DEFAULT gen_random_uuid(),
-    project_id    uuid          REFERENCES public.projects(id) ON DELETE CASCADE,
-    service_id    uuid          REFERENCES public.services(id) ON DELETE CASCADE,
+    unit_price    decimal(10,2) DEFAULT 0,
+    quantity      integer       DEFAULT 1,
+    iva_percent   decimal(5,2)  DEFAULT 21,
     invoice_id    uuid,
     created_at    timestamptz   DEFAULT now(),
     UNIQUE(project_id, service_id)
 );
 
--- Agregar columna invoice_id si la tabla ya existe
+-- Agregar columnas de precio/iva si la tabla ya existe
 DO $$ BEGIN
+    ALTER TABLE public.project_services ADD COLUMN IF NOT EXISTS unit_price decimal(10,2) DEFAULT 0;
+    ALTER TABLE public.project_services ADD COLUMN IF NOT EXISTS quantity integer DEFAULT 1;
+    ALTER TABLE public.project_services ADD COLUMN IF NOT EXISTS iva_percent decimal(5,2) DEFAULT 21;
     ALTER TABLE public.project_services ADD COLUMN IF NOT EXISTS invoice_id uuid;
 END $$;
 
@@ -417,6 +420,22 @@ CREATE TABLE IF NOT EXISTS public.project_invoices (
 );
 
 CREATE INDEX IF NOT EXISTS idx_invoices_project ON public.project_invoices(project_id);
+
+-- Presupuestos del Proyecto (Snapshots)
+CREATE TABLE IF NOT EXISTS public.project_budgets (
+    id              uuid          PRIMARY KEY DEFAULT gen_random_uuid(),
+    project_id      uuid          REFERENCES public.projects(id) ON DELETE CASCADE,
+    budget_number   text          NOT NULL,
+    budget_date     date          DEFAULT CURRENT_DATE,
+    subtotal        decimal(10,2) DEFAULT 0,
+    iva_total       decimal(10,2) DEFAULT 0,
+    total           decimal(10,2) DEFAULT 0,
+    line_items      jsonb         DEFAULT '[]',
+    status          text          DEFAULT 'pendiente' CHECK (status IN ('pendiente', 'confirmado', 'denegado')),
+    created_at      timestamptz   DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_budgets_project ON public.project_budgets(project_id);
 
 -- Pagos / Cobros del Proyecto
 CREATE TABLE IF NOT EXISTS public.project_payments (
@@ -497,8 +516,11 @@ BEGIN
     -- Servicios
     IF p_service_ids IS NOT NULL AND array_length(p_service_ids, 1) > 0 THEN
         FOREACH v_service_id IN ARRAY p_service_ids LOOP
-            INSERT INTO public.project_services (project_id, service_id)
-            VALUES (new_project_id, v_service_id) ON CONFLICT DO NOTHING;
+            INSERT INTO public.project_services (project_id, service_id, unit_price, quantity, iva_percent)
+            SELECT new_project_id, v_service_id, price, 1, 21
+            FROM public.services
+            WHERE id = v_service_id
+            ON CONFLICT DO NOTHING;
         END LOOP;
     END IF;
 
@@ -599,6 +621,10 @@ CREATE POLICY "budget_lines_select" ON public.project_budget_lines FOR SELECT TO
 DROP POLICY IF EXISTS "budget_lines_all" ON public.project_budget_lines;
 CREATE POLICY "budget_lines_all" ON public.project_budget_lines FOR ALL TO authenticated USING (true);
 
+DROP POLICY IF EXISTS "project_budgets_select" ON public.project_budgets;
+CREATE POLICY "project_budgets_select" ON public.project_budgets FOR SELECT TO authenticated USING (true);
+DROP POLICY IF EXISTS "project_budgets_all" ON public.project_budgets FOR ALL TO authenticated USING (true);
+
 -- Políticas para project_invoices
 DROP POLICY IF EXISTS "invoices_select" ON public.project_invoices;
 CREATE POLICY "invoices_select" ON public.project_invoices FOR SELECT TO authenticated USING (true);
@@ -685,6 +711,9 @@ BEGIN
     IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'project_payments') THEN
         ALTER PUBLICATION supabase_realtime ADD TABLE public.project_payments;
     END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'project_budgets') THEN
+        ALTER PUBLICATION supabase_realtime ADD TABLE public.project_budgets;
+    END IF;
 END $$;
 
 
@@ -712,6 +741,7 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON public.project_services TO authenticated
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.project_budget_lines TO authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.project_invoices TO authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.project_payments TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.project_budgets TO authenticated;
 
 -- Función RPC create_project (8 parámetros)
 GRANT EXECUTE ON FUNCTION public.create_project(text, text, text, text, int, uuid, uuid[], uuid[]) TO authenticated;
