@@ -146,8 +146,9 @@ DROP POLICY IF EXISTS "profiles_admin_insert" ON public.profiles;
 DROP POLICY IF EXISTS "profiles_admin_update" ON public.profiles;
 DROP POLICY IF EXISTS "profiles_admin_delete" ON public.profiles;
 
-CREATE POLICY "profiles_admin_modification" ON public.profiles FOR INSERT, UPDATE, DELETE TO authenticated 
-USING (public.is_admin());
+CREATE POLICY "profiles_admin_insert" ON public.profiles FOR INSERT TO authenticated WITH CHECK (public.is_admin());
+CREATE POLICY "profiles_admin_update" ON public.profiles FOR UPDATE TO authenticated USING (public.is_admin());
+CREATE POLICY "profiles_admin_delete" ON public.profiles FOR DELETE TO authenticated USING (public.is_admin());
 
 -- =============================================
 -- 8. POLÍTICAS RLS - leads, segmentacion, flujos
