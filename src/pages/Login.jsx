@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { Mail, Lock, LogIn, ShieldAlert, CheckCircle2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 import logo from '../assets/logo.png';
 
 export default function Login() {
@@ -12,32 +13,52 @@ export default function Login() {
     const [error, setError] = useState(null);
     const [connectionStatus, setConnectionStatus] = useState('checking'); // 'checking', 'connected', 'error'
     const navigate = useNavigate();
+    const { user, loading: authLoading } = useAuth();
+
+    // Redirigir al panel si el usuario ya está autenticado
+    useEffect(() => {
+        if (!authLoading && user) {
+            console.log("Login: Active user found, redirecting to Dashboard...");
+            navigate('/');
+        }
+    }, [user, authLoading, navigate]);
 
     useEffect(() => {
         const checkConnection = async () => {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
+
             try {
                 const apiUrl = import.meta.env.VITE_SUPABASE_URL || import.meta.env.VITE_PUBLIC_SUPABASE_URL || ''
                 const apiKey = import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY
 
                 const res = await fetch(`${apiUrl}/auth/v1/health`, {
                     method: 'GET',
-                    headers: {
-                        'apikey': apiKey
-                    }
+                    headers: { 'apikey': apiKey },
+                    signal: controller.signal
                 });
+                clearTimeout(timeoutId);
+
                 if (res.ok) {
                     setConnectionStatus('connected');
                 } else {
+                    // Si el servidor responde aunque sea un error, la conexión básica está
                     setConnectionStatus('connected');
-                    console.log("Health check response:", res.status);
                 }
             } catch (err) {
-                console.error("Connection check failed:", err);
+                if (err.name === 'AbortError') {
+                    console.error("Health check timed out");
+                } else {
+                    console.error("Connection check failed:", err);
+                }
                 setConnectionStatus('error');
             }
         };
-        checkConnection();
-    }, []);
+
+        if (!user) {
+            checkConnection();
+        }
+    }, [user]);
 
     const handleLogin = async (e) => {
         e.preventDefault();
@@ -45,8 +66,9 @@ export default function Login() {
         setError(null);
 
         try {
+            console.log("Login: Attempting sign in...");
             const timeoutPromise = new Promise((_, reject) =>
-                setTimeout(() => reject(new Error('Tiempo de espera agotado. Verifica tu conexión.')), 30000)
+                setTimeout(() => reject(new Error('Tiempo de espera agotado. Verifica tu conexión.')), 45000)
             );
 
             const loginLogic = async () => {
@@ -57,6 +79,7 @@ export default function Login() {
 
                 if (authError) throw authError;
 
+                console.log("Login: Auth successful, fetching admin profile...");
                 const { data: profile, error: profileError } = await supabase
                     .from('profiles')
                     .select('role')
@@ -65,9 +88,8 @@ export default function Login() {
 
                 if (profileError) {
                     console.error("Error al obtener perfil:", profileError);
-                    // Si recibimos un error 500 es muy probable que sea por la política RLS recursiva
                     if (profileError.code === '500' || profileError.message?.includes('recursion')) {
-                        throw new Error('Error de servidor (RLS Recursion). Las políticas de la base de datos están mal configuradas.');
+                        throw new Error('Error de servidor (RLS Recursion). Contacta a soporte.');
                     }
                 }
 
@@ -80,8 +102,10 @@ export default function Login() {
             };
 
             await Promise.race([loginLogic(), timeoutPromise]);
+            console.log("Login: Success, navigating to home...");
             navigate('/');
         } catch (err) {
+            console.error("Login: error:", err.message);
             setError(err.message || 'Error desconocido al iniciar sesión');
         } finally {
             setLoading(false);
@@ -128,7 +152,7 @@ export default function Login() {
                                 type="email"
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
-                                className="w-full bg-white/5 border border-variable rounded-2xl pl-14 pr-6 py-4 focus:outline-none focus:border-primary/50 text-variable-main transition-all"
+                                className="w-full bg-white/5 border border-variable rounded-2xl pl-14 pr-6 py-4 focus:outline-none focus:border-primary/50 text-variable-main transition-all placeholder:text-variable-muted/30"
                                 placeholder="tuemail@afcademia.com"
                             />
                         </div>
@@ -143,7 +167,7 @@ export default function Login() {
                                 type="password"
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
-                                className="w-full bg-white/5 border border-variable rounded-2xl pl-14 pr-6 py-4 focus:outline-none focus:border-primary/50 text-variable-main transition-all"
+                                className="w-full bg-white/5 border border-variable rounded-2xl pl-14 pr-6 py-4 focus:outline-none focus:border-primary/50 text-variable-main transition-all placeholder:text-variable-muted/30"
                                 placeholder="••••••••"
                             />
                         </div>
