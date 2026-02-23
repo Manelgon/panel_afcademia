@@ -115,7 +115,22 @@ CREATE TABLE IF NOT EXISTS public.flujos_embudo (
 CREATE INDEX IF NOT EXISTS idx_flujos_status ON public.flujos_embudo(status_actual);
 
 -- =============================================
--- 6. POLÍTICAS RLS - profiles
+-- 6. SEGURIDAD: Función is_admin (Antirecursión)
+-- =============================================
+
+CREATE OR REPLACE FUNCTION public.is_admin()
+RETURNS boolean AS $$
+BEGIN
+  RETURN (
+    SELECT (role = 'admin')
+    FROM public.profiles
+    WHERE id = auth.uid()
+  );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
+
+-- =============================================
+-- 7. POLÍTICAS RLS - profiles
 -- =============================================
 
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
@@ -127,51 +142,49 @@ DROP POLICY IF EXISTS "profiles_update_own" ON public.profiles;
 CREATE POLICY "profiles_update_own" ON public.profiles FOR UPDATE TO authenticated USING (auth.uid() = id);
 
 DROP POLICY IF EXISTS "profiles_admin_all" ON public.profiles;
-CREATE POLICY "profiles_admin_all" ON public.profiles FOR ALL TO authenticated 
-USING ((SELECT role FROM public.profiles WHERE id = auth.uid()) = 'admin');
+DROP POLICY IF EXISTS "profiles_admin_insert" ON public.profiles;
+DROP POLICY IF EXISTS "profiles_admin_update" ON public.profiles;
+DROP POLICY IF EXISTS "profiles_admin_delete" ON public.profiles;
+
+CREATE POLICY "profiles_admin_modification" ON public.profiles FOR INSERT, UPDATE, DELETE TO authenticated 
+USING (public.is_admin());
 
 -- =============================================
--- 7. POLÍTICAS RLS - leads, segmentacion, flujos
+-- 8. POLÍTICAS RLS - leads, segmentacion, flujos
 -- =============================================
 
 -- Leads
 ALTER TABLE public.leads ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "leads_select_auth" ON public.leads;
-CREATE POLICY "leads_select_auth" ON public.leads FOR SELECT TO authenticated USING (true);
-
 DROP POLICY IF EXISTS "leads_insert_public" ON public.leads;
-CREATE POLICY "leads_insert_public" ON public.leads FOR INSERT TO anon, authenticated WITH CHECK (true);
-
 DROP POLICY IF EXISTS "leads_admin_all" ON public.leads;
-CREATE POLICY "leads_admin_all" ON public.leads FOR ALL TO authenticated 
-USING ((SELECT role FROM public.profiles WHERE id = auth.uid()) = 'admin');
+
+CREATE POLICY "leads_select_auth" ON public.leads FOR SELECT TO authenticated USING (true);
+CREATE POLICY "leads_insert_public" ON public.leads FOR INSERT TO anon, authenticated WITH CHECK (true);
+CREATE POLICY "leads_admin_all" ON public.leads FOR ALL TO authenticated USING (public.is_admin());
 
 -- Segmentacion
 ALTER TABLE public.segmentacion_despacho ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "seg_select_auth" ON public.segmentacion_despacho;
-CREATE POLICY "seg_select_auth" ON public.segmentacion_despacho FOR SELECT TO authenticated USING (true);
-
 DROP POLICY IF EXISTS "seg_insert_public" ON public.segmentacion_despacho;
-CREATE POLICY "seg_insert_public" ON public.segmentacion_despacho FOR INSERT TO anon, authenticated WITH CHECK (true);
-
 DROP POLICY IF EXISTS "seg_admin_all" ON public.segmentacion_despacho;
-CREATE POLICY "seg_admin_all" ON public.segmentacion_despacho FOR ALL TO authenticated 
-USING ((SELECT role FROM public.profiles WHERE id = auth.uid()) = 'admin');
+
+CREATE POLICY "seg_select_auth" ON public.segmentacion_despacho FOR SELECT TO authenticated USING (true);
+CREATE POLICY "seg_insert_public" ON public.segmentacion_despacho FOR INSERT TO anon, authenticated WITH CHECK (true);
+CREATE POLICY "seg_admin_all" ON public.segmentacion_despacho FOR ALL TO authenticated USING (public.is_admin());
 
 -- Flujos
 ALTER TABLE public.flujos_embudo ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "flujos_select_auth" ON public.flujos_embudo;
-CREATE POLICY "flujos_select_auth" ON public.flujos_embudo FOR SELECT TO authenticated USING (true);
-
 DROP POLICY IF EXISTS "flujos_insert_public" ON public.flujos_embudo;
-CREATE POLICY "flujos_insert_public" ON public.flujos_embudo FOR INSERT TO anon, authenticated WITH CHECK (true);
-
 DROP POLICY IF EXISTS "flujos_admin_all" ON public.flujos_embudo;
-CREATE POLICY "flujos_admin_all" ON public.flujos_embudo FOR ALL TO authenticated 
-USING ((SELECT role FROM public.profiles WHERE id = auth.uid()) = 'admin');
+
+CREATE POLICY "flujos_select_auth" ON public.flujos_embudo FOR SELECT TO authenticated USING (true);
+CREATE POLICY "flujos_insert_public" ON public.flujos_embudo FOR INSERT TO anon, authenticated WITH CHECK (true);
+CREATE POLICY "flujos_admin_all" ON public.flujos_embudo FOR ALL TO authenticated USING (public.is_admin());
 
 -- =============================================
--- 8. REALTIME
+-- 9. REALTIME
 -- =============================================
 
 BEGIN;
