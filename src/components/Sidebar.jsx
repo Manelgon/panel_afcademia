@@ -59,7 +59,7 @@ export default function Sidebar() {
             <aside className="hidden md:flex w-28 flex-col items-center py-8 glass border-r border-variable h-screen sticky top-0 shrink-0 z-50">
                 <div className="mb-12">
                     <div className="size-14 rounded-2xl bg-white/5 flex items-center justify-center p-2 shadow-xl border border-variable">
-                        <img src={logo} alt="Automatizatelo" className="w-full h-full object-contain" />
+                        <img src={logo} alt="AFCademia" className="w-full h-full object-contain" />
                     </div>
                 </div>
 
@@ -67,11 +67,6 @@ export default function Sidebar() {
                     <SidebarItem icon={LayoutDashboard} to="/" label="Dashboard" />
                     <SidebarItem icon={Users} to="/users" label="Usuarios" />
                     <SidebarItem icon={Target} to="/leads" label="Leads" />
-                    <SidebarItem icon={Briefcase} to="/services" label="Servicios" />
-                    <SidebarItem icon={FolderOpen} to="/projects" label="Proyectos" />
-                    <SidebarItem icon={ListTodo} to="/tasks" label="Tareas" />
-                    <SidebarItem icon={CalendarIcon} to="/calendar" label="Calendario / Hitos" />
-                    <SidebarItem icon={FileText} label="Documentos" />
                 </div>
 
                 <div className="mt-auto flex flex-col gap-6 items-center w-full px-4">
@@ -79,33 +74,28 @@ export default function Sidebar() {
 
                     <button
                         onClick={handleSignOut}
-                        className="p-4 rounded-2xl text-variable-muted hover:text-rose-500 hover:bg-rose-500/10 transition-all duration-300 flex items-center justify-center"
+                        className="p-4 rounded-2xl text-variable-muted hover:text-red-600 hover:bg-red-500/10 transition-all duration-300 flex items-center justify-center"
                         title="Cerrar Sesión"
                     >
                         <LogOut size={24} />
                     </button>
 
                     <div className="size-12 rounded-2xl border-2 border-primary/20 p-0.5 mt-2">
-                        <img className="rounded-xl w-full h-full object-cover" src="https://ui-avatars.com/api/?name=Admin&background=f3791b&color=fff" alt="User" />
+                        <img className="rounded-xl w-full h-full object-cover" src="https://ui-avatars.com/api/?name=AF&background=003865&color=fff" alt="User" />
                     </div>
                 </div>
             </aside>
 
             {/* Mobile Bottom Navigation */}
             <nav className="md:hidden fixed bottom-0 left-0 right-0 glass border-t border-variable z-[100] safe-area-bottom">
-                <div className="flex items-center gap-1 px-3 py-2 overflow-x-auto no-scrollbar">
+                <div className="flex items-center justify-around px-3 py-2">
                     <SidebarItem icon={LayoutDashboard} to="/" label="Dashboard" />
                     <SidebarItem icon={Users} to="/users" label="Usuarios" />
                     <SidebarItem icon={Target} to="/leads" label="Leads" />
-                    <SidebarItem icon={Briefcase} to="/services" label="Servicios" />
-                    <SidebarItem icon={FolderOpen} to="/projects" label="Proyectos" />
-                    <SidebarItem icon={ListTodo} to="/tasks" label="Tareas" />
-                    <SidebarItem icon={CalendarIcon} to="/calendar" label="Calendario" />
-                    <SidebarItem icon={FileText} label="Documentos" />
                     <SidebarItem icon={Settings} label="Config" />
                     <button
                         onClick={handleSignOut}
-                        className="p-3 rounded-xl text-variable-muted hover:text-rose-500 hover:bg-rose-500/10 transition-all flex-shrink-0 flex items-center justify-center"
+                        className="p-3 rounded-xl text-variable-muted hover:text-red-600 hover:bg-red-500/10 transition-all flex-shrink-0 flex items-center justify-center"
                         title="Cerrar Sesión"
                     >
                         <LogOut size={22} />

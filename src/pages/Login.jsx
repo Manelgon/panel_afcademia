@@ -16,11 +16,13 @@ export default function Login() {
     useEffect(() => {
         const checkConnection = async () => {
             try {
-                // Always use relative path - both Vite (dev) and Vercel (prod) proxy to Supabase
-                const res = await fetch('/auth/v1/health', {
+                const apiUrl = import.meta.env.VITE_SUPABASE_URL || import.meta.env.VITE_PUBLIC_SUPABASE_URL || ''
+                const apiKey = import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY
+
+                const res = await fetch(`${apiUrl}/auth/v1/health`, {
                     method: 'GET',
                     headers: {
-                        'apikey': import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY
+                        'apikey': apiKey
                     }
                 });
                 if (res.ok) {
@@ -55,14 +57,20 @@ export default function Login() {
 
                 if (authError) throw authError;
 
-                // Verificar rol en tabla 'users'
-                const { data: profile } = await supabase
-                    .from('users')
+                const { data: profile, error: profileError } = await supabase
+                    .from('profiles')
                     .select('role')
                     .eq('id', authData.user.id)
                     .single();
 
-                // Solo admins pueden acceder al panel
+                if (profileError) {
+                    console.error("Error al obtener perfil:", profileError);
+                    // Si recibimos un error 500 es muy probable que sea por la política RLS recursiva
+                    if (profileError.code === '500' || profileError.message?.includes('recursion')) {
+                        throw new Error('Error de servidor (RLS Recursion). Las políticas de la base de datos están mal configuradas.');
+                    }
+                }
+
                 if (profile && profile.role !== 'admin') {
                     await supabase.auth.signOut();
                     throw new Error('Acceso denegado. Se requieren privilegios de Administrador.');
@@ -98,7 +106,7 @@ export default function Login() {
                         <img src={logo} alt="Logo" className="w-full h-full object-contain" />
                     </div>
                     <h1 className="text-3xl font-bold font-display text-variable-main mb-2">Acceso <span className="text-primary italic">Premium</span></h1>
-                    <p className="text-variable-muted text-sm font-medium italic">Automatizatelo Admin Panel</p>
+                    <p className="text-variable-muted text-sm font-medium italic">AFCademIA Admin Panel</p>
                 </div>
 
                 <form onSubmit={handleLogin} className="space-y-6">
@@ -121,7 +129,7 @@ export default function Login() {
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
                                 className="w-full bg-white/5 border border-variable rounded-2xl pl-14 pr-6 py-4 focus:outline-none focus:border-primary/50 text-variable-main transition-all"
-                                placeholder="juan.perez@automatizatelo.com"
+                                placeholder="tuemail@afcademia.com"
                             />
                         </div>
                     </div>

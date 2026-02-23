@@ -1,25 +1,35 @@
 @import "tailwindcss";
 
 :root {
-    --primary: #f3791b;
-    --bg-main: #0F0716;
-    --bg-gradient: radial-gradient(circle at top right, #2a1f14, #0F0716);
-    --text-main: #ffffff;
-    --text-muted: #9ca3af;
-    --glass-bg: rgba(255, 255, 255, 0.03);
-    --glass-border: rgba(255, 255, 255, 0.1);
-    --sidebar-border: rgba(255, 255, 255, 0.05);
+    /* Paleta de colores AFCademIA (Sincronizada con afc-landing) */
+    --azul-oscuro: #003865;
+    --azul-medio: #2C6DA4;
+    --celeste-claro: #8EC8E7;
+    --naranja-vibrante: #F37321;
+    --gris-claro: #F4F6F8;
+    --gris-medio: #A2ACB5;
+    --blanco: #FFFFFF;
+
+    /* Semantic mapping for the panel */
+    --primary: var(--naranja-vibrante);
+    --bg-main: var(--gris-claro);
+    --bg-surface: var(--blanco);
+    --text-main: var(--azul-oscuro);
+    --text-muted: var(--gris-medio);
+
+    --glass-bg: rgba(255, 255, 255, 0.95);
+    --glass-border: rgba(0, 56, 101, 0.08);
+    --sidebar-border: rgba(0, 56, 101, 0.05);
 }
 
-.light {
-    --bg-main: #f8f9fa;
-    --bg-gradient: radial-gradient(circle at top right, #ffffff, #f1f3f5);
-    --text-main: #1a1a1a;
-    --text-muted: #6b7280;
-    --glass-bg: rgba(255, 255, 255, 0.85);
-    /* Slightly more opaque for better readability in light mode */
-    --glass-border: rgba(0, 0, 0, 0.08);
-    --sidebar-border: rgba(0, 0, 0, 0.05);
+.dark {
+    --bg-main: #001a2e;
+    --bg-surface: #002540;
+    --text-main: #ffffff;
+    --text-muted: var(--celeste-claro);
+    --glass-bg: rgba(0, 56, 101, 0.4);
+    --glass-border: rgba(255, 255, 255, 0.1);
+    --sidebar-border: rgba(255, 255, 255, 0.05);
 }
 
 @theme {
@@ -31,12 +41,11 @@
 @layer base {
     body {
         background-color: var(--bg-main) !important;
-        background-image: var(--bg-gradient) !important;
         color: var(--text-main);
         font-family: "Outfit", sans-serif;
         min-height: 100vh;
         margin: 0;
-        transition: background-color 0.3s ease, background-image 0.3s ease, color 0.3s ease;
+        transition: background-color 0.3s ease, color 0.3s ease;
     }
 }
 

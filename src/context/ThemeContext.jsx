@@ -10,12 +10,12 @@ export const ThemeProvider = ({ children }) => {
     });
 
     useEffect(() => {
-        if (!darkMode) {
-            document.documentElement.classList.add('light');
-            localStorage.setItem('theme-mode', 'light');
-        } else {
-            document.documentElement.classList.remove('light');
+        if (darkMode) {
+            document.documentElement.classList.add('dark');
             localStorage.setItem('theme-mode', 'dark');
+        } else {
+            document.documentElement.classList.remove('dark');
+            localStorage.setItem('theme-mode', 'light');
         }
     }, [darkMode]);
 

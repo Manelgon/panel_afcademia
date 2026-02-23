@@ -12,23 +12,23 @@ export default defineConfig({
         proxy: {
             // Proxy all Supabase API requests through Vite dev server to avoid CORS
             '/rest': {
-                target: 'https://ssdbss.automatizatelo.com',
+                target: 'https://tfwnekfuqxpnezbjcbpj.supabase.co',
                 changeOrigin: true,
                 secure: true,
             },
             '/auth': {
-                target: 'https://ssdbss.automatizatelo.com',
+                target: 'https://tfwnekfuqxpnezbjcbpj.supabase.co',
                 changeOrigin: true,
                 secure: true,
             },
             '/realtime': {
-                target: 'https://ssdbss.automatizatelo.com',
+                target: 'https://tfwnekfuqxpnezbjcbpj.supabase.co',
                 changeOrigin: true,
                 secure: true,
                 ws: true, // WebSocket support for realtime
             },
             '/storage': {
-                target: 'https://ssdbss.automatizatelo.com',
+                target: 'https://tfwnekfuqxpnezbjcbpj.supabase.co',
                 changeOrigin: true,
                 secure: true,
             },

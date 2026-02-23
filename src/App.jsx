@@ -20,7 +20,7 @@ const ProtectedRoute = ({ children, requireAdmin = true }) => {
     // Session is still loading
     if (loading) {
         return (
-            <div className="min-h-screen flex items-center justify-center bg-[#0F0716]">
+            <div className="min-h-screen flex items-center justify-center bg-variable-main">
                 <div className="size-12 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
             </div>
         );
@@ -34,7 +34,7 @@ const ProtectedRoute = ({ children, requireAdmin = true }) => {
     // Profile is still loading → show spinner (not "Acceso Denegado")
     if (profileLoading) {
         return (
-            <div className="min-h-screen flex items-center justify-center bg-[#0F0716]">
+            <div className="min-h-screen flex items-center justify-center bg-variable-main">
                 <div className="size-12 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
             </div>
         );
@@ -44,7 +44,7 @@ const ProtectedRoute = ({ children, requireAdmin = true }) => {
     if (requireAdmin) {
         if (!profile || profile.role !== 'admin') {
             return (
-                <div className="min-h-screen flex items-center justify-center bg-[#0F0716] text-white p-10 text-center font-display">
+                <div className="min-h-screen flex items-center justify-center bg-variable-main text-variable-main p-10 text-center font-display">
                     <div>
                         <h1 className="text-4xl font-bold mb-4 text-primary">Acceso Denegado</h1>
                         <p className="text-xl text-gray-400">No tienes permisos de administrador para ver esta sección.</p>
@@ -82,36 +82,6 @@ function App() {
                                 <Route path="/leads" element={
                                     <ProtectedRoute>
                                         <Leads />
-                                    </ProtectedRoute>
-                                } />
-
-                                <Route path="/services" element={
-                                    <ProtectedRoute>
-                                        <Services />
-                                    </ProtectedRoute>
-                                } />
-
-                                <Route path="/projects/:id" element={
-                                    <ProtectedRoute>
-                                        <ProjectDetail />
-                                    </ProtectedRoute>
-                                } />
-
-                                <Route path="/projects" element={
-                                    <ProtectedRoute>
-                                        <Projects />
-                                    </ProtectedRoute>
-                                } />
-
-                                <Route path="/tasks" element={
-                                    <ProtectedRoute requireAdmin={false}>
-                                        <Tasks />
-                                    </ProtectedRoute>
-                                } />
-
-                                <Route path="/calendar" element={
-                                    <ProtectedRoute requireAdmin={false}>
-                                        <Calendar />
                                     </ProtectedRoute>
                                 } />
 
