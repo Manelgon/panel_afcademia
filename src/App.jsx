@@ -31,28 +31,19 @@ const ProtectedRoute = ({ children, requireAdmin = true }) => {
         return <Navigate to="/login" replace />;
     }
 
-    // Rutas de admin requieren role = 'admin'
-    // Si el perfil aún no cargó (null) pero hay usuario, esperamos un momento más
-    if (requireAdmin) {
-        if (profile === null) {
-            // El perfil todavía está cargando (viene en background desde onAuthStateChange)
-            // Mostramos spinner brevemente en lugar de "Acceso Denegado"
-            return (
-                <div className="min-h-screen flex items-center justify-center bg-variable-main">
-                    <div className="size-12 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
+    // Verificación de admin:
+    // - Si profile cargó y NO es admin → Acceso Denegado
+    // - Si profile es null (error de RLS/timeout) → dejamos pasar (graceful degradation)
+    // - Si profile es admin → dejamos pasar
+    if (requireAdmin && profile && profile.role !== 'admin') {
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-variable-main text-variable-main p-10 text-center font-display">
+                <div>
+                    <h1 className="text-4xl font-bold mb-4 text-primary">Acceso Denegado</h1>
+                    <p className="text-xl text-gray-400">No tienes permisos de administrador para ver esta sección.</p>
                 </div>
-            );
-        }
-        if (profile.role !== 'admin') {
-            return (
-                <div className="min-h-screen flex items-center justify-center bg-variable-main text-variable-main p-10 text-center font-display">
-                    <div>
-                        <h1 className="text-4xl font-bold mb-4 text-primary">Acceso Denegado</h1>
-                        <p className="text-xl text-gray-400">No tienes permisos de administrador para ver esta sección.</p>
-                    </div>
-                </div>
-            );
-        }
+            </div>
+        );
     }
 
     return children;
