@@ -63,11 +63,37 @@ export default function Dashboard() {
     useEffect(() => {
         const fetchData = async () => {
             setLoading(true);
+
+            // Helper: query con timeout REAL usando Promise.race
+            const queryWithTimeout = async (label, queryFn, ms = 10000) => {
+                console.log(`[Dashboard] Fetching ${label}...`);
+                const start = Date.now();
+                try {
+                    const result = await Promise.race([
+                        queryFn(),
+                        new Promise((_, reject) =>
+                            setTimeout(() => reject(new Error(`${label} timeout after ${ms}ms`)), ms)
+                        )
+                    ]);
+                    console.log(`[Dashboard] ${label} OK (${Date.now() - start}ms):`, result.data?.length ?? 0, 'rows');
+                    if (result.error) {
+                        console.error(`[Dashboard] ${label} Supabase error:`, result.error.message, result.error);
+                    }
+                    return result;
+                } catch (err) {
+                    console.error(`[Dashboard] ${label} FAILED (${Date.now() - start}ms):`, err.message);
+                    return { data: [], error: err };
+                }
+            };
+
             try {
-                const [leadsRes, usersRes] = await Promise.all([
-                    supabase.from('leads').select('*, flujos_embudo(status_actual)').order('fecha_creacion', { ascending: false }),
+                const leadsRes = await queryWithTimeout('leads', () =>
+                    supabase.from('leads').select('*, flujos_embudo(status_actual)').order('fecha_creacion', { ascending: false })
+                );
+
+                const usersRes = await queryWithTimeout('profiles', () =>
                     supabase.from('profiles').select('*')
-                ]);
+                );
 
                 const leadsData = leadsRes.data || [];
                 const usersData = usersRes.data || [];
@@ -82,7 +108,7 @@ export default function Dashboard() {
                     totalUsers: usersData.length
                 });
             } catch (err) {
-                console.error('Error fetching dashboard data:', err);
+                console.error('[Dashboard] Error general:', err);
             } finally {
                 setLoading(false);
             }

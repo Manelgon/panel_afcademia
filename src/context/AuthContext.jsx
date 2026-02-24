@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 
 const AuthContext = createContext();
@@ -7,76 +7,73 @@ export const AuthProvider = ({ children }) => {
     const [user, setUser] = useState(null);
     const [profile, setProfile] = useState(null);
     const [loading, setLoading] = useState(true);
+    const profileFetchedFor = useRef(null);
 
-    // Helper para cargar perfil
-    const fetchProfile = async (userId) => {
-        try {
-            const { data, error } = await supabase
-                .from('profiles')
-                .select('*')
-                .eq('id', userId)
-                .single();
-
-            if (!error && data) {
-                console.log('[Auth] Profile loaded:', data.nombre, '| role:', data.role);
-                return data;
-            }
-            console.error('[Auth] Profile error:', error?.message);
-            return null;
-        } catch (err) {
-            console.error('[Auth] Profile exception:', err);
-            return null;
-        }
-    };
-
+    // ===================================================================
+    // EFECTO 1: Auth listener — SOLO state updates síncronos
+    // NUNCA hacer queries de Supabase dentro de onAuthStateChange
+    // porque causa deadlocks con getSession() y otras queries.
+    // ===================================================================
     useEffect(() => {
-        let mounted = true;
-        let initialDone = false;
-
         const { data: { subscription } } = supabase.auth.onAuthStateChange(
-            async (event, session) => {
+            (event, session) => {
                 console.log('[Auth] Event:', event, '| User:', session?.user?.email ?? 'none');
 
-                if (!mounted) return;
-
+                // SOLO operaciones síncronas aquí
                 if (session?.user) {
-                    // IMPORTANTE: cargamos el perfil ANTES de actualizar el state
-                    // para que ProtectedRoute nunca vea user sin profile
-                    const profileData = await fetchProfile(session.user.id);
-
-                    if (!mounted) return;
-
-                    // Actualizamos todo de golpe
                     setUser(session.user);
-                    setProfile(profileData);
                 } else {
                     setUser(null);
                     setProfile(null);
+                    profileFetchedFor.current = null;
                 }
-
-                // Marcamos el loading como terminado
-                if (mounted) {
-                    initialDone = true;
-                    setLoading(false);
-                }
+                setLoading(false);
             }
         );
 
-        // Fallback: si onAuthStateChange no se dispara en 8 segundos, 
-        // quitamos el loading de todas formas (previene spinner infinito)
-        const fallbackTimer = setTimeout(() => {
-            if (!initialDone && mounted) {
-                console.warn('[Auth] Fallback: no auth event in 8s, forcing loading=false');
-                setLoading(false);
-            }
-        }, 8000);
-
-        return () => {
-            mounted = false;
-            clearTimeout(fallbackTimer);
-            subscription.unsubscribe();
-        };
+        return () => subscription.unsubscribe();
     }, []);
+
+    // ===================================================================
+    // EFECTO 2: Cargar perfil FUERA del callback de auth
+    // Se activa cuando cambia el user, con un pequeño delay para
+    // asegurar que el cliente Supabase completó su inicialización.
+    // ===================================================================
+    useEffect(() => {
+        if (!user) {
+            setProfile(null);
+            profileFetchedFor.current = null;
+            return;
+        }
+
+        // Evitar fetch duplicado para el mismo user
+        if (profileFetchedFor.current === user.id) return;
+        profileFetchedFor.current = user.id;
+
+        const fetchProfile = async () => {
+            try {
+                console.log('[Auth] Fetching profile for:', user.email);
+                const { data, error } = await supabase
+                    .from('profiles')
+                    .select('*')
+                    .eq('id', user.id)
+                    .single();
+
+                if (!error && data) {
+                    console.log('[Auth] Profile loaded:', data.nombre, '| role:', data.role);
+                    setProfile(data);
+                } else if (error) {
+                    console.error('[Auth] Profile error:', error.message);
+                }
+            } catch (err) {
+                console.error('[Auth] Profile exception:', err);
+            }
+        };
+
+        // Defer: ejecutar fuera del ciclo de auth del cliente
+        const timer = setTimeout(fetchProfile, 50);
+        return () => clearTimeout(timer);
+    }, [user]);
 
     const signOut = async () => {
         await supabase.auth.signOut();

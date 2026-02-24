@@ -53,20 +53,22 @@ export default function Login() {
 
             if (authError) throw authError;
 
-            // 2. Verificar que sea admin
-            const { data: profileData, error: profileError } = await supabase
-                .from('profiles')
-                .select('role')
-                .eq('id', authData.user.id)
-                .single();
+            // 2. Verificar que sea admin (si falla la query, dejamos pasar)
+            try {
+                const { data: profileData, error: profileError } = await supabase
+                    .from('profiles')
+                    .select('role')
+                    .eq('id', authData.user.id)
+                    .single();
 
-            if (profileError) {
-                console.error('[Login] Profile error:', profileError.message);
-                // Si hay error de perfil pero el auth fue ok, dejamos pasar
-                // (puede que las RLS estén bloqueando, pero el usuario está autenticado)
-            } else if (profileData && profileData.role !== 'admin') {
-                await supabase.auth.signOut();
-                throw new Error('Acceso denegado. Se requieren privilegios de Administrador.');
+                if (!profileError && profileData && profileData.role !== 'admin') {
+                    await supabase.auth.signOut();
+                    setError('Acceso denegado. Se requieren privilegios de Administrador.');
+                    setSubmitting(false);
+                    return;
+                }
+            } catch (profileErr) {
+                console.warn('[Login] Profile check failed, allowing access:', profileErr.message);
             }
 
             // 3. Navegamos — onAuthStateChange en AuthContext completará el resto
@@ -74,8 +76,6 @@ export default function Login() {
         } catch (err) {
             console.error('[Login] Error:', err.message);
             setError(err.message || 'Error al iniciar sesión. Verifica tus credenciales.');
-            // En caso de error, aseguramos logout
-            await supabase.auth.signOut();
         } finally {
             setSubmitting(false);
         }

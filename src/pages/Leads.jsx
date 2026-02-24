@@ -9,6 +9,7 @@ import {
     X,
     ShieldCheck,
     Mail,
+    Send,
     Phone,
     MapPin,
     Briefcase,
@@ -90,7 +91,15 @@ export default function Leads() {
         whatsapp: '',
         empresa_nombre: '',
         ciudad: '',
-        source: 'Landing Page'
+        // Embudo
+        status_actual: 'nuevo',
+        newTag: '',
+        newActivity: 'lead_inactivo',
+        // Segmentación
+        num_comunidades: '',
+        interes_fundae: false,
+        software_actual: '',
+        objetivo_automatizacion: ''
     };
     const [formData, setFormData] = useState(defaultForm);
 
@@ -99,19 +108,42 @@ export default function Leads() {
         setLoading(true);
         await withLoading(async () => {
             try {
+                // 1. Crear lead con source 'Panel Admin'
                 const { data: newLead, error } = await supabase
                     .from('leads')
-                    .insert([formData])
+                    .insert([{
+                        nombre: formData.nombre,
+                        email: formData.email,
+                        whatsapp: formData.whatsapp,
+                        empresa_nombre: formData.empresa_nombre,
+                        ciudad: formData.ciudad,
+                        source: 'Panel Admin'
+                    }])
                     .select()
                     .single();
 
                 if (error) throw error;
 
-                // Crear entrada inicial en flujos_embudo
-                await supabase.from('flujos_embudo').insert([{
+                // 2. Crear entrada en flujos_embudo con estado, tag y actividad
+                const flujoData = {
                     lead_id: newLead.id,
-                    status_actual: 'nuevo'
-                }]);
+                    status_actual: formData.status_actual || 'nuevo',
+                    actividad: formData.newActivity || 'lead_inactivo',
+                    tags_proceso: formData.newTag ? [formData.newTag] : []
+                };
+                await supabase.from('flujos_embudo').insert([flujoData]);
+
+                // 3. Crear segmentación si se rellenó al menos un campo
+                const hasSeg = formData.num_comunidades || formData.interes_fundae || formData.software_actual || formData.objetivo_automatizacion;
+                if (hasSeg) {
+                    await supabase.from('segmentacion_despacho').insert([{
+                        lead_id: newLead.id,
+                        num_comunidades: formData.num_comunidades || null,
+                        interes_fundae: formData.interes_fundae || false,
+                        software_actual: formData.software_actual || null,
+                        objetivo_automatizacion: formData.objetivo_automatizacion || null
+                    }]);
+                }
 
                 setFormData(defaultForm);
                 setIsModalOpen(false);
@@ -191,6 +223,8 @@ export default function Leads() {
         setEditingLead(lead);
         const tags = lead.flujos_embudo?.[0]?.tags_proceso || [];
         const currentActivity = lead.flujos_embudo?.[0]?.actividad || '';
+        const currentStatus = lead.flujos_embudo?.[0]?.status_actual || 'nuevo';
+        const seg = lead.segmentacion_despacho || {};
 
         setFormData({
             nombre: lead.nombre,
@@ -198,8 +232,13 @@ export default function Leads() {
             whatsapp: lead.whatsapp || '',
             empresa_nombre: lead.empresa_nombre || '',
             ciudad: lead.ciudad || '',
+            status_actual: currentStatus,
             newTag: tags.length > 0 ? tags[tags.length - 1] : '',
-            newActivity: currentActivity
+            newActivity: currentActivity,
+            num_comunidades: seg.num_comunidades || '',
+            interes_fundae: seg.interes_fundae || false,
+            software_actual: seg.software_actual || '',
+            objetivo_automatizacion: seg.objetivo_automatizacion || ''
         });
         setIsModalOpen(true);
     };
@@ -224,6 +263,52 @@ export default function Leads() {
                 }
             }, 'Eliminando lead...');
         }
+    };
+
+    const handleSendEmail = async (lead) => {
+        const webhookUrl = import.meta.env.VITE_WEBHOOK_EMAIL_CONTACTO;
+        if (!webhookUrl) {
+            showNotification('Webhook de email no configurado en .env', 'error');
+            return;
+        }
+
+        await withLoading(async () => {
+            try {
+                const payload = {
+                    lead_id: lead.id,
+                    nombre: lead.nombre,
+                    email: lead.email,
+                    whatsapp: lead.whatsapp,
+                    empresa_nombre: lead.empresa_nombre,
+                    ciudad: lead.ciudad,
+                    source: lead.source,
+                    fecha_creacion: lead.fecha_creacion,
+                    // Embudo
+                    status_actual: lead.flujos_embudo?.[0]?.status_actual || 'nuevo',
+                    actividad: lead.flujos_embudo?.[0]?.actividad || null,
+                    tags_proceso: lead.flujos_embudo?.[0]?.tags_proceso || [],
+                    keyword_recibida: lead.flujos_embudo?.[0]?.keyword_recibida || null,
+                    // Segmentación
+                    num_comunidades: lead.segmentacion_despacho?.num_comunidades || null,
+                    interes_fundae: lead.segmentacion_despacho?.interes_fundae || false,
+                    software_actual: lead.segmentacion_despacho?.software_actual || null,
+                    objetivo_automatizacion: lead.segmentacion_despacho?.objetivo_automatizacion || null
+                };
+
+                const res = await fetch(webhookUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!res.ok) throw new Error(`Webhook respondió con ${res.status}`);
+
+                showNotification(`Email de contacto enviado a ${lead.nombre}`);
+            } catch (err) {
+                console.error('Error enviando email:', err);
+                showNotification(`Error al enviar email: ${err.message}`, 'error');
+            }
+        }, `Enviando email a ${lead.nombre}...`);
     };
 
     useEffect(() => {
@@ -309,6 +394,15 @@ export default function Leads() {
                             render: (lead) => <span className="text-variable-muted text-sm">{lead.ciudad || '—'}</span>
                         },
                         {
+                            key: 'source',
+                            label: 'Origen',
+                            render: (lead) => (
+                                <span className="px-2 py-0.5 rounded-md bg-white/5 border border-variable text-variable-muted text-[9px] font-bold uppercase tracking-widest leading-tight">
+                                    {lead.source || 'Landing Page'}
+                                </span>
+                            )
+                        },
+                        {
                             key: 'segmentacion',
                             label: 'Comunidades',
                             render: (lead) => (
@@ -390,8 +484,9 @@ export default function Leads() {
                             align: 'right',
                             render: (lead) => (
                                 <div className="flex gap-2 justify-end">
-                                    <button onClick={() => openEditModal(lead)} className="p-2 glass rounded-xl text-variable-muted hover:text-primary"><Edit3 size={16} /></button>
-                                    <button onClick={() => handleDeleteLead(lead)} className="p-2 glass rounded-xl text-variable-muted hover:text-rose-500"><Trash2 size={16} /></button>
+                                    <button onClick={() => handleSendEmail(lead)} title="Enviar email de contacto" className="p-2 glass rounded-xl text-variable-muted hover:text-emerald-500 transition-colors"><Send size={16} /></button>
+                                    <button onClick={() => openEditModal(lead)} className="p-2 glass rounded-xl text-variable-muted hover:text-primary transition-colors"><Edit3 size={16} /></button>
+                                    <button onClick={() => handleDeleteLead(lead)} className="p-2 glass rounded-xl text-variable-muted hover:text-rose-500 transition-colors"><Trash2 size={16} /></button>
                                 </div>
                             )
                         }
@@ -403,12 +498,14 @@ export default function Leads() {
                 {isModalOpen && (
                     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
                         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsModalOpen(false)} className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
-                        <motion.div initial={{ scale: 0.9, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.9, opacity: 0, y: 20 }} className="relative w-full max-w-xl glass rounded-[2.5rem] p-8 sm:p-12 shadow-2xl">
+                        <motion.div initial={{ scale: 0.9, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.9, opacity: 0, y: 20 }} className="relative w-full max-w-2xl glass rounded-[2.5rem] p-8 sm:p-12 shadow-2xl max-h-[90vh] overflow-y-auto">
                             <button onClick={() => setIsModalOpen(false)} className="absolute top-8 right-8 text-variable-muted hover:text-primary transition-colors"><X size={24} /></button>
                             <h2 className="text-3xl font-bold font-display mb-8 text-variable-main">
                                 {editingLead ? 'Editar Lead' : 'Nuevo Lead'}
                             </h2>
                             <form onSubmit={editingLead ? handleUpdateLead : handleCreateLead} className="space-y-6">
+                                {/* === DATOS DEL CONTACTO === */}
+                                <p className="text-[10px] font-black text-primary uppercase tracking-[0.2em] border-b border-primary/20 pb-2">Datos del Contacto</p>
                                 <div className="space-y-2">
                                     <label className="text-xs font-bold text-variable-muted uppercase tracking-widest ml-1">Nombre Completo</label>
                                     <input required value={formData.nombre} onChange={(e) => setFormData({ ...formData, nombre: e.target.value })} className="w-full bg-white/5 border border-variable rounded-2xl px-5 py-4 focus:outline-none focus:border-primary/50 text-variable-main transition-all" placeholder="Ej: Juan Pérez" />
@@ -433,35 +530,100 @@ export default function Leads() {
                                         <input value={formData.ciudad} onChange={(e) => setFormData({ ...formData, ciudad: e.target.value })} className="w-full bg-white/5 border border-variable rounded-2xl px-5 py-4 focus:outline-none focus:border-primary/50 text-variable-main transition-all" placeholder="Ej: Madrid" />
                                     </div>
                                 </div>
-                                {editingLead && (
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                                        <div className="space-y-2">
-                                            <label className="text-xs font-bold text-variable-muted uppercase tracking-widest ml-1">Tag Proceso / Estado</label>
-                                            <select
-                                                value={formData.newTag || ''}
-                                                onChange={(e) => setFormData({ ...formData, newTag: e.target.value })}
-                                                className="w-full bg-white/5 border border-variable rounded-2xl px-5 py-4 focus:outline-none focus:border-primary/50 text-variable-main transition-all appearance-none cursor-pointer"
-                                            >
-                                                <option value="" disabled className="bg-[#003865]">Seleccionar Tag...</option>
-                                                <option value="nuevo" className="bg-[#003865]">NUEVO</option>
-                                                <option value="email_enviado" className="bg-[#003865]">EMAIL ENVIADO</option>
-                                                <option value="respondido" className="bg-[#003865]">RESPONDIDO</option>
-                                            </select>
-                                        </div>
-                                        <div className="space-y-2">
-                                            <label className="text-xs font-bold text-variable-muted uppercase tracking-widest ml-1">Actividad</label>
-                                            <select
-                                                value={formData.newActivity || ''}
-                                                onChange={(e) => setFormData({ ...formData, newActivity: e.target.value })}
-                                                className="w-full bg-white/5 border border-variable rounded-2xl px-5 py-4 focus:outline-none focus:border-primary/50 text-variable-main transition-all appearance-none cursor-pointer"
-                                            >
-                                                <option value="" className="bg-[#003865]">Ninguna</option>
-                                                <option value="lead_activo" className="bg-[#003865] text-emerald-500 font-bold">● LEAD ACTIVO</option>
-                                                <option value="lead_inactivo" className="bg-[#003865] text-rose-500 font-bold">● LEAD INACTIVO</option>
-                                            </select>
-                                        </div>
+
+                                {/* === EMBUDO Y SEGUIMIENTO === */}
+                                <p className="text-[10px] font-black text-primary uppercase tracking-[0.2em] border-b border-primary/20 pb-2 pt-2">Embudo y Seguimiento</p>
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+                                    <div className="space-y-2">
+                                        <label className="text-xs font-bold text-variable-muted uppercase tracking-widest ml-1">Estado</label>
+                                        <select
+                                            value={formData.status_actual || 'nuevo'}
+                                            onChange={(e) => setFormData({ ...formData, status_actual: e.target.value })}
+                                            className="w-full bg-white/5 border border-variable rounded-2xl px-5 py-4 focus:outline-none focus:border-primary/50 text-variable-main transition-all appearance-none cursor-pointer"
+                                        >
+                                            <option value="nuevo" className="bg-[#003865]">Nuevo</option>
+                                            <option value="en_proceso" className="bg-[#003865]">En Proceso</option>
+                                            <option value="contactado" className="bg-[#003865]">Contactado</option>
+                                            <option value="convertido" className="bg-[#003865]">Convertido</option>
+                                            <option value="perdido" className="bg-[#003865]">Perdido</option>
+                                        </select>
                                     </div>
-                                )}
+                                    <div className="space-y-2">
+                                        <label className="text-xs font-bold text-variable-muted uppercase tracking-widest ml-1">Tag Proceso</label>
+                                        <select
+                                            value={formData.newTag || ''}
+                                            onChange={(e) => setFormData({ ...formData, newTag: e.target.value })}
+                                            className="w-full bg-white/5 border border-variable rounded-2xl px-5 py-4 focus:outline-none focus:border-primary/50 text-variable-main transition-all appearance-none cursor-pointer"
+                                        >
+                                            <option value="" className="bg-[#003865]">Sin tag</option>
+                                            <option value="nuevo" className="bg-[#003865]">NUEVO</option>
+                                            <option value="email_enviado" className="bg-[#003865]">EMAIL ENVIADO</option>
+                                            <option value="respondido" className="bg-[#003865]">RESPONDIDO</option>
+                                        </select>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-xs font-bold text-variable-muted uppercase tracking-widest ml-1">Actividad</label>
+                                        <select
+                                            value={formData.newActivity || ''}
+                                            onChange={(e) => setFormData({ ...formData, newActivity: e.target.value })}
+                                            className="w-full bg-white/5 border border-variable rounded-2xl px-5 py-4 focus:outline-none focus:border-primary/50 text-variable-main transition-all appearance-none cursor-pointer"
+                                        >
+                                            <option value="" className="bg-[#003865]">Sin asignar</option>
+                                            <option value="lead_activo" className="bg-[#003865]">● LEAD ACTIVO</option>
+                                            <option value="lead_inactivo" className="bg-[#003865]">● LEAD INACTIVO</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                {/* === SEGMENTACIÓN DEL DESPACHO === */}
+                                <p className="text-[10px] font-black text-primary uppercase tracking-[0.2em] border-b border-primary/20 pb-2 pt-2">Segmentación del Despacho</p>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                                    <div className="space-y-2">
+                                        <label className="text-xs font-bold text-variable-muted uppercase tracking-widest ml-1">Nº Comunidades</label>
+                                        <select
+                                            value={formData.num_comunidades || ''}
+                                            onChange={(e) => setFormData({ ...formData, num_comunidades: e.target.value })}
+                                            className="w-full bg-white/5 border border-variable rounded-2xl px-5 py-4 focus:outline-none focus:border-primary/50 text-variable-main transition-all appearance-none cursor-pointer"
+                                        >
+                                            <option value="" className="bg-[#003865]">Sin especificar</option>
+                                            <option value="1-10" className="bg-[#003865]">1 - 10</option>
+                                            <option value="11-50" className="bg-[#003865]">11 - 50</option>
+                                            <option value="50+" className="bg-[#003865]">50+</option>
+                                        </select>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-xs font-bold text-variable-muted uppercase tracking-widest ml-1">Software Actual</label>
+                                        <input
+                                            value={formData.software_actual}
+                                            onChange={(e) => setFormData({ ...formData, software_actual: e.target.value })}
+                                            className="w-full bg-white/5 border border-variable rounded-2xl px-5 py-4 focus:outline-none focus:border-primary/50 text-variable-main transition-all"
+                                            placeholder="Ej: Gesfincas, Fynkus..."
+                                        />
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                                    <div className="space-y-2">
+                                        <label className="text-xs font-bold text-variable-muted uppercase tracking-widest ml-1">Objetivo Automatización</label>
+                                        <input
+                                            value={formData.objetivo_automatizacion}
+                                            onChange={(e) => setFormData({ ...formData, objetivo_automatizacion: e.target.value })}
+                                            className="w-full bg-white/5 border border-variable rounded-2xl px-5 py-4 focus:outline-none focus:border-primary/50 text-variable-main transition-all"
+                                            placeholder="Ej: Reducir incidencias"
+                                        />
+                                    </div>
+                                    <div className="flex items-center gap-4 pt-6">
+                                        <label className="relative inline-flex items-center cursor-pointer">
+                                            <input
+                                                type="checkbox"
+                                                checked={formData.interes_fundae}
+                                                onChange={(e) => setFormData({ ...formData, interes_fundae: e.target.checked })}
+                                                className="sr-only peer"
+                                            />
+                                            <div className="w-11 h-6 bg-white/10 border border-primary/40 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                                        </label>
+                                        <span className="text-xs font-bold text-variable-muted uppercase tracking-widest">Interés FUNDAE</span>
+                                    </div>
+                                </div>
 
                                 <button disabled={loading} type="submit" className="w-full py-5 bg-primary text-white rounded-2xl font-bold hover:brightness-110 active:scale-[0.98] transition-all shadow-xl shadow-primary/30 mt-4 flex items-center justify-center gap-2">
                                     {loading ? (editingLead ? 'Actualizando...' : 'Creando...') : <><ShieldCheck size={20} /> {editingLead ? 'Actualizar Lead' : 'Guardar Lead'}</>}
