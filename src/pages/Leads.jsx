@@ -28,6 +28,21 @@ import DataTable from '../components/DataTable';
 import { useNotifications } from '../context/NotificationContext';
 import { useGlobalLoading } from '../context/LoadingContext';
 
+const INITIAL_FORM_STATE = {
+    nombre: '',
+    email: '',
+    whatsapp: '',
+    empresa_nombre: '',
+    ciudad: '',
+    status_actual: 'nuevo',
+    newTag: '',
+    newActivity: 'lead_inactivo',
+    num_comunidades: '',
+    interes_fundae: false,
+    software_actual: '',
+    objetivo_automatizacion: ''
+};
+
 export default function Leads() {
     const { darkMode, toggleTheme } = useTheme();
     const { showNotification } = useNotifications();
@@ -38,6 +53,7 @@ export default function Leads() {
     const [activeTab, setActiveTab] = useState('todos');
     const [fetchError, setFetchError] = useState(null);
     const [editingLead, setEditingLead] = useState(null);
+    const [formData, setFormData] = useState(INITIAL_FORM_STATE);
 
     const tabs = [
         { id: 'todos', label: 'Todos' },
@@ -85,24 +101,6 @@ export default function Leads() {
         ? leadsList
         : leadsList.filter(l => (l.flujos_embudo?.[0]?.status_actual || 'nuevo') === activeTab);
 
-    const defaultForm = {
-        nombre: '',
-        email: '',
-        whatsapp: '',
-        empresa_nombre: '',
-        ciudad: '',
-        // Embudo
-        status_actual: 'nuevo',
-        newTag: '',
-        newActivity: 'lead_inactivo',
-        // Segmentación
-        num_comunidades: '',
-        interes_fundae: false,
-        software_actual: '',
-        objetivo_automatizacion: ''
-    };
-    const [formData, setFormData] = useState(defaultForm);
-
     const handleCreateLead = async (e) => {
         e.preventDefault();
         setLoading(true);
@@ -145,8 +143,7 @@ export default function Leads() {
                     }]);
                 }
 
-                setFormData(defaultForm);
-                setIsModalOpen(false);
+                handleCloseModal();
                 showNotification('Lead creado con éxito');
                 fetchLeads();
             } catch (err) {
@@ -205,9 +202,7 @@ export default function Leads() {
                     })
                     .eq('lead_id', editingLead.id);
 
-                setIsModalOpen(false);
-                setEditingLead(null);
-                setFormData(defaultForm);
+                handleCloseModal();
                 showNotification('Lead actualizado con éxito');
                 fetchLeads();
             } catch (err) {
@@ -217,6 +212,12 @@ export default function Leads() {
                 setLoading(false);
             }
         }, 'Actualizando lead...');
+    };
+
+    const handleOpenCreateModal = () => {
+        setEditingLead(null);
+        setFormData(INITIAL_FORM_STATE);
+        setIsModalOpen(true);
     };
 
     const openEditModal = (lead) => {
@@ -241,6 +242,14 @@ export default function Leads() {
             objetivo_automatizacion: seg.objetivo_automatizacion || ''
         });
         setIsModalOpen(true);
+    };
+
+    const handleCloseModal = () => {
+        setIsModalOpen(false);
+        setTimeout(() => {
+            setEditingLead(null);
+            setFormData(INITIAL_FORM_STATE);
+        }, 300); // Wait for exit animation
     };
 
     const handleDeleteLead = async (lead) => {
@@ -338,7 +347,7 @@ export default function Leads() {
                         <button onClick={toggleTheme} className="p-3 glass rounded-2xl text-variable-muted hover:text-primary transition-all">
                             {darkMode ? <Sun size={20} /> : <Moon size={20} />}
                         </button>
-                        <button onClick={() => setIsModalOpen(true)} className="flex-1 sm:flex-none bg-primary text-white px-6 py-3 rounded-2xl font-bold flex items-center justify-center gap-2 hover:brightness-110 transition-all shadow-lg shadow-primary/20">
+                        <button onClick={handleOpenCreateModal} className="flex-1 sm:flex-none bg-primary text-white px-6 py-3 rounded-2xl font-bold flex items-center justify-center gap-2 hover:brightness-110 transition-all shadow-lg shadow-primary/20">
                             <UserPlus size={20} /> <span>Nuevo Lead</span>
                         </button>
                     </div>
@@ -497,9 +506,15 @@ export default function Leads() {
             <AnimatePresence>
                 {isModalOpen && (
                     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-                        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsModalOpen(false)} className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
-                        <motion.div initial={{ scale: 0.9, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.9, opacity: 0, y: 20 }} className="relative w-full max-w-2xl glass rounded-[2.5rem] p-8 sm:p-12 shadow-2xl max-h-[90vh] overflow-y-auto">
-                            <button onClick={() => setIsModalOpen(false)} className="absolute top-8 right-8 text-variable-muted hover:text-primary transition-colors"><X size={24} /></button>
+                        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={handleCloseModal} className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+                        <motion.div
+                            key={editingLead?.id || 'new'}
+                            initial={{ scale: 0.9, opacity: 0, y: 20 }}
+                            animate={{ scale: 1, opacity: 1, y: 0 }}
+                            exit={{ scale: 0.9, opacity: 0, y: 20 }}
+                            className="relative w-full max-w-2xl glass rounded-[2.5rem] p-8 sm:p-12 shadow-2xl max-h-[90vh] overflow-y-auto"
+                        >
+                            <button onClick={handleCloseModal} className="absolute top-8 right-8 text-variable-muted hover:text-primary transition-colors"><X size={24} /></button>
                             <h2 className="text-3xl font-bold font-display mb-8 text-variable-main">
                                 {editingLead ? 'Editar Lead' : 'Nuevo Lead'}
                             </h2>

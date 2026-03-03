@@ -340,3 +340,122 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 .safe-area-bottom {
     padding-bottom: env(safe-area-inset-bottom, 0px);
 }
+
+/* ============================================= */
+/* CONFIGURATION SUBMENU — Desktop & Mobile      */
+/* ============================================= */
+
+/* Desktop: vertical submenu that slides open above the gear icon */
+.config-submenu-desktop {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    width: 100%;
+    max-height: 0;
+    overflow: hidden;
+    opacity: 0;
+    transform: translateY(8px);
+    transition: max-height 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+        opacity 0.25s ease,
+        transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.config-submenu-desktop.config-submenu-open {
+    max-height: 300px;
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.config-submenu-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+    border-radius: 12px;
+    font-size: 0.7rem;
+    font-family: "Outfit", sans-serif;
+    color: var(--text-muted);
+    text-decoration: none;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+}
+
+.config-submenu-item:hover {
+    color: var(--primary);
+    background: rgba(243, 115, 33, 0.08);
+}
+
+.config-submenu-item-active {
+    color: var(--primary) !important;
+    background: rgba(243, 115, 33, 0.12) !important;
+    font-weight: 600;
+}
+
+.config-submenu-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Mobile: popover that opens upward */
+.config-popover-mobile {
+    position: absolute;
+    bottom: calc(100% + 12px);
+    left: 50%;
+    transform: translateX(-50%) translateY(8px) scale(0.95);
+    min-width: 180px;
+    background: var(--glass-bg);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid var(--glass-border);
+    border-radius: 16px;
+    padding: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.15),
+        0 -2px 8px rgba(0, 0, 0, 0.08);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s ease,
+        transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 200;
+}
+
+.config-popover-mobile.config-popover-open {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateX(-50%) translateY(0) scale(1);
+}
+
+.config-popover-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    border-radius: 12px;
+    font-size: 0.82rem;
+    font-family: "Outfit", sans-serif;
+    color: var(--text-muted);
+    text-decoration: none;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+}
+
+.config-popover-item:hover {
+    color: var(--primary);
+    background: rgba(243, 115, 33, 0.08);
+}
+
+/* Small arrow pointing down from the popover */
+.config-popover-mobile::after {
+    content: '';
+    position: absolute;
+    bottom: -6px;
+    left: 50%;
+    transform: translateX(-50%) rotate(45deg);
+    width: 12px;
+    height: 12px;
+    background: var(--glass-bg);
+    border-right: 1px solid var(--glass-border);
+    border-bottom: 1px solid var(--glass-border);
+}

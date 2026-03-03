@@ -176,9 +176,9 @@ CREATE INDEX IF NOT EXISTS idx_flujos_lead_id ON public.flujos_embudo(lead_id);
 -- │ Tabla              │ SELECT  │ INSERT  │ UPDATE  │ DELETE  │
 -- ├────────────────────┼─────────┼─────────┼─────────┼─────────┤
 -- │ profiles           │ auth    │ admin   │ own/adm │ admin   │
--- │ leads              │ auth    │ any*    │ admin   │ admin   │
--- │ segmentacion       │ auth    │ any*    │ admin   │ admin   │
--- │ flujos_embudo      │ auth    │ any*    │ admin   │ admin   │
+-- │ leads              │ any*    │ any*    │ admin   │ admin   │
+-- │ segmentacion       │ any*    │ any*    │ admin   │ admin   │
+-- │ flujos_embudo      │ any*    │ any*    │ admin   │ admin   │
 -- └────────────────────┴─────────┴─────────┴─────────┴─────────┘
 -- auth = cualquier usuario autenticado
 -- any* = anon (landing page) + autenticados
@@ -232,7 +232,7 @@ CREATE POLICY "leads_delete" ON public.leads
 ALTER TABLE public.segmentacion_despacho ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "seg_select" ON public.segmentacion_despacho
-  FOR SELECT TO authenticated
+  FOR SELECT TO anon, authenticated
   USING (true);
 
 CREATE POLICY "seg_insert" ON public.segmentacion_despacho
@@ -252,7 +252,7 @@ CREATE POLICY "seg_delete" ON public.segmentacion_despacho
 ALTER TABLE public.flujos_embudo ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "flujos_select" ON public.flujos_embudo
-  FOR SELECT TO authenticated
+  FOR SELECT TO anon, authenticated
   USING (true);
 
 CREATE POLICY "flujos_insert" ON public.flujos_embudo

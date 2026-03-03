@@ -25,6 +25,7 @@ const StatCard = ({ title, value, subtitle, icon: Icon, color = 'primary', delay
         blue: { bg: 'bg-blue-500/10', text: 'text-blue-500', shadow: 'shadow-blue-500/10' },
         emerald: { bg: 'bg-emerald-500/10', text: 'text-emerald-500', shadow: 'shadow-emerald-500/10' },
         amber: { bg: 'bg-amber-500/10', text: 'text-amber-500', shadow: 'shadow-amber-500/10' },
+        indigo: { bg: 'bg-indigo-500/10', text: 'text-indigo-500', shadow: 'shadow-indigo-500/10' },
     };
     const c = colorMap[color] || colorMap.primary;
 
@@ -55,7 +56,9 @@ export default function Dashboard() {
     const [users, setUsers] = useState([]);
     const [stats, setStats] = useState({
         totalLeads: 0,
-        activeLeads: 0,
+        nuevos: 0,
+        enProceso: 0,
+        contactados: 0,
         convertedLeads: 0,
         totalUsers: 0
     });
@@ -103,7 +106,9 @@ export default function Dashboard() {
 
                 setStats({
                     totalLeads: leadsData.length,
-                    activeLeads: leadsData.filter(l => (l.flujos_embudo?.[0]?.status_actual || 'nuevo') !== 'convertido' && (l.flujos_embudo?.[0]?.status_actual || 'nuevo') !== 'perdido').length,
+                    nuevos: leadsData.filter(l => (l.flujos_embudo?.[0]?.status_actual || 'nuevo') === 'nuevo').length,
+                    enProceso: leadsData.filter(l => l.flujos_embudo?.[0]?.status_actual === 'en_proceso').length,
+                    contactados: leadsData.filter(l => l.flujos_embudo?.[0]?.status_actual === 'contactado').length,
                     convertedLeads: leadsData.filter(l => l.flujos_embudo?.[0]?.status_actual === 'convertido').length,
                     totalUsers: usersData.length
                 });
@@ -166,11 +171,12 @@ export default function Dashboard() {
                     </div>
                 </header>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-10">
                     <StatCard title="Leads Totales" value={stats.totalLeads} icon={Target} color="primary" delay={0} />
-                    <StatCard title="En Proceso" value={stats.activeLeads} icon={Activity} color="blue" delay={0.1} />
+                    <StatCard title="Nuevos" value={stats.nuevos} icon={UserPlus} color="blue" delay={0.05} />
+                    <StatCard title="En Proceso" value={stats.enProceso} icon={Clock} color="amber" delay={0.1} />
+                    <StatCard title="Contactados" value={stats.contactados} icon={Activity} color="indigo" delay={0.15} />
                     <StatCard title="Convertidos" value={stats.convertedLeads} icon={CheckCircle2} color="emerald" delay={0.2} />
-                    <StatCard title="Tu Equipo" value={stats.totalUsers} icon={IconUsers} color="amber" delay={0.3} />
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-10">
@@ -206,8 +212,8 @@ export default function Dashboard() {
                         <div className="space-y-6">
                             {[
                                 { label: 'Nuevos', value: leads.filter(l => (l.flujos_embudo?.[0]?.status_actual || 'nuevo') === 'nuevo').length, total: stats.totalLeads, color: 'bg-blue-500' },
-                                { label: 'Contactados', value: leads.filter(l => l.flujos_embudo?.[0]?.status_actual === 'contactado').length, total: stats.totalLeads, color: 'bg-indigo-500' },
                                 { label: 'En Proceso', value: leads.filter(l => l.flujos_embudo?.[0]?.status_actual === 'en_proceso').length, total: stats.totalLeads, color: 'bg-amber-500' },
+                                { label: 'Contactados', value: leads.filter(l => l.flujos_embudo?.[0]?.status_actual === 'contactado').length, total: stats.totalLeads, color: 'bg-indigo-500' },
                                 { label: 'Convertidos', value: leads.filter(l => l.flujos_embudo?.[0]?.status_actual === 'convertido').length, total: stats.totalLeads, color: 'bg-emerald-500' }
                             ].map((item, i) => (
                                 <div key={i} className="space-y-2">
