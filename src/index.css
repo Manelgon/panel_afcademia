@@ -342,58 +342,92 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 }
 
 /* ============================================= */
-/* CONFIGURATION SUBMENU — Desktop & Mobile      */
+/* CONFIGURATION FLYOUT — Desktop & Mobile       */
 /* ============================================= */
 
-/* Desktop: vertical submenu that slides open above the gear icon */
-.config-submenu-desktop {
+/* Desktop: floating popover to the right of the sidebar */
+.config-flyout {
+    position: absolute;
+    left: calc(100% + 16px);
+    bottom: 0;
+    min-width: 220px;
+    background: #ffffff;
+    border: 1px solid rgba(0, 56, 101, 0.1);
+    border-radius: 18px;
+    padding: 16px 12px 12px;
     display: flex;
     flex-direction: column;
-    gap: 4px;
-    width: 100%;
-    max-height: 0;
-    overflow: hidden;
+    gap: 2px;
+    box-shadow: 0 8px 40px rgba(0, 0, 0, 0.12),
+        0 2px 12px rgba(0, 0, 0, 0.06);
     opacity: 0;
-    transform: translateY(8px);
-    transition: max-height 0.35s cubic-bezier(0.4, 0, 0.2, 1),
-        opacity 0.25s ease,
-        transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    pointer-events: none;
+    transform: translateX(-8px) scale(0.96);
+    transition: opacity 0.2s ease,
+        transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 200;
 }
 
-.config-submenu-desktop.config-submenu-open {
-    max-height: 300px;
+.config-flyout.config-flyout-open {
     opacity: 1;
-    transform: translateY(0);
+    pointer-events: auto;
+    transform: translateX(0) scale(1);
 }
 
-.config-submenu-item {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 10px 12px;
-    border-radius: 12px;
-    font-size: 0.7rem;
+.config-flyout-title {
+    font-size: 10px;
+    font-weight: 800;
     font-family: "Outfit", sans-serif;
     color: var(--text-muted);
+    letter-spacing: 0.15em;
+    padding: 0 8px 8px;
+    margin: 0;
+}
+
+.config-flyout-divider {
+    height: 1px;
+    background: rgba(0, 56, 101, 0.08);
+    margin: 0 4px 6px;
+}
+
+.config-flyout-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    border-radius: 12px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    font-family: "Outfit", sans-serif;
+    color: var(--azul-oscuro);
     text-decoration: none;
-    transition: all 0.2s ease;
+    transition: all 0.15s ease;
     white-space: nowrap;
 }
 
-.config-submenu-item:hover {
+.config-flyout-item:hover {
     color: var(--primary);
-    background: rgba(243, 115, 33, 0.08);
+    background: rgba(243, 115, 33, 0.06);
 }
 
-.config-submenu-item-active {
+.config-flyout-item-active {
     color: var(--primary) !important;
-    background: rgba(243, 115, 33, 0.12) !important;
-    font-weight: 600;
+    background: rgba(243, 115, 33, 0.1) !important;
+    font-weight: 700;
 }
 
-.config-submenu-label {
-    overflow: hidden;
-    text-overflow: ellipsis;
+/* Small arrow pointing left from the flyout */
+.config-flyout::before {
+    content: '';
+    position: absolute;
+    left: -6px;
+    bottom: 18px;
+    transform: rotate(45deg);
+    width: 12px;
+    height: 12px;
+    background: #ffffff;
+    border-left: 1px solid rgba(0, 56, 101, 0.1);
+    border-bottom: 1px solid rgba(0, 56, 101, 0.1);
 }
 
 /* Mobile: popover that opens upward */
@@ -402,22 +436,20 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     bottom: calc(100% + 12px);
     left: 50%;
     transform: translateX(-50%) translateY(8px) scale(0.95);
-    min-width: 180px;
-    background: var(--glass-bg);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    border: 1px solid var(--glass-border);
-    border-radius: 16px;
-    padding: 8px;
+    min-width: 210px;
+    background: #ffffff;
+    border: 1px solid rgba(0, 56, 101, 0.1);
+    border-radius: 18px;
+    padding: 14px 10px 10px;
     display: flex;
     flex-direction: column;
     gap: 2px;
-    box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.15),
-        0 -2px 8px rgba(0, 0, 0, 0.08);
+    box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.12),
+        0 -2px 8px rgba(0, 0, 0, 0.06);
     opacity: 0;
     pointer-events: none;
-    transition: opacity 0.25s ease,
-        transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: opacity 0.2s ease,
+        transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     z-index: 200;
 }
 
@@ -430,23 +462,24 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 .config-popover-item {
     display: flex;
     align-items: center;
-    gap: 10px;
-    padding: 10px 14px;
+    gap: 12px;
+    padding: 10px 12px;
     border-radius: 12px;
-    font-size: 0.82rem;
+    font-size: 0.85rem;
+    font-weight: 500;
     font-family: "Outfit", sans-serif;
-    color: var(--text-muted);
+    color: var(--azul-oscuro);
     text-decoration: none;
-    transition: all 0.2s ease;
+    transition: all 0.15s ease;
     white-space: nowrap;
 }
 
 .config-popover-item:hover {
     color: var(--primary);
-    background: rgba(243, 115, 33, 0.08);
+    background: rgba(243, 115, 33, 0.06);
 }
 
-/* Small arrow pointing down from the popover */
+/* Small arrow pointing down from the mobile popover */
 .config-popover-mobile::after {
     content: '';
     position: absolute;
@@ -455,7 +488,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     transform: translateX(-50%) rotate(45deg);
     width: 12px;
     height: 12px;
-    background: var(--glass-bg);
-    border-right: 1px solid var(--glass-border);
-    border-bottom: 1px solid var(--glass-border);
+    background: #ffffff;
+    border-right: 1px solid rgba(0, 56, 101, 0.1);
+    border-bottom: 1px solid rgba(0, 56, 101, 0.1);
 }

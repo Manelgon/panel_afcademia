@@ -4,7 +4,6 @@ import Dashboard from './pages/Dashboard';
 import ProjectDetail from './pages/ProjectDetail';
 import Users from './pages/Users';
 import Leads from './pages/Leads';
-import Services from './pages/Services';
 import Projects from './pages/Projects';
 import Tasks from './pages/Tasks';
 import Calendar from './pages/Calendar';

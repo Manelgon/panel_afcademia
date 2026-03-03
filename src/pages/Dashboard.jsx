@@ -4,8 +4,6 @@ import {
     Users as IconUsers,
     TrendingUp,
     Clock,
-    Sun,
-    Moon,
     Target,
     Activity,
     UserPlus,
@@ -47,7 +45,7 @@ const StatCard = ({ title, value, subtitle, icon: Icon, color = 'primary', delay
 };
 
 export default function Dashboard() {
-    const { darkMode, toggleTheme } = useTheme();
+    const { darkMode } = useTheme();
     const { profile } = useAuth();
     const navigate = useNavigate();
 
@@ -164,11 +162,7 @@ export default function Dashboard() {
                             <Clock size={14} /> Panel de Control AFCademIA
                         </p>
                     </div>
-                    <div className="flex gap-3">
-                        <button onClick={toggleTheme} className="p-3 glass rounded-2xl text-variable-muted hover:text-primary transition-all">
-                            {darkMode ? <Sun size={20} /> : <Moon size={20} />}
-                        </button>
-                    </div>
+
                 </header>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-10">

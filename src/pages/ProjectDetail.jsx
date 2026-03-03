@@ -77,7 +77,6 @@ export default function ProjectDetail() {
     const [formLoading, setFormLoading] = useState(false);
 
     // Budget / Services state
-    const [projectServices, setProjectServices] = useState([]);
     const [budgetLines, setBudgetLines] = useState([]);
     const [budgetExpanded, setBudgetExpanded] = useState(true);
     const [budgetLineModal, setBudgetLineModal] = useState(false);
@@ -85,8 +84,6 @@ export default function ProjectDetail() {
     const [invoices, setInvoices] = useState([]);
     const [budgets, setBudgets] = useState([]);
     const [invoiceLoading, setInvoiceLoading] = useState(false);
-    const [catalogServices, setCatalogServices] = useState([]);
-    const [isCatalogMode, setIsCatalogMode] = useState(false);
 
     // Payments state
     const [payments, setPayments] = useState([]);
@@ -183,13 +180,6 @@ export default function ProjectDetail() {
     };
 
     const fetchBudgetData = async () => {
-        // Fetch services linked to this project
-        const { data: svcData } = await supabase
-            .from('project_services')
-            .select('*, services:service_id(name, description, price)')
-            .eq('project_id', id);
-        setProjectServices(svcData || []);
-
         // Fetch manual budget lines
         const { data: lineData } = await supabase
             .from('project_budget_lines')
@@ -221,14 +211,6 @@ export default function ProjectDetail() {
             .eq('project_id', id)
             .order('payment_date', { ascending: false });
         setPayments(payData || []);
-
-        // Fetch all catalog services
-        const { data: catalogData } = await supabase
-            .from('services')
-            .select('*')
-            .eq('is_active', true)
-            .order('name');
-        setCatalogServices(catalogData || []);
     };
 
     useEffect(() => {
@@ -243,7 +225,6 @@ export default function ProjectDetail() {
                 .on('postgres_changes', { event: '*', schema: 'public', table: 'project_milestones', filter: `project_id=eq.${id}` }, fetchProjectData)
                 .on('postgres_changes', { event: '*', schema: 'public', table: 'project_tasks', filter: `project_id=eq.${id}` }, fetchProjectData)
                 .on('postgres_changes', { event: '*', schema: 'public', table: 'project_files', filter: `project_id=eq.${id}` }, fetchProjectData)
-                .on('postgres_changes', { event: '*', schema: 'public', table: 'project_services', filter: `project_id=eq.${id}` }, fetchBudgetData)
                 .on('postgres_changes', { event: '*', schema: 'public', table: 'project_budget_lines', filter: `project_id=eq.${id}` }, fetchBudgetData)
                 .on('postgres_changes', { event: '*', schema: 'public', table: 'project_invoices', filter: `project_id=eq.${id}` }, fetchBudgetData)
                 .on('postgres_changes', { event: '*', schema: 'public', table: 'project_budgets', filter: `project_id=eq.${id}` }, fetchBudgetData)
@@ -289,6 +270,7 @@ export default function ProjectDetail() {
 
     const handleAddBudgetLine = async (e) => {
         e.preventDefault();
+        const hasPendingBudget = budgets.some(b => b.status === 'pendiente');
         if (hasPendingBudget) {
             showNotification('Hay un presupuesto pendiente. Debes confirmarlo o denegarlo antes de modificar las líneas.', 'error');
             return;
@@ -311,35 +293,8 @@ export default function ProjectDetail() {
         }, 'Añadiendo línea de presupuesto...');
     };
 
-    const handleAddCatalogService = async (serviceId) => {
-        if (hasPendingBudget) {
-            showNotification('Hay un presupuesto pendiente. Debes confirmarlo o denegarlo antes de modificar las líneas.', 'error');
-            return;
-        }
-        await withLock(async () => {
-            const service = catalogServices.find(s => s.id === serviceId);
-            if (!service) return;
-            const { error } = await supabase
-                .from('project_services')
-                .insert([{
-                    project_id: id,
-                    service_id: serviceId,
-                    unit_price: service.price,
-                    quantity: 1,
-                    iva_percent: 21
-                }]);
-            if (error) {
-                if (error.code === '23505') throw new Error('Este servicio ya está en el presupuesto');
-                throw error;
-            }
-            setBudgetLineModal(false);
-            setIsCatalogMode(false);
-            showNotification('Servicio añadido del catálogo');
-            fetchBudgetData();
-        }, 'Añadiendo servicio...');
-    };
-
     const handleDeleteBudgetLine = async (lineId) => {
+        const hasPendingBudget = budgets.some(b => b.status === 'pendiente');
         if (hasPendingBudget) {
             showNotification('Hay un presupuesto pendiente. Debes confirmarlo o denegarlo antes de modificar las líneas.', 'error');
             return;
@@ -351,35 +306,20 @@ export default function ProjectDetail() {
         }, 'Eliminando línea...');
     };
 
-    const handleRemoveProjectService = async (serviceId) => {
-        if (hasPendingBudget) {
-            showNotification('Hay un presupuesto pendiente. Debes confirmarlo o denegarlo antes de modificar las líneas.', 'error');
-            return;
-        }
-        await withLock(async () => {
-            const { error } = await supabase.from('project_services').delete().eq('project_id', id).eq('service_id', serviceId);
-            if (error) throw error;
-            fetchBudgetData();
-        }, 'Eliminando servicio...');
-    };
-
-    const handleSaveLine = async (lineId, isService) => {
+    const handleSaveLine = async (lineId) => {
+        const hasPendingBudget = budgets.some(b => b.status === 'pendiente');
         if (hasPendingBudget) {
             showNotification('Hay un presupuesto pendiente. No se pueden guardar cambios.', 'error');
             return;
         }
         await withLock(async () => {
-            const table = isService ? 'project_services' : 'project_budget_lines';
+            const table = 'project_budget_lines';
             let query = supabase.from(table).update({
                 unit_price: parseFloat(tempLine.unit_price) || 0,
                 quantity: parseInt(tempLine.quantity) || 1,
                 iva_percent: parseFloat(tempLine.iva_percent) || 0
             });
-            if (isService) {
-                query = query.eq('project_id', id).eq('service_id', lineId);
-            } else {
-                query = query.eq('id', lineId);
-            }
+            query = query.eq('id', lineId);
             const { error } = await query;
             if (error) throw error;
             showNotification('Línea actualizada');
@@ -390,6 +330,7 @@ export default function ProjectDetail() {
     };
 
     const handleEditLine = (line) => {
+        const hasPendingBudget = budgets.some(b => b.status === 'pendiente');
         if (hasPendingBudget) {
             showNotification('Hay un presupuesto pendiente. Debes confirmarlo o denegarlo antes de modificar las líneas.', 'error');
             return;
@@ -407,25 +348,6 @@ export default function ProjectDetail() {
     };
 
     // Cálculos de presupuesto — separar facturadas vs pendientes
-    const serviceLines = projectServices.map(ps => {
-        const unitPrice = parseFloat(ps.unit_price !== null ? ps.unit_price : ps.services?.price) || 0;
-        const quantity = parseInt(ps.quantity) || 1;
-        const ivaPercent = parseFloat(ps.iva_percent) || 21;
-        const base = unitPrice * quantity;
-        const iva = base * (ivaPercent / 100);
-        return {
-            description: ps.services?.name || 'Servicio',
-            base,
-            iva,
-            total: base + iva,
-            isService: true,
-            id: ps.service_id,
-            invoiced: !!ps.invoice_id,
-            quantity,
-            unit_price: unitPrice,
-            iva_percent: ivaPercent
-        };
-    });
     const manualLines = budgetLines.map(bl => {
         const base = (parseFloat(bl.unit_price) || 0) * (parseInt(bl.quantity) || 1);
         const iva = base * ((parseFloat(bl.iva_percent) || 0) / 100);
@@ -434,7 +356,6 @@ export default function ProjectDetail() {
             base,
             iva,
             total: base + iva,
-            isService: false,
             id: bl.id,
             quantity: bl.quantity,
             unit_price: bl.unit_price,
@@ -442,13 +363,12 @@ export default function ProjectDetail() {
             invoiced: !!bl.invoice_id
         };
     });
-    const allBudgetLines = [...serviceLines, ...manualLines];
-    const uninvoicedLines = allBudgetLines.filter(l => !l.invoiced);
+    const uninvoicedLines = manualLines.filter(l => !l.invoiced);
     const hasPendingBudget = budgets.some(b => b.status === 'pendiente');
-    const invoicedLines = allBudgetLines.filter(l => l.invoiced);
-    const budgetSubtotal = allBudgetLines.reduce((sum, l) => sum + l.base, 0);
-    const budgetIVA = allBudgetLines.reduce((sum, l) => sum + l.iva, 0);
-    const budgetTotal = allBudgetLines.reduce((sum, l) => sum + l.total, 0);
+    const invoicedLines = manualLines.filter(l => l.invoiced);
+    const budgetSubtotal = manualLines.reduce((sum, l) => sum + l.base, 0);
+    const budgetIVA = manualLines.reduce((sum, l) => sum + l.iva, 0);
+    const budgetTotal = manualLines.reduce((sum, l) => sum + l.total, 0);
     const uninvoicedSubtotal = uninvoicedLines.reduce((sum, l) => sum + l.base, 0);
     const uninvoicedIVA = uninvoicedLines.reduce((sum, l) => sum + l.iva, 0);
     const uninvoicedTotal = uninvoicedLines.reduce((sum, l) => sum + l.total, 0);
@@ -577,7 +497,7 @@ export default function ProjectDetail() {
                 base: l.base,
                 iva: l.iva,
                 total: l.total,
-                type: l.isService ? 'servicio' : 'manual'
+                type: 'manual'
             }));
             const { data: invoice, error: invErr } = await supabase
                 .from('project_invoices')
@@ -594,10 +514,7 @@ export default function ProjectDetail() {
                 .select()
                 .single();
             if (invErr) throw invErr;
-            const uninvoicedServiceIds = projectServices.filter(ps => !ps.invoice_id).map(ps => ps.id);
-            if (uninvoicedServiceIds.length > 0) {
-                await supabase.from('project_services').update({ invoice_id: invoice.id }).in('id', uninvoicedServiceIds);
-            }
+
             const uninvoicedBudgetIds = budgetLines.filter(bl => !bl.invoice_id).map(bl => bl.id);
             if (uninvoicedBudgetIds.length > 0) {
                 await supabase.from('project_budget_lines').update({ invoice_id: invoice.id }).in('id', uninvoicedBudgetIds);
@@ -679,7 +596,7 @@ export default function ProjectDetail() {
             doc.text(pClient, 50, 62);
 
             // Table
-            const tableRows = allBudgetLines.map(l => [
+            const tableRows = manualLines.map(l => [
                 l.description,
                 l.quantity?.toString() || '1',
                 `€${parseFloat(l.unit_price || 0).toFixed(2)}`,
@@ -726,7 +643,7 @@ export default function ProjectDetail() {
             const bAlias = project?.id_alias || project?.id?.substring(0, 8).toUpperCase() || '';
             const budgetNumber = `PRE-${bAlias}-${String(budgetCount).padStart(3, '0')}`;
 
-            const lineItemsSnapshot = allBudgetLines.map(l => ({
+            const lineItemsSnapshot = manualLines.map(l => ({
                 description: l.description,
                 quantity: l.quantity || 1,
                 unit_price: l.unit_price,
@@ -734,7 +651,7 @@ export default function ProjectDetail() {
                 base: l.base,
                 iva: l.iva,
                 total: l.total,
-                type: l.isService ? 'servicio' : 'manual'
+                type: 'manual'
             }));
 
             const { data: newBudget, error: budErr } = await supabase
@@ -759,7 +676,7 @@ export default function ProjectDetail() {
             await supabase.from('project_files').insert([{
                 project_id: id,
                 name: fileName,
-                size: `${allBudgetLines.length} líneas`,
+                size: `${manualLines.length} líneas`,
                 file_type: 'PRESUPUESTO',
                 url: `budget:${newBudget.id}`
             }]);
@@ -922,7 +839,6 @@ export default function ProjectDetail() {
                         .from('project_invoices').select('total').eq('project_id', id);
                     const totalFacturado = (allInvoices || []).reduce((sum, inv) => sum + parseFloat(inv.total || 0), 0);
                     await supabase.from('projects').update({ budget: totalFacturado }).eq('id', id);
-                    await supabase.from('project_services').delete().eq('project_id', id);
                     await supabase.from('project_budget_lines').delete().eq('project_id', id);
                     showNotification('¡Presupuesto confirmado y factura generada! 🚀');
                 } else if (newStatus === 'denegado') {
@@ -1606,10 +1522,10 @@ export default function ProjectDetail() {
                                 </div>
                                 <div>
                                     <h3 className="text-xl font-bold text-variable-main flex items-center gap-2">
-                                        Presupuesto / Servicios
+                                        Presupuesto
                                         {budgetExpanded ? <ChevronUp size={18} className="text-variable-muted" /> : <ChevronDown size={18} className="text-variable-muted" />}
                                     </h3>
-                                    <p className="text-xs text-variable-muted italic">Líneas de servicio contratadas y extras manuales</p>
+                                    <p className="text-xs text-variable-muted italic">Líneas de presupuesto y extras manuales</p>
                                 </div>
                             </button>
                             <div className="flex flex-wrap items-center gap-2 sm:gap-3">
@@ -1655,7 +1571,7 @@ export default function ProjectDetail() {
                                     <div className="py-12 text-center border-2 border-dashed border-variable rounded-3xl">
                                         <Receipt size={32} className="mx-auto text-variable-muted mb-3 opacity-50" />
                                         <p className="text-sm text-variable-muted">No hay líneas de presupuesto.</p>
-                                        <p className="text-xs text-variable-muted italic mt-1">Añade servicios al crear el proyecto o agrega líneas manuales.</p>
+                                        <p className="text-xs text-variable-muted italic mt-1">Agrega líneas manuales al presupuesto.</p>
                                     </div>
                                 )}
 
@@ -1663,16 +1579,16 @@ export default function ProjectDetail() {
                                 {allBudgetLines.map((line) => {
                                     const isEditing = editingLineId === line.id;
                                     return (
-                                        <div key={`${line.isService ? 'svc' : 'man'}-${line.id}`} className={`grid grid-cols-1 sm:grid-cols-12 gap-2 sm:gap-4 items-center px-5 py-4 rounded-2xl border transition-colors ${line.invoiced ? 'bg-emerald-500/5 border-emerald-500/20 opacity-70' : isEditing ? 'bg-primary/5 border-primary/50' : 'bg-white/5 border-variable hover:bg-white/[0.08]'}`}>
+                                        <div key={`man-${line.id}`} className={`grid grid-cols-1 sm:grid-cols-12 gap-2 sm:gap-4 items-center px-5 py-4 rounded-2xl border transition-colors ${line.invoiced ? 'bg-emerald-500/5 border-emerald-500/20 opacity-70' : isEditing ? 'bg-primary/5 border-primary/50' : 'bg-white/5 border-variable hover:bg-white/[0.08]'}`}>
                                             <div className="sm:col-span-5 flex items-center gap-3">
-                                                <div className={`size-8 rounded-lg flex items-center justify-center flex-shrink-0 ${line.isService ? 'bg-primary/10' : 'bg-emerald-500/10'}`}>
-                                                    {line.isService ? <Briefcase size={14} className="text-primary" /> : <DollarSign size={14} className="text-emerald-500" />}
+                                                <div className="size-8 rounded-lg flex items-center justify-center flex-shrink-0 bg-emerald-500/10">
+                                                    <DollarSign size={14} className="text-emerald-500" />
                                                 </div>
                                                 <div>
                                                     <p className="text-sm font-bold text-variable-main">{line.description}</p>
                                                     <div className="flex items-center gap-2">
-                                                        <p className={`text-[9px] font-bold uppercase tracking-widest ${line.isService ? 'text-primary' : 'text-emerald-500'}`}>
-                                                            {line.isService ? 'Servicio contratado' : 'Línea manual'}
+                                                        <p className="text-[9px] font-bold uppercase tracking-widest text-emerald-500">
+                                                            Línea de presupuesto
                                                         </p>
                                                         {line.invoiced && (
                                                             <span className="text-[8px] font-black bg-emerald-500/20 text-emerald-600 px-2 py-0.5 rounded-md uppercase">Facturada ✓</span>
@@ -1709,7 +1625,7 @@ export default function ProjectDetail() {
                                                 {!line.invoiced && (
                                                     isEditing ? (
                                                         <>
-                                                            <button onClick={() => handleSaveLine(line.id, line.isService)} className="p-1.5 text-emerald-500 hover:bg-emerald-500/10 transition-colors rounded-lg" title="Guardar">
+                                                            <button onClick={() => handleSaveLine(line.id)} className="p-1.5 text-emerald-500 hover:bg-emerald-500/10 transition-colors rounded-lg" title="Guardar">
                                                                 <CheckCircle2 size={16} />
                                                             </button>
                                                             <button onClick={() => { setEditingLineId(null); setTempLine(null); }} className="p-1.5 text-rose-500 hover:bg-rose-500/10 transition-colors rounded-lg" title="Cancelar">
@@ -1721,7 +1637,7 @@ export default function ProjectDetail() {
                                                             <button onClick={() => handleEditLine(line)} className="p-1.5 text-variable-muted hover:text-primary transition-colors rounded-lg hover:bg-primary/10" title="Editar">
                                                                 <Edit3 size={14} />
                                                             </button>
-                                                            <button onClick={() => line.isService ? handleRemoveProjectService(line.id) : handleDeleteBudgetLine(line.id)} className="p-1.5 text-variable-muted hover:text-rose-500 transition-colors rounded-lg hover:bg-rose-500/10" title="Eliminar">
+                                                            <button onClick={() => handleDeleteBudgetLine(line.id)} className="p-1.5 text-variable-muted hover:text-rose-500 transition-colors rounded-lg hover:bg-rose-500/10" title="Eliminar">
                                                                 <Trash2 size={14} />
                                                             </button>
                                                         </>
@@ -2038,106 +1954,46 @@ export default function ProjectDetail() {
                         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
                             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => { setBudgetLineModal(false); setIsCatalogMode(false); }} className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
                             <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="relative w-full max-w-md glass rounded-[2.5rem] p-10 shadow-2xl overflow-visible">
-                                <h2 className="text-2xl font-bold mb-2 text-variable-main text-center">Añadir al Presupuesto</h2>
-
-                                {/* Selector de modo */}
-                                <div className="flex bg-white/5 p-1 rounded-2xl mb-8 border border-variable">
-                                    <button
-                                        onClick={() => setIsCatalogMode(false)}
-                                        className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all ${!isCatalogMode ? 'bg-primary text-white shadow-lg' : 'text-variable-muted hover:text-variable-main'}`}
-                                    >
-                                        Línea Manual
-                                    </button>
-                                    <button
-                                        onClick={() => setIsCatalogMode(true)}
-                                        className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all ${isCatalogMode ? 'bg-primary text-white shadow-lg' : 'text-variable-muted hover:text-variable-main'}`}
-                                    >
-                                        Catálogo de Servicios
-                                    </button>
-                                </div>
-
-                                {!isCatalogMode ? (
-                                    <form onSubmit={handleAddBudgetLine} className="space-y-6">
-                                        <div className="space-y-2">
-                                            <label className="text-[10px] font-black text-primary uppercase tracking-widest ml-1">Concepto / Descripción</label>
-                                            <input required value={newBudgetLine.description} onChange={e => setNewBudgetLine({ ...newBudgetLine, description: e.target.value })} className="w-full bg-white/5 border border-variable rounded-2xl px-5 py-4 text-variable-main focus:outline-none focus:border-primary/50" placeholder="Ej: Diseño landing page extra" />
-                                        </div>
-                                        <div className="grid grid-cols-3 gap-4">
-                                            <div className="space-y-2">
-                                                <label className="text-[10px] font-black text-primary uppercase tracking-widest ml-1">Precio Unit. (€)</label>
-                                                <input required type="number" step="0.01" min="0" value={newBudgetLine.unit_price} onChange={e => setNewBudgetLine({ ...newBudgetLine, unit_price: e.target.value })} className="w-full bg-white/5 border border-variable rounded-2xl px-4 py-4 text-variable-main focus:outline-none focus:border-primary/50 text-sm" placeholder="0.00" />
-                                            </div>
-                                            <div className="space-y-2">
-                                                <label className="text-[10px] font-black text-primary uppercase tracking-widest ml-1">Cantidad</label>
-                                                <input required type="number" min="1" value={newBudgetLine.quantity} onChange={e => setNewBudgetLine({ ...newBudgetLine, quantity: e.target.value })} className="w-full bg-white/5 border border-variable rounded-2xl px-4 py-4 text-variable-main focus:outline-none focus:border-primary/50 text-sm" />
-                                            </div>
-                                            <div className="space-y-2">
-                                                <label className="text-[10px] font-black text-primary uppercase tracking-widest ml-1">IVA %</label>
-                                                <input required type="number" step="0.5" min="0" max="100" value={newBudgetLine.iva_percent} onChange={e => setNewBudgetLine({ ...newBudgetLine, iva_percent: e.target.value })} className="w-full bg-white/5 border border-variable rounded-2xl px-4 py-4 text-variable-main focus:outline-none focus:border-primary/50 text-sm" />
-                                            </div>
-                                        </div>
-                                        {/* Preview */}
-                                        {newBudgetLine.unit_price && (
-                                            <div className="p-4 rounded-2xl bg-primary/5 border border-primary/20 text-sm">
-                                                <div className="flex justify-between text-variable-muted">
-                                                    <span>Base:</span>
-                                                    <span className="font-bold text-variable-main">€{((parseFloat(newBudgetLine.unit_price) || 0) * (parseInt(newBudgetLine.quantity) || 1)).toFixed(2)}</span>
-                                                </div>
-                                                <div className="flex justify-between text-variable-muted mt-1">
-                                                    <span>IVA ({newBudgetLine.iva_percent}%):</span>
-                                                    <span className="font-bold text-variable-main">€{(((parseFloat(newBudgetLine.unit_price) || 0) * (parseInt(newBudgetLine.quantity) || 1)) * ((parseFloat(newBudgetLine.iva_percent) || 0) / 100)).toFixed(2)}</span>
-                                                </div>
-                                                <div className="flex justify-between text-primary font-black mt-2 pt-2 border-t border-primary/20">
-                                                    <span>Total:</span>
-                                                    <span>€{(((parseFloat(newBudgetLine.unit_price) || 0) * (parseInt(newBudgetLine.quantity) || 1)) * (1 + (parseFloat(newBudgetLine.iva_percent) || 0) / 100)).toFixed(2)}</span>
-                                                </div>
-                                            </div>
-                                        )}
-                                        <button disabled={formLoading} type="submit" className="w-full py-4 bg-primary text-white rounded-2xl font-bold shadow-xl shadow-primary/30 hover:brightness-110 transition-all">
-                                            {formLoading ? 'Guardando...' : 'Añadir Línea'}
-                                        </button>
-                                    </form>
-                                ) : (
-                                    <div className="space-y-6">
-                                        <div className="space-y-2">
-                                            <label className="text-[10px] font-black text-primary uppercase tracking-widest ml-1">Seleccionar Servicio</label>
-                                            <div className="space-y-2 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
-                                                {catalogServices.map(service => {
-                                                    const isAlreadyInProject = projectServices.some(ps => ps.service_id === service.id);
-                                                    return (
-                                                        <button
-                                                            key={service.id}
-                                                            disabled={isAlreadyInProject || formLoading}
-                                                            onClick={() => handleAddCatalogService(service.id)}
-                                                            className={`w-full flex items-center justify-between p-4 rounded-2xl border transition-all text-left ${isAlreadyInProject
-                                                                ? 'bg-white/5 border-variable opacity-50 cursor-not-allowed'
-                                                                : 'bg-white/5 border-variable hover:border-primary/50 hover:bg-primary/5'
-                                                                }`}
-                                                        >
-                                                            <div>
-                                                                <p className="text-sm font-bold text-variable-main">{service.name}</p>
-                                                                <p className="text-[10px] text-variable-muted line-clamp-1">{service.description}</p>
-                                                            </div>
-                                                            <div className="text-right">
-                                                                <p className="text-sm font-black text-primary">€{parseFloat(service.price).toFixed(2)}</p>
-                                                                {isAlreadyInProject && <p className="text-[8px] font-black text-emerald-500 uppercase mt-1">En presupuesto</p>}
-                                                            </div>
-                                                        </button>
-                                                    );
-                                                })}
-                                                {catalogServices.length === 0 && (
-                                                    <p className="text-center text-xs text-variable-muted py-8">No hay servicios en el catálogo.</p>
-                                                )}
-                                            </div>
-                                        </div>
-                                        <button
-                                            onClick={() => { setBudgetLineModal(false); setIsCatalogMode(false); }}
-                                            className="w-full py-4 glass text-variable-muted rounded-2xl font-bold hover:text-variable-main transition-all text-sm"
-                                        >
-                                            Cerrar
-                                        </button>
+                                <form onSubmit={handleAddBudgetLine} className="space-y-6">
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] font-black text-primary uppercase tracking-widest ml-1">Concepto / Descripción</label>
+                                        <input required value={newBudgetLine.description} onChange={e => setNewBudgetLine({ ...newBudgetLine, description: e.target.value })} className="w-full bg-white/5 border border-variable rounded-2xl px-5 py-4 text-variable-main focus:outline-none focus:border-primary/50" placeholder="Ej: Diseño landing page extra" />
                                     </div>
-                                )}
+                                    <div className="grid grid-cols-3 gap-4">
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-black text-primary uppercase tracking-widest ml-1">Precio Unit. (€)</label>
+                                            <input required type="number" step="0.01" min="0" value={newBudgetLine.unit_price} onChange={e => setNewBudgetLine({ ...newBudgetLine, unit_price: e.target.value })} className="w-full bg-white/5 border border-variable rounded-2xl px-4 py-4 text-variable-main focus:outline-none focus:border-primary/50 text-sm" placeholder="0.00" />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-black text-primary uppercase tracking-widest ml-1">Cantidad</label>
+                                            <input required type="number" min="1" value={newBudgetLine.quantity} onChange={e => setNewBudgetLine({ ...newBudgetLine, quantity: e.target.value })} className="w-full bg-white/5 border border-variable rounded-2xl px-4 py-4 text-variable-main focus:outline-none focus:border-primary/50 text-sm" />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-black text-primary uppercase tracking-widest ml-1">IVA %</label>
+                                            <input required type="number" step="0.5" min="0" max="100" value={newBudgetLine.iva_percent} onChange={e => setNewBudgetLine({ ...newBudgetLine, iva_percent: e.target.value })} className="w-full bg-white/5 border border-variable rounded-2xl px-4 py-4 text-variable-main focus:outline-none focus:border-primary/50 text-sm" />
+                                        </div>
+                                    </div>
+                                    {/* Preview */}
+                                    {newBudgetLine.unit_price && (
+                                        <div className="p-4 rounded-2xl bg-primary/5 border border-primary/20 text-sm">
+                                            <div className="flex justify-between text-variable-muted">
+                                                <span>Base:</span>
+                                                <span className="font-bold text-variable-main">€{((parseFloat(newBudgetLine.unit_price) || 0) * (parseInt(newBudgetLine.quantity) || 1)).toFixed(2)}</span>
+                                            </div>
+                                            <div className="flex justify-between text-variable-muted mt-1">
+                                                <span>IVA ({newBudgetLine.iva_percent}%):</span>
+                                                <span className="font-bold text-variable-main">€{(((parseFloat(newBudgetLine.unit_price) || 0) * (parseInt(newBudgetLine.quantity) || 1)) * ((parseFloat(newBudgetLine.iva_percent) || 0) / 100)).toFixed(2)}</span>
+                                            </div>
+                                            <div className="flex justify-between text-primary font-black mt-2 pt-2 border-t border-primary/20">
+                                                <span>Total:</span>
+                                                <span>€{(((parseFloat(newBudgetLine.unit_price) || 0) * (parseInt(newBudgetLine.quantity) || 1)) * (1 + (parseFloat(newBudgetLine.iva_percent) || 0) / 100)).toFixed(2)}</span>
+                                            </div>
+                                        </div>
+                                    )}
+                                    <button disabled={formLoading} type="submit" className="w-full py-4 bg-primary text-white rounded-2xl font-bold shadow-xl shadow-primary/30 hover:brightness-110 transition-all">
+                                        {formLoading ? 'Guardando...' : 'Añadir Línea'}
+                                    </button>
+                                </form>}
                             </motion.div>
                         </div>
                     )

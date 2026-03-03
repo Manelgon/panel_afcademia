@@ -4,8 +4,6 @@ import {
     UserPlus,
     Search,
     Clock,
-    Sun,
-    Moon,
     X,
     ShieldCheck,
     Mail,
@@ -44,7 +42,7 @@ const INITIAL_FORM_STATE = {
 };
 
 export default function Leads() {
-    const { darkMode, toggleTheme } = useTheme();
+    const { darkMode } = useTheme();
     const { showNotification } = useNotifications();
     const { withLoading } = useGlobalLoading();
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -344,9 +342,7 @@ export default function Leads() {
                         <button onClick={fetchLeads} className="p-3 glass rounded-2xl text-variable-muted hover:text-primary transition-all">
                             <Clock size={20} />
                         </button>
-                        <button onClick={toggleTheme} className="p-3 glass rounded-2xl text-variable-muted hover:text-primary transition-all">
-                            {darkMode ? <Sun size={20} /> : <Moon size={20} />}
-                        </button>
+
                         <button onClick={handleOpenCreateModal} className="flex-1 sm:flex-none bg-primary text-white px-6 py-3 rounded-2xl font-bold flex items-center justify-center gap-2 hover:brightness-110 transition-all shadow-lg shadow-primary/20">
                             <UserPlus size={20} /> <span>Nuevo Lead</span>
                         </button>

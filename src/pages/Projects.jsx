@@ -15,7 +15,6 @@ import {
     ShieldCheck,
     Type,
     FileText,
-    Briefcase,
     X,
     ChevronDown
 } from 'lucide-react';
@@ -45,7 +44,6 @@ export default function Projects() {
     const [projectsList, setProjectsList] = useState([]);
     const [leads, setLeads] = useState([]);
     const [users, setUsers] = useState([]);
-    const [services, setServices] = useState([]);
     const [fetchError, setFetchError] = useState(null);
 
     const defaultForm = {
@@ -56,8 +54,7 @@ export default function Projects() {
         total_hours: 0,
         id_alias: '',
         lead_id: '',
-        assigned_users: [], // Array of user IDs
-        selected_services: [] // Array of service IDs
+        assigned_users: [] // Array of user IDs
     };
     const [formData, setFormData] = useState(defaultForm);
 
@@ -83,7 +80,7 @@ export default function Projects() {
     const fetchLeads = async () => {
         const { data } = await supabase
             .from('leads')
-            .select('id, first_name, last_name, company, service_interest')
+            .select('id, first_name, last_name, company')
             .order('created_at', { ascending: false });
         setLeads(data || []);
         return data || [];
@@ -99,21 +96,10 @@ export default function Projects() {
         setUsers(data || []);
     };
 
-    const fetchServices = async () => {
-        const { data, error } = await supabase
-            .from('services')
-            .select('*')
-            .order('name', { ascending: true });
-
-        if (error) console.error("Error fetching services:", error);
-        setServices(data || []);
-    };
-
     useEffect(() => {
         const init = async () => {
             await fetchProjects();
             await fetchUsers();
-            await fetchServices();
             const leadsData = await fetchLeads();
 
             if (convertLeadId) {
@@ -127,7 +113,7 @@ export default function Projects() {
                     setFormData({
                         ...defaultForm,
                         lead_id: lead.id,
-                        name: `Proyecto ${lead.service_interest || ''}`,
+                        name: `Proyecto ${lead.company || lead.last_name || ''}`.trim(),
                         client: lead.company || `${lead.first_name} ${lead.last_name}`,
                         id_alias: `${firstInitial}${lastInitial}-${dateStr}-${randomDigits}`
                     });
@@ -179,8 +165,7 @@ export default function Projects() {
                         p_alias: finalAlias,
                         p_total_hours: parseInt(formData.total_hours) || 0,
                         p_lead_id: formData.lead_id || null,
-                        p_assigned_users: formData.assigned_users,
-                        p_service_ids: formData.selected_services
+                        p_assigned_users: formData.assigned_users
                     });
 
                 if (rpcError) throw rpcError;
@@ -471,34 +456,7 @@ export default function Projects() {
                                     />
                                 </div>
 
-                                {/* ── SERVICIOS DROPDOWN ── */}
-                                <div className="space-y-3">
-                                    <label className="text-xs font-black text-primary uppercase tracking-[0.2em] ml-1 flex items-center justify-between">
-                                        <div className="flex items-center gap-2"><Briefcase size={14} /> Servicios Incluidos</div>
-                                        <div className="px-3 py-1 bg-primary/10 rounded-lg text-primary text-[10px] font-black">
-                                            TOTAL: €{services
-                                                .filter(s => formData.selected_services.includes(s.id))
-                                                .reduce((sum, s) => sum + (parseFloat(s.price) || 0), 0)
-                                                .toLocaleString('es-ES', { minimumFractionDigits: 2 })}
-                                        </div>
-                                    </label>
-                                    <CustomDropdown
-                                        multiple
-                                        placeholder="Seleccionar servicios..."
-                                        selected={formData.selected_services}
-                                        onToggle={(serviceId) => setFormData(prev => ({
-                                            ...prev,
-                                            selected_services: prev.selected_services.includes(serviceId)
-                                                ? prev.selected_services.filter(id => id !== serviceId)
-                                                : [...prev.selected_services, serviceId]
-                                        }))}
-                                        options={services.map(s => ({
-                                            value: s.id,
-                                            label: s.name,
-                                            right: `€${parseFloat(s.price || 0).toFixed(2)}`
-                                        }))}
-                                    />
-                                </div>
+                                {/* ── USUARIOS DROPDOWN ── */}
 
                                 {/* ── USUARIOS DROPDOWN ── */}
                                 <div className="space-y-3">

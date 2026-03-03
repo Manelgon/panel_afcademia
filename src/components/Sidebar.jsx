@@ -3,17 +3,9 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
     LayoutDashboard,
     Users,
-    FolderOpen,
-    FileText,
     Settings,
     LogOut,
-    Target,
-    Briefcase,
-    ListTodo,
-    Calendar as CalendarIcon,
-    ChevronUp,
-    ChevronDown,
-    UserCog
+    Target
 } from 'lucide-react';
 import logo from '../assets/logo.png';
 import { useAuth } from '../context/AuthContext';
@@ -53,8 +45,7 @@ const SidebarItem = ({ icon: Icon, to = "#", label, activeOverride, onClick }) =
 
 // Configuration submenu items
 const CONFIG_ITEMS = [
-    { icon: UserCog, to: '/users', label: 'Gestión de Usuarios' },
-    // Add more config items here in the future
+    { icon: Users, to: '/users', label: 'Gestión de Equipo' },
 ];
 
 export default function Sidebar() {
@@ -63,6 +54,7 @@ export default function Sidebar() {
     const location = useLocation();
     const [configOpen, setConfigOpen] = useState(false);
     const [mobileConfigOpen, setMobileConfigOpen] = useState(false);
+    const configRef = useRef(null);
     const mobileConfigRef = useRef(null);
 
     // Check if any config route is active
@@ -70,25 +62,21 @@ export default function Sidebar() {
         location.pathname === item.to || location.pathname.startsWith(item.to + '/')
     );
 
-    // Auto-open config menu if we're on a config page
-    useEffect(() => {
-        if (isConfigActive) {
-            setConfigOpen(true);
-        }
-    }, [isConfigActive]);
-
-    // Close mobile config popover when clicking outside
+    // Close desktop popover when clicking outside
     useEffect(() => {
         const handleClickOutside = (e) => {
+            if (configRef.current && !configRef.current.contains(e.target)) {
+                setConfigOpen(false);
+            }
             if (mobileConfigRef.current && !mobileConfigRef.current.contains(e.target)) {
                 setMobileConfigOpen(false);
             }
         };
-        if (mobileConfigOpen) {
+        if (configOpen || mobileConfigOpen) {
             document.addEventListener('mousedown', handleClickOutside);
         }
         return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, [mobileConfigOpen]);
+    }, [configOpen, mobileConfigOpen]);
 
     const handleSignOut = async () => {
         try {
@@ -118,35 +106,39 @@ export default function Sidebar() {
                 </div>
 
                 <div className="mt-auto flex flex-col gap-4 items-center w-full px-4">
-                    {/* Config submenu (desktop) — opens above the gear icon */}
-                    <div className={`config-submenu-desktop ${configOpen ? 'config-submenu-open' : ''}`}>
-                        {CONFIG_ITEMS.map((item) => (
-                            <Link
-                                key={item.to}
-                                to={item.to}
-                                title={item.label}
-                                className={`config-submenu-item ${location.pathname === item.to || location.pathname.startsWith(item.to + '/')
-                                        ? 'config-submenu-item-active'
+                    {/* Config toggle + floating popover */}
+                    <div className="relative" ref={configRef}>
+                        {/* Floating popover — appears to the right */}
+                        <div className={`config-flyout ${configOpen ? 'config-flyout-open' : ''}`}>
+                            <p className="config-flyout-title">CONFIGURACIÓN</p>
+                            <div className="config-flyout-divider" />
+                            {CONFIG_ITEMS.map((item) => (
+                                <Link
+                                    key={item.to}
+                                    to={item.to}
+                                    onClick={() => setConfigOpen(false)}
+                                    className={`config-flyout-item ${location.pathname === item.to || location.pathname.startsWith(item.to + '/')
+                                        ? 'config-flyout-item-active'
                                         : ''
-                                    }`}
-                            >
-                                <item.icon size={18} />
-                                <span className="config-submenu-label">{item.label}</span>
-                            </Link>
-                        ))}
-                    </div>
+                                        }`}
+                                >
+                                    <item.icon size={18} />
+                                    <span>{item.label}</span>
+                                </Link>
+                            ))}
+                        </div>
 
-                    {/* Config toggle button */}
-                    <button
-                        onClick={toggleConfig}
-                        title="Configuración"
-                        className={`p-4 rounded-2xl transition-all duration-300 flex items-center justify-center gap-1 ${isConfigActive || configOpen
+                        <button
+                            onClick={toggleConfig}
+                            title="Configuración"
+                            className={`p-4 rounded-2xl transition-all duration-300 flex items-center justify-center ${isConfigActive || configOpen
                                 ? 'bg-primary text-white shadow-lg shadow-primary/30'
                                 : 'text-variable-muted hover:text-primary hover:bg-white/5'
-                            }`}
-                    >
-                        <Settings size={24} className={`transition-transform duration-300 ${configOpen ? 'rotate-90' : ''}`} />
-                    </button>
+                                }`}
+                        >
+                            <Settings size={24} className={`transition-transform duration-300 ${configOpen ? 'rotate-90' : ''}`} />
+                        </button>
+                    </div>
 
                     <button
                         onClick={handleSignOut}
@@ -170,16 +162,17 @@ export default function Sidebar() {
 
                     {/* Mobile config with popover */}
                     <div className="relative" ref={mobileConfigRef}>
-                        {/* Popover menu */}
                         <div className={`config-popover-mobile ${mobileConfigOpen ? 'config-popover-open' : ''}`}>
+                            <p className="config-flyout-title" style={{ fontSize: '9px' }}>CONFIGURACIÓN</p>
+                            <div className="config-flyout-divider" />
                             {CONFIG_ITEMS.map((item) => (
                                 <Link
                                     key={item.to}
                                     to={item.to}
                                     onClick={() => setMobileConfigOpen(false)}
                                     className={`config-popover-item ${location.pathname === item.to || location.pathname.startsWith(item.to + '/')
-                                            ? 'config-submenu-item-active'
-                                            : ''
+                                        ? 'config-flyout-item-active'
+                                        : ''
                                         }`}
                                 >
                                     <item.icon size={18} />
@@ -192,8 +185,8 @@ export default function Sidebar() {
                             onClick={toggleMobileConfig}
                             title="Configuración"
                             className={`p-3 rounded-xl transition-all flex-shrink-0 flex items-center justify-center ${isConfigActive || mobileConfigOpen
-                                    ? 'bg-primary text-white shadow-lg shadow-primary/30'
-                                    : 'text-variable-muted hover:text-primary hover:bg-white/5'
+                                ? 'bg-primary text-white shadow-lg shadow-primary/30'
+                                : 'text-variable-muted hover:text-primary hover:bg-white/5'
                                 }`}
                         >
                             <Settings size={22} />
