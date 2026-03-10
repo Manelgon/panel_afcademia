@@ -26,11 +26,22 @@ CREATE TABLE IF NOT EXISTS public.fundae_seguimiento (
     id                      uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
     lead_id                 bigint      REFERENCES public.leads(id) ON DELETE SET NULL,
 
-    -- Datos de la empresa (editables independientemente del lead)
+    -- Datos de empresa para FUNDAE (Formulario Oficial)
     empresa                 text,
+    razon_social            text,
     cif                     text,
     email                   text,
     telefono                text,
+    domicilio               text,
+    poblacion               text,
+    codigo_postal           text,
+    provincia               text,
+    convenio_referencia     text,
+    cnae                    text,
+    ccc                     text,
+    num_medio_empleados     text,
+    representante_empresa   text,
+    nif_nie_representante   text,
 
     -- Datos financieros
     creditos_fundae         numeric     DEFAULT 0,

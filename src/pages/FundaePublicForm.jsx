@@ -40,10 +40,21 @@ export default function FundaePublicForm() {
     // Estado del Formulario
     const [formData, setFormData] = useState({
         empresa: '',
+        razon_social: '',
         cif: '',
         telefono: '',
+        email: '',
+        domicilio: '',
+        poblacion: '',
+        codigo_postal: '',
+        provincia: '',
+        convenio_referencia: '',
+        cnae: '',
+        ccc: '',
+        num_medio_empleados: '',
         num_asistentes: '',
-        email: ''
+        representante_empresa: '',
+        nif_nie_representante: ''
     });
     const [submitting, setSubmitting] = useState(false);
 
@@ -79,10 +90,21 @@ export default function FundaePublicForm() {
                 setFundaeRecord(fundae);
                 setFormData({
                     empresa: fundae.empresa || '',
+                    razon_social: fundae.razon_social || '',
                     cif: fundae.cif || '',
                     telefono: fundae.telefono || '',
+                    email: tData.email || '',
+                    domicilio: fundae.domicilio || '',
+                    poblacion: fundae.poblacion || '',
+                    codigo_postal: fundae.codigo_postal || '',
+                    provincia: fundae.provincia || '',
+                    convenio_referencia: fundae.convenio_referencia || '',
+                    cnae: fundae.cnae || '',
+                    ccc: fundae.ccc || '',
+                    num_medio_empleados: fundae.num_medio_empleados || '',
                     num_asistentes: fundae.num_asistentes || '',
-                    email: tData.email || ''
+                    representante_empresa: fundae.representante_empresa || '',
+                    nif_nie_representante: fundae.nif_nie_representante || ''
                 });
 
                 // Determinar el paso inicial
@@ -217,10 +239,21 @@ export default function FundaePublicForm() {
                 .from('fundae_seguimiento')
                 .update({
                     empresa: formData.empresa,
+                    razon_social: formData.razon_social,
                     cif: formData.cif,
                     telefono: formData.telefono,
-                    num_asistentes: parseInt(formData.num_asistentes) || 0,
                     email: formData.email,
+                    domicilio: formData.domicilio,
+                    poblacion: formData.poblacion,
+                    codigo_postal: formData.codigo_postal,
+                    provincia: formData.provincia,
+                    convenio_referencia: formData.convenio_referencia,
+                    cnae: formData.cnae,
+                    ccc: formData.ccc,
+                    num_medio_empleados: formData.num_medio_empleados,
+                    num_asistentes: parseInt(formData.num_asistentes) || 0,
+                    representante_empresa: formData.representante_empresa,
+                    nif_nie_representante: formData.nif_nie_representante,
                     formulario_recibido: true,
                     formulario_enviado: true // Aseguramos que el paso 1 esté a true
                 })
@@ -420,21 +453,33 @@ export default function FundaePublicForm() {
 
                             <form onSubmit={handleSubmitForm} className="space-y-6">
                                 <div className="space-y-4">
-                                    <div className="space-y-2">
-                                        <label className="text-xs font-bold text-variable-muted uppercase tracking-widest ml-1">Nombre de la Empresa</label>
-                                        <div className="relative group">
-                                            <Building2 className="absolute left-5 top-1/2 -translate-y-1/2 text-variable-muted group-focus-within:text-primary transition-colors" size={18} />
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                        <div className="space-y-2">
+                                            <label className="text-xs font-bold text-variable-muted uppercase tracking-widest ml-1">Nombre Comercial</label>
+                                            <div className="relative group">
+                                                <Building2 className="absolute left-5 top-1/2 -translate-y-1/2 text-variable-muted group-focus-within:text-primary transition-colors" size={18} />
+                                                <input
+                                                    required
+                                                    value={formData.empresa}
+                                                    onChange={e => setFormData({ ...formData, empresa: e.target.value })}
+                                                    className="w-full bg-white/5 border border-variable rounded-2xl pl-14 pr-6 py-4 focus:outline-none focus:border-primary/50 text-variable-main transition-all placeholder:text-variable-muted/30"
+                                                    placeholder="Ej. Mi Empresa"
+                                                />
+                                            </div>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-xs font-bold text-variable-muted uppercase tracking-widest ml-1">Razón Social</label>
                                             <input
                                                 required
-                                                value={formData.empresa}
-                                                onChange={e => setFormData({ ...formData, empresa: e.target.value })}
-                                                className="w-full bg-white/5 border border-variable rounded-2xl pl-14 pr-6 py-4 focus:outline-none focus:border-primary/50 text-variable-main transition-all placeholder:text-variable-muted/30"
+                                                value={formData.razon_social}
+                                                onChange={e => setFormData({ ...formData, razon_social: e.target.value })}
+                                                className="w-full bg-white/5 border border-variable rounded-2xl px-6 py-4 focus:outline-none focus:border-primary/50 text-variable-main transition-all placeholder:text-variable-muted/30"
                                                 placeholder="Ej. Mi Empresa S.L."
                                             />
                                         </div>
                                     </div>
 
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                                         <div className="space-y-2">
                                             <label className="text-xs font-bold text-variable-muted uppercase tracking-widest ml-1">CIF / NIF</label>
                                             <input
@@ -443,31 +488,6 @@ export default function FundaePublicForm() {
                                                 onChange={e => setFormData({ ...formData, cif: e.target.value })}
                                                 className="w-full bg-white/5 border border-variable rounded-2xl px-6 py-4 focus:outline-none focus:border-primary/50 text-variable-main transition-all placeholder:text-variable-muted/30 font-mono"
                                                 placeholder="B12345678"
-                                            />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <label className="text-xs font-bold text-variable-muted uppercase tracking-widest ml-1">Nº Trabajadores / Alumnos</label>
-                                            <input
-                                                type="number"
-                                                required
-                                                value={formData.num_asistentes}
-                                                onChange={e => setFormData({ ...formData, num_asistentes: e.target.value })}
-                                                className="w-full bg-white/5 border border-variable rounded-2xl px-6 py-4 focus:outline-none focus:border-primary/50 text-variable-main transition-all placeholder:text-variable-muted/30"
-                                                placeholder="0"
-                                            />
-                                        </div>
-                                    </div>
-
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                        <div className="space-y-2">
-                                            <label className="text-xs font-bold text-variable-muted uppercase tracking-widest ml-1">Email de Contacto</label>
-                                            <input
-                                                type="email"
-                                                required
-                                                value={formData.email}
-                                                onChange={e => setFormData({ ...formData, email: e.target.value })}
-                                                className="w-full bg-white/5 border border-variable rounded-2xl px-6 py-4 focus:outline-none focus:border-primary/50 text-variable-main transition-all placeholder:text-variable-muted/30"
-                                                placeholder="empresa@mail.com"
                                             />
                                         </div>
                                         <div className="space-y-2">
@@ -480,7 +500,146 @@ export default function FundaePublicForm() {
                                                 placeholder="+34"
                                             />
                                         </div>
+                                        <div className="space-y-2 sm:col-span-2 lg:col-span-1">
+                                            <label className="text-xs font-bold text-variable-muted uppercase tracking-widest ml-1">Email de Contacto</label>
+                                            <input
+                                                type="email"
+                                                required
+                                                value={formData.email}
+                                                onChange={e => setFormData({ ...formData, email: e.target.value })}
+                                                className="w-full bg-white/5 border border-variable rounded-2xl px-6 py-4 focus:outline-none focus:border-primary/50 text-variable-main transition-all placeholder:text-variable-muted/30"
+                                                placeholder="empresa@mail.com"
+                                            />
+                                        </div>
                                     </div>
+
+                                    <div className="space-y-2">
+                                        <label className="text-xs font-bold text-variable-muted uppercase tracking-widest ml-1">Domicilio Social</label>
+                                        <input
+                                            required
+                                            value={formData.domicilio}
+                                            onChange={e => setFormData({ ...formData, domicilio: e.target.value })}
+                                            className="w-full bg-white/5 border border-variable rounded-2xl px-6 py-4 focus:outline-none focus:border-primary/50 text-variable-main transition-all placeholder:text-variable-muted/30"
+                                            placeholder="Calle, Número, Piso..."
+                                        />
+                                    </div>
+
+                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                        <div className="space-y-2">
+                                            <label className="text-xs font-bold text-variable-muted uppercase tracking-widest ml-1">Localidad</label>
+                                            <input
+                                                required
+                                                value={formData.poblacion}
+                                                onChange={e => setFormData({ ...formData, poblacion: e.target.value })}
+                                                className="w-full bg-white/5 border border-variable rounded-2xl px-6 py-4 focus:outline-none focus:border-primary/50 text-variable-main transition-all placeholder:text-variable-muted/30"
+                                                placeholder="Población"
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-xs font-bold text-variable-muted uppercase tracking-widest ml-1">C.P.</label>
+                                            <input
+                                                required
+                                                value={formData.codigo_postal}
+                                                onChange={e => setFormData({ ...formData, codigo_postal: e.target.value })}
+                                                className="w-full bg-white/5 border border-variable rounded-2xl px-6 py-4 focus:outline-none focus:border-primary/50 text-variable-main transition-all placeholder:text-variable-muted/30"
+                                                placeholder="00000"
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-xs font-bold text-variable-muted uppercase tracking-widest ml-1">Provincia</label>
+                                            <input
+                                                required
+                                                value={formData.provincia}
+                                                onChange={e => setFormData({ ...formData, provincia: e.target.value })}
+                                                className="w-full bg-white/5 border border-variable rounded-2xl px-6 py-4 focus:outline-none focus:border-primary/50 text-variable-main transition-all placeholder:text-variable-muted/30"
+                                                placeholder="Provincia"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                        <div className="space-y-2">
+                                            <label className="text-xs font-bold text-variable-muted uppercase tracking-widest ml-1">Convenio de Referencia</label>
+                                            <input
+                                                required
+                                                value={formData.convenio_referencia}
+                                                onChange={e => setFormData({ ...formData, convenio_referencia: e.target.value })}
+                                                className="w-full bg-white/5 border border-variable rounded-2xl px-6 py-4 focus:outline-none focus:border-primary/50 text-variable-main transition-all placeholder:text-variable-muted/30"
+                                                placeholder="Convenio Colectivo"
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-xs font-bold text-variable-muted uppercase tracking-widest ml-1">CNAE (Actividad Principal)</label>
+                                            <input
+                                                required
+                                                value={formData.cnae}
+                                                onChange={e => setFormData({ ...formData, cnae: e.target.value })}
+                                                className="w-full bg-white/5 border border-variable rounded-2xl px-6 py-4 focus:outline-none focus:border-primary/50 text-variable-main transition-all placeholder:text-variable-muted/30 font-mono"
+                                                placeholder="0000"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                        <div className="space-y-2 sm:col-span-2">
+                                            <label className="text-xs font-bold text-variable-muted uppercase tracking-widest ml-1">Código Cuenta de Cotización (CCC)</label>
+                                            <input
+                                                required
+                                                value={formData.ccc}
+                                                onChange={e => setFormData({ ...formData, ccc: e.target.value })}
+                                                className="w-full bg-white/5 border border-variable rounded-2xl px-6 py-4 focus:outline-none focus:border-primary/50 text-variable-main transition-all placeholder:text-variable-muted/30 font-mono"
+                                                placeholder="00000000000"
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-xs font-bold text-variable-muted uppercase tracking-widest ml-1">Plantilla Media</label>
+                                            <input
+                                                type="number"
+                                                required
+                                                value={formData.num_medio_empleados}
+                                                onChange={e => setFormData({ ...formData, num_medio_empleados: e.target.value })}
+                                                className="w-full bg-white/5 border border-variable rounded-2xl px-6 py-4 focus:outline-none focus:border-primary/50 text-variable-main transition-all placeholder:text-variable-muted/30"
+                                                placeholder="Nº en 2024"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                        <div className="space-y-2">
+                                            <label className="text-xs font-bold text-variable-muted uppercase tracking-widest ml-1">Representante Legal</label>
+                                            <input
+                                                required
+                                                value={formData.representante_empresa}
+                                                onChange={e => setFormData({ ...formData, representante_empresa: e.target.value })}
+                                                className="w-full bg-white/5 border border-variable rounded-2xl px-6 py-4 focus:outline-none focus:border-primary/50 text-variable-main transition-all placeholder:text-variable-muted/30"
+                                                placeholder="Nombre Completo"
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-xs font-bold text-variable-muted uppercase tracking-widest ml-1">NIF/NIE Representante</label>
+                                            <input
+                                                required
+                                                value={formData.nif_nie_representante}
+                                                onChange={e => setFormData({ ...formData, nif_nie_representante: e.target.value })}
+                                                className="w-full bg-white/5 border border-variable rounded-2xl px-6 py-4 focus:outline-none focus:border-primary/50 text-variable-main transition-all placeholder:text-variable-muted/30 font-mono"
+                                                placeholder="12345678Z"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    {/* Campo oculto de num_asistentes si fuese necesario o podemos dejarlo como opcional/fuera si ya no hace falta. Por si acaso, lo incluyo. */}
+                                    <div className="space-y-2">
+                                        <label className="text-xs font-bold text-variable-muted uppercase tracking-widest ml-1">Nº Trabajadores a Formar (Estimado)</label>
+                                        <input
+                                            type="number"
+                                            required
+                                            value={formData.num_asistentes}
+                                            onChange={e => setFormData({ ...formData, num_asistentes: e.target.value })}
+                                            className="w-full bg-white/5 border border-variable rounded-2xl px-6 py-4 focus:outline-none focus:border-primary/50 text-variable-main transition-all placeholder:text-variable-muted/30"
+                                            placeholder="Cantidad de alumnos"
+                                        />
+                                    </div>
+
                                 </div>
 
                                 <div className="bg-primary/5 border border-primary/10 p-4 rounded-2xl flex items-start gap-4">
