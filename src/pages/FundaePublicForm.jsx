@@ -453,20 +453,20 @@ export default function FundaePublicForm() {
                         >
                             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8 pb-6 border-b border-variable">
                                 <div className="flex items-center gap-4">
-                                    <div className="size-14 bg-primary/10 rounded-2xl flex items-center justify-center shadow-inner shrink-0">
-                                        <ClipboardList className="text-primary size-7" />
+                                    <div className="size-14 bg-white/50 rounded-2xl flex items-center justify-center shadow-sm p-2 shrink-0 border border-variable/10 overflow-hidden">
+                                        <img src={logo} alt="Logo" className="w-full h-full object-contain" />
                                     </div>
-                                    <div>
-                                        <h2 className="text-2xl sm:text-3xl font-bold text-variable-main">Datos del Expediente</h2>
-                                        <p className="hidden sm:block text-[10px] text-variable-muted uppercase font-black tracking-wider mt-1 opacity-50">Gestión de Formación</p>
+                                    <div className="flex flex-col">
+                                        <div className="flex items-center gap-2 select-none">
+                                            <span className="text-xl sm:text-2xl font-bold text-[#004b90] tracking-tight">Formulario</span>
+                                            <span className="text-2xl sm:text-3xl font-black italic text-[#ff7900] leading-none">FUNDAE</span>
+                                        </div>
+                                        <div className="h-1 w-24 bg-gradient-to-r from-[#004b90] to-[#ff7900] rounded-full mt-1 opacity-20"></div>
                                     </div>
                                 </div>
-                                <div className="text-right flex flex-col items-end">
-                                    <div className="flex items-center gap-2 select-none">
-                                        <span className="text-xl sm:text-2xl font-bold text-[#004b90] tracking-tight">Formulario</span>
-                                        <span className="text-2xl sm:text-3xl font-black italic text-[#ff7900] leading-none">FUNDAE</span>
-                                    </div>
-                                    <div className="h-1 w-24 bg-gradient-to-r from-[#004b90] to-[#ff7900] rounded-full mt-1 opacity-20"></div>
+                                <div className="text-right">
+                                    <h2 className="text-xl sm:text-2xl font-bold text-variable-main">Datos del Expediente</h2>
+                                    <p className="hidden sm:block text-[10px] text-variable-muted uppercase font-black tracking-wider mt-0.5 opacity-50">Gestión de Formación</p>
                                 </div>
                             </div>
 
