@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import logo from '../assets/logo.png';
+import logo_fundae from '../assets/logo_fundae.png';
 import CustomSelect from '../components/CustomSelect';
 
 // ── CONFIGURACIÓN DEL COOLDOWN ──────────────────────────────────────────
@@ -350,17 +351,6 @@ export default function FundaePublicForm() {
             </div>
 
             <div className="w-full max-w-7xl relative z-10 transition-all duration-500">
-                {/* Header / Logo — Project Standard */}
-                <div className="flex flex-col items-center mb-10 text-center">
-                    <div className="size-16 rounded-2xl bg-white/5 flex items-center justify-center p-3 shadow-xl border border-variable mb-4">
-                        <img src={logo} alt="Logo AFCademIA" className="w-full h-full object-contain" />
-                    </div>
-                    <h1 className="text-2xl font-bold font-display text-variable-main mb-1">
-                        Formulario <span className="text-primary italic">FUNDAE</span>
-                    </h1>
-                    <p className="text-variable-muted text-xs font-medium italic">Gestión Profesional AFCademIA</p>
-                </div>
-
                 <AnimatePresence mode="wait">
                     {/* Pantalla 0: Solicitar Código */}
                     {step === 0 && (
@@ -454,7 +444,7 @@ export default function FundaePublicForm() {
                             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8 pb-6 border-b border-variable">
                                 <div className="flex items-center gap-4">
                                     <div className="size-14 bg-white/50 rounded-2xl flex items-center justify-center shadow-sm p-2 shrink-0 border border-variable/10 overflow-hidden">
-                                        <img src={logo} alt="Logo" className="w-full h-full object-contain" />
+                                        <img src={logo_fundae} alt="Logo" className="w-full h-full object-contain" />
                                     </div>
                                     <div className="flex flex-col">
                                         <div className="flex items-center gap-2 select-none">
