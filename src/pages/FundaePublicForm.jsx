@@ -95,6 +95,11 @@ export default function FundaePublicForm() {
                     telefono: fundae.telefono || '',
                     email: tData.email || '',
                     domicilio: fundae.domicilio || '',
+                    tipo_via: fundae.tipo_via || '',
+                    nombre_via: fundae.nombre_via || '',
+                    numero_via: fundae.numero_via || '',
+                    piso: fundae.piso || '',
+                    puerta: fundae.puerta || '',
                     poblacion: fundae.poblacion || '',
                     codigo_postal: fundae.codigo_postal || '',
                     provincia: fundae.provincia || '',
@@ -103,7 +108,11 @@ export default function FundaePublicForm() {
                     ccc: fundae.ccc || '',
                     num_medio_empleados: fundae.num_medio_empleados || '',
                     num_asistentes: fundae.num_asistentes || '',
+                    prefijo_telefono: fundae.prefijo_telefono || '+34',
                     representante_empresa: fundae.representante_empresa || '',
+                    representante_nombre: fundae.representante_nombre || '',
+                    representante_apellido1: fundae.representante_apellido1 || '',
+                    representante_apellido2: fundae.representante_apellido2 || '',
                     nif_nie_representante: fundae.nif_nie_representante || ''
                 });
 
@@ -339,7 +348,7 @@ export default function FundaePublicForm() {
                 <div className="absolute bottom-[-10%] left-[-10%] size-[500px] rounded-full bg-primary/10 blur-[120px]" />
             </div>
 
-            <div className="w-full max-w-xl relative z-10">
+            <div className="w-full max-w-7xl relative z-10 transition-all duration-500">
                 {/* Header / Logo — Project Standard */}
                 <div className="flex flex-col items-center mb-10 text-center">
                     <div className="size-16 rounded-2xl bg-white/5 flex items-center justify-center p-3 shadow-xl border border-variable mb-4">
@@ -359,7 +368,7 @@ export default function FundaePublicForm() {
                             initial={{ opacity: 0, scale: 0.95 }}
                             animate={{ opacity: 1, scale: 1 }}
                             exit={{ opacity: 0, x: -50 }}
-                            className="glass rounded-[2.5rem] p-8 sm:p-12 shadow-2xl text-center"
+                            className="glass rounded-[2.5rem] p-8 sm:p-12 shadow-2xl text-center max-w-xl mx-auto"
                         >
                             <div className="size-16 bg-primary/10 rounded-2xl flex items-center justify-center mx-auto mb-6">
                                 <Mail className="text-primary size-8" />
@@ -386,7 +395,7 @@ export default function FundaePublicForm() {
                             initial={{ opacity: 0, x: 50 }}
                             animate={{ opacity: 1, x: 0 }}
                             exit={{ opacity: 0, x: -50 }}
-                            className="glass rounded-[2.5rem] p-8 sm:p-12 shadow-2xl text-center"
+                            className="glass rounded-[2.5rem] p-8 sm:p-12 shadow-2xl text-center max-w-xl mx-auto"
                         >
                             <h2 className="text-2xl sm:text-3xl font-bold text-variable-main mb-2">Introduce el código</h2>
                             <p className="text-variable-muted text-sm mb-8">
@@ -439,223 +448,309 @@ export default function FundaePublicForm() {
                             initial={{ opacity: 0, y: 30 }}
                             animate={{ opacity: 1, y: 0 }}
                             exit={{ opacity: 0, scale: 0.95 }}
-                            className="glass rounded-[2.5rem] p-8 sm:p-12 shadow-2xl"
+                            className="glass rounded-[2rem] p-6 lg:p-10 shadow-2xl w-full mx-auto"
                         >
-                            <div className="flex items-center gap-4 mb-8">
-                                <div className="size-12 bg-primary/10 rounded-2xl flex items-center justify-center">
-                                    <ClipboardList className="text-primary size-6" />
+                            <div className="flex items-center gap-4 mb-8 pb-6 border-b border-variable">
+                                <div className="size-14 bg-primary/10 rounded-2xl flex items-center justify-center shadow-inner shrink-0">
+                                    <ClipboardList className="text-primary size-7" />
                                 </div>
                                 <div>
-                                    <h2 className="text-2xl font-bold text-variable-main">Datos del Expediente</h2>
-                                    <p className="text-[10px] text-variable-muted uppercase font-black tracking-widest">Formulario Oficial FUNDAE</p>
+                                    <h2 className="text-2xl sm:text-3xl font-bold text-variable-main">Datos del Expediente</h2>
+                                    <p className="text-[11px] text-variable-muted uppercase font-black tracking-wider mt-1">Formulario Oficial FUNDAE</p>
                                 </div>
                             </div>
 
-                            <form onSubmit={handleSubmitForm} className="space-y-6">
-                                <div className="space-y-4">
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                        <div className="space-y-2">
-                                            <label className="text-xs font-bold text-variable-muted uppercase tracking-widest ml-1">Nombre Comercial</label>
-                                            <div className="relative group">
-                                                <Building2 className="absolute left-5 top-1/2 -translate-y-1/2 text-variable-muted group-focus-within:text-primary transition-colors" size={18} />
+                            <form onSubmit={handleSubmitForm} className="grid grid-cols-1 xl:grid-cols-2 gap-8 xl:gap-12">
+                                {/* COLUMNA IZQUIERDA */}
+                                <div className="space-y-6">
+                                    {/* SECCIÓN 1: Identificación de la Empresa */}
+                                    <div className="space-y-3">
+                                        <h3 className="text-sm font-bold text-primary uppercase tracking-widest flex items-center gap-2">
+                                            <Building2 size={16} /> Identificación de la Empresa
+                                        </h3>
+                                        <div className="bg-white/5 border border-variable rounded-2xl p-4 sm:p-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                            <div className="space-y-1.5 sm:col-span-2">
+                                                <label className="text-[11px] font-bold text-variable-muted uppercase tracking-widest ml-1">Razón Social</label>
+                                                <input
+                                                    required
+                                                    value={formData.razon_social}
+                                                    onChange={e => setFormData({ ...formData, razon_social: e.target.value })}
+                                                    className="w-full bg-black/10 border border-variable rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-primary/50 text-variable-main transition-all placeholder:text-variable-muted/30"
+                                                    placeholder="Ej. Mi Empresa S.L."
+                                                />
+                                            </div>
+                                            <div className="space-y-1.5">
+                                                <label className="text-[11px] font-bold text-variable-muted uppercase tracking-widest ml-1">Nombre Comercial</label>
                                                 <input
                                                     required
                                                     value={formData.empresa}
                                                     onChange={e => setFormData({ ...formData, empresa: e.target.value })}
-                                                    className="w-full bg-white/5 border border-variable rounded-2xl pl-14 pr-6 py-4 focus:outline-none focus:border-primary/50 text-variable-main transition-all placeholder:text-variable-muted/30"
+                                                    className="w-full bg-black/10 border border-variable rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-primary/50 text-variable-main transition-all placeholder:text-variable-muted/30"
                                                     placeholder="Ej. Mi Empresa"
                                                 />
                                             </div>
-                                        </div>
-                                        <div className="space-y-2">
-                                            <label className="text-xs font-bold text-variable-muted uppercase tracking-widest ml-1">Razón Social</label>
-                                            <input
-                                                required
-                                                value={formData.razon_social}
-                                                onChange={e => setFormData({ ...formData, razon_social: e.target.value })}
-                                                className="w-full bg-white/5 border border-variable rounded-2xl px-6 py-4 focus:outline-none focus:border-primary/50 text-variable-main transition-all placeholder:text-variable-muted/30"
-                                                placeholder="Ej. Mi Empresa S.L."
-                                            />
-                                        </div>
-                                    </div>
-
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                                        <div className="space-y-2">
-                                            <label className="text-xs font-bold text-variable-muted uppercase tracking-widest ml-1">CIF / NIF</label>
-                                            <input
-                                                required
-                                                value={formData.cif}
-                                                onChange={e => setFormData({ ...formData, cif: e.target.value })}
-                                                className="w-full bg-white/5 border border-variable rounded-2xl px-6 py-4 focus:outline-none focus:border-primary/50 text-variable-main transition-all placeholder:text-variable-muted/30 font-mono"
-                                                placeholder="B12345678"
-                                            />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <label className="text-xs font-bold text-variable-muted uppercase tracking-widest ml-1">Teléfono</label>
-                                            <input
-                                                required
-                                                value={formData.telefono}
-                                                onChange={e => setFormData({ ...formData, telefono: e.target.value })}
-                                                className="w-full bg-white/5 border border-variable rounded-2xl px-6 py-4 focus:outline-none focus:border-primary/50 text-variable-main transition-all placeholder:text-variable-muted/30"
-                                                placeholder="+34"
-                                            />
-                                        </div>
-                                        <div className="space-y-2 sm:col-span-2 lg:col-span-1">
-                                            <label className="text-xs font-bold text-variable-muted uppercase tracking-widest ml-1">Email de Contacto</label>
-                                            <input
-                                                type="email"
-                                                required
-                                                value={formData.email}
-                                                onChange={e => setFormData({ ...formData, email: e.target.value })}
-                                                className="w-full bg-white/5 border border-variable rounded-2xl px-6 py-4 focus:outline-none focus:border-primary/50 text-variable-main transition-all placeholder:text-variable-muted/30"
-                                                placeholder="empresa@mail.com"
-                                            />
+                                            <div className="space-y-1.5">
+                                                <label className="text-[11px] font-bold text-variable-muted uppercase tracking-widest ml-1">CIF / NIF</label>
+                                                <input
+                                                    required
+                                                    value={formData.cif}
+                                                    onChange={e => setFormData({ ...formData, cif: e.target.value })}
+                                                    className="w-full bg-black/10 border border-variable rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-primary/50 text-variable-main transition-all placeholder:text-variable-muted/30 font-mono"
+                                                    placeholder="B12345678"
+                                                />
+                                            </div>
                                         </div>
                                     </div>
 
-                                    <div className="space-y-2">
-                                        <label className="text-xs font-bold text-variable-muted uppercase tracking-widest ml-1">Domicilio Social</label>
-                                        <input
-                                            required
-                                            value={formData.domicilio}
-                                            onChange={e => setFormData({ ...formData, domicilio: e.target.value })}
-                                            className="w-full bg-white/5 border border-variable rounded-2xl px-6 py-4 focus:outline-none focus:border-primary/50 text-variable-main transition-all placeholder:text-variable-muted/30"
-                                            placeholder="Calle, Número, Piso..."
-                                        />
+                                    {/* SECCIÓN 2: Domicilio y Contacto */}
+                                    <div className="space-y-3">
+                                        <h3 className="text-sm font-bold text-primary uppercase tracking-widest flex items-center gap-2">
+                                            <Mail size={16} /> Domicilio y Contacto
+                                        </h3>
+                                        <div className="bg-white/5 border border-variable rounded-2xl p-4 sm:p-5 space-y-4">
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                                <div className="space-y-1.5">
+                                                    <label className="text-[11px] font-bold text-variable-muted uppercase tracking-widest ml-1">Teléfono</label>
+                                                    <div className="flex gap-2">
+                                                        <select
+                                                            value={formData.prefijo_telefono}
+                                                            onChange={e => setFormData({ ...formData, prefijo_telefono: e.target.value })}
+                                                            className="w-[100px] bg-black/10 border border-variable rounded-xl px-2 py-2.5 text-sm focus:outline-none focus:border-primary/50 text-variable-main transition-all appearance-none"
+                                                        >
+                                                            <option value="+34" className="text-black bg-white">+34 (ES)</option>
+                                                            <option value="+33" className="text-black bg-white">+33 (FR)</option>
+                                                            <option value="+351" className="text-black bg-white">+351 (PT)</option>
+                                                            <option value="+44" className="text-black bg-white">+44 (UK)</option>
+                                                            <option value="+1" className="text-black bg-white">+1 (US)</option>
+                                                        </select>
+                                                        <input
+                                                            required
+                                                            value={formData.telefono}
+                                                            onChange={e => setFormData({ ...formData, telefono: e.target.value })}
+                                                            className="flex-1 bg-black/10 border border-variable rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-primary/50 text-variable-main transition-all placeholder:text-variable-muted/30"
+                                                            placeholder="600 000 000"
+                                                        />
+                                                    </div>
+                                                </div>
+                                                <div className="space-y-1.5">
+                                                    <label className="text-[11px] font-bold text-variable-muted uppercase tracking-widest ml-1">Email de Contacto</label>
+                                                    <input
+                                                        type="email"
+                                                        required
+                                                        value={formData.email}
+                                                        onChange={e => setFormData({ ...formData, email: e.target.value })}
+                                                        className="w-full bg-black/10 border border-variable rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-primary/50 text-variable-main transition-all placeholder:text-variable-muted/30"
+                                                        placeholder="empresa@mail.com"
+                                                    />
+                                                </div>
+                                            </div>
+                                            <div className="space-y-1.5">
+                                                <label className="text-[11px] font-bold text-variable-muted uppercase tracking-widest ml-1">Domicilio Social</label>
+                                                <div className="grid grid-cols-12 gap-2">
+                                                    <select
+                                                        value={formData.tipo_via}
+                                                        onChange={e => setFormData({ ...formData, tipo_via: e.target.value })}
+                                                        className="col-span-12 sm:col-span-3 bg-black/10 border border-variable rounded-xl px-2 py-2.5 text-sm focus:outline-none focus:border-primary/50 text-variable-main transition-all appearance-none"
+                                                    >
+                                                        <option value="" disabled className="text-gray-400 bg-white">Tipo</option>
+                                                        <option value="Calle" className="text-black bg-white">Calle</option>
+                                                        <option value="Avenida" className="text-black bg-white">Avenida</option>
+                                                        <option value="Plaza" className="text-black bg-white">Plaza</option>
+                                                        <option value="Paseo" className="text-black bg-white">Paseo</option>
+                                                        <option value="Carretera" className="text-black bg-white">Carretera</option>
+                                                        <option value="Camino" className="text-black bg-white">Camino</option>
+                                                    </select>
+                                                    <input
+                                                        required
+                                                        value={formData.nombre_via}
+                                                        onChange={e => setFormData({ ...formData, nombre_via: e.target.value })}
+                                                        className="col-span-12 sm:col-span-5 bg-black/10 border border-variable rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-primary/50 text-variable-main transition-all placeholder:text-variable-muted/30"
+                                                        placeholder="Nombre de la vía"
+                                                    />
+                                                    <input
+                                                        required
+                                                        value={formData.numero_via}
+                                                        onChange={e => setFormData({ ...formData, numero_via: e.target.value })}
+                                                        className="col-span-4 sm:col-span-2 bg-black/10 border border-variable rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-primary/50 text-variable-main transition-all placeholder:text-variable-muted/30"
+                                                        placeholder="Nº"
+                                                    />
+                                                    <input
+                                                        value={formData.piso}
+                                                        onChange={e => setFormData({ ...formData, piso: e.target.value })}
+                                                        className="col-span-4 sm:col-span-1 bg-black/10 border border-variable rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-primary/50 text-variable-main transition-all placeholder:text-variable-muted/30"
+                                                        placeholder="Piso"
+                                                    />
+                                                    <input
+                                                        value={formData.puerta}
+                                                        onChange={e => setFormData({ ...formData, puerta: e.target.value })}
+                                                        className="col-span-4 sm:col-span-1 bg-black/10 border border-variable rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-primary/50 text-variable-main transition-all placeholder:text-variable-muted/30"
+                                                        placeholder="Pta"
+                                                    />
+                                                </div>
+                                            </div>
+                                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                                <div className="space-y-1.5">
+                                                    <label className="text-[11px] font-bold text-variable-muted uppercase tracking-widest ml-1">Localidad</label>
+                                                    <input
+                                                        required
+                                                        value={formData.poblacion}
+                                                        onChange={e => setFormData({ ...formData, poblacion: e.target.value })}
+                                                        className="w-full bg-black/10 border border-variable rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-primary/50 text-variable-main transition-all placeholder:text-variable-muted/30"
+                                                        placeholder="Ej. Madrid"
+                                                    />
+                                                </div>
+                                                <div className="space-y-1.5">
+                                                    <label className="text-[11px] font-bold text-variable-muted uppercase tracking-widest ml-1">C.P.</label>
+                                                    <input
+                                                        required
+                                                        value={formData.codigo_postal}
+                                                        onChange={e => setFormData({ ...formData, codigo_postal: e.target.value })}
+                                                        className="w-full bg-black/10 border border-variable rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-primary/50 text-variable-main transition-all placeholder:text-variable-muted/30"
+                                                        placeholder="28001"
+                                                    />
+                                                </div>
+                                                <div className="space-y-1.5">
+                                                    <label className="text-[11px] font-bold text-variable-muted uppercase tracking-widest ml-1">Provincia</label>
+                                                    <input
+                                                        required
+                                                        value={formData.provincia}
+                                                        onChange={e => setFormData({ ...formData, provincia: e.target.value })}
+                                                        className="w-full bg-black/10 border border-variable rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-primary/50 text-variable-main transition-all placeholder:text-variable-muted/30"
+                                                        placeholder="Madrid"
+                                                    />
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
-
-                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                                        <div className="space-y-2">
-                                            <label className="text-xs font-bold text-variable-muted uppercase tracking-widest ml-1">Localidad</label>
-                                            <input
-                                                required
-                                                value={formData.poblacion}
-                                                onChange={e => setFormData({ ...formData, poblacion: e.target.value })}
-                                                className="w-full bg-white/5 border border-variable rounded-2xl px-6 py-4 focus:outline-none focus:border-primary/50 text-variable-main transition-all placeholder:text-variable-muted/30"
-                                                placeholder="Población"
-                                            />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <label className="text-xs font-bold text-variable-muted uppercase tracking-widest ml-1">C.P.</label>
-                                            <input
-                                                required
-                                                value={formData.codigo_postal}
-                                                onChange={e => setFormData({ ...formData, codigo_postal: e.target.value })}
-                                                className="w-full bg-white/5 border border-variable rounded-2xl px-6 py-4 focus:outline-none focus:border-primary/50 text-variable-main transition-all placeholder:text-variable-muted/30"
-                                                placeholder="00000"
-                                            />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <label className="text-xs font-bold text-variable-muted uppercase tracking-widest ml-1">Provincia</label>
-                                            <input
-                                                required
-                                                value={formData.provincia}
-                                                onChange={e => setFormData({ ...formData, provincia: e.target.value })}
-                                                className="w-full bg-white/5 border border-variable rounded-2xl px-6 py-4 focus:outline-none focus:border-primary/50 text-variable-main transition-all placeholder:text-variable-muted/30"
-                                                placeholder="Provincia"
-                                            />
-                                        </div>
-                                    </div>
-
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                        <div className="space-y-2">
-                                            <label className="text-xs font-bold text-variable-muted uppercase tracking-widest ml-1">Convenio de Referencia</label>
-                                            <input
-                                                required
-                                                value={formData.convenio_referencia}
-                                                onChange={e => setFormData({ ...formData, convenio_referencia: e.target.value })}
-                                                className="w-full bg-white/5 border border-variable rounded-2xl px-6 py-4 focus:outline-none focus:border-primary/50 text-variable-main transition-all placeholder:text-variable-muted/30"
-                                                placeholder="Convenio Colectivo"
-                                            />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <label className="text-xs font-bold text-variable-muted uppercase tracking-widest ml-1">CNAE (Actividad Principal)</label>
-                                            <input
-                                                required
-                                                value={formData.cnae}
-                                                onChange={e => setFormData({ ...formData, cnae: e.target.value })}
-                                                className="w-full bg-white/5 border border-variable rounded-2xl px-6 py-4 focus:outline-none focus:border-primary/50 text-variable-main transition-all placeholder:text-variable-muted/30 font-mono"
-                                                placeholder="0000"
-                                            />
-                                        </div>
-                                    </div>
-
-                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                                        <div className="space-y-2 sm:col-span-2">
-                                            <label className="text-xs font-bold text-variable-muted uppercase tracking-widest ml-1">Código Cuenta de Cotización (CCC)</label>
-                                            <input
-                                                required
-                                                value={formData.ccc}
-                                                onChange={e => setFormData({ ...formData, ccc: e.target.value })}
-                                                className="w-full bg-white/5 border border-variable rounded-2xl px-6 py-4 focus:outline-none focus:border-primary/50 text-variable-main transition-all placeholder:text-variable-muted/30 font-mono"
-                                                placeholder="00000000000"
-                                            />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <label className="text-xs font-bold text-variable-muted uppercase tracking-widest ml-1">Plantilla Media</label>
-                                            <input
-                                                type="number"
-                                                required
-                                                value={formData.num_medio_empleados}
-                                                onChange={e => setFormData({ ...formData, num_medio_empleados: e.target.value })}
-                                                className="w-full bg-white/5 border border-variable rounded-2xl px-6 py-4 focus:outline-none focus:border-primary/50 text-variable-main transition-all placeholder:text-variable-muted/30"
-                                                placeholder="Nº en 2024"
-                                            />
-                                        </div>
-                                    </div>
-
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                        <div className="space-y-2">
-                                            <label className="text-xs font-bold text-variable-muted uppercase tracking-widest ml-1">Representante Legal</label>
-                                            <input
-                                                required
-                                                value={formData.representante_empresa}
-                                                onChange={e => setFormData({ ...formData, representante_empresa: e.target.value })}
-                                                className="w-full bg-white/5 border border-variable rounded-2xl px-6 py-4 focus:outline-none focus:border-primary/50 text-variable-main transition-all placeholder:text-variable-muted/30"
-                                                placeholder="Nombre Completo"
-                                            />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <label className="text-xs font-bold text-variable-muted uppercase tracking-widest ml-1">NIF/NIE Representante</label>
-                                            <input
-                                                required
-                                                value={formData.nif_nie_representante}
-                                                onChange={e => setFormData({ ...formData, nif_nie_representante: e.target.value })}
-                                                className="w-full bg-white/5 border border-variable rounded-2xl px-6 py-4 focus:outline-none focus:border-primary/50 text-variable-main transition-all placeholder:text-variable-muted/30 font-mono"
-                                                placeholder="12345678Z"
-                                            />
-                                        </div>
-                                    </div>
-
-                                    {/* Campo oculto de num_asistentes si fuese necesario o podemos dejarlo como opcional/fuera si ya no hace falta. Por si acaso, lo incluyo. */}
-                                    <div className="space-y-2">
-                                        <label className="text-xs font-bold text-variable-muted uppercase tracking-widest ml-1">Nº Trabajadores a Formar (Estimado)</label>
-                                        <input
-                                            type="number"
-                                            required
-                                            value={formData.num_asistentes}
-                                            onChange={e => setFormData({ ...formData, num_asistentes: e.target.value })}
-                                            className="w-full bg-white/5 border border-variable rounded-2xl px-6 py-4 focus:outline-none focus:border-primary/50 text-variable-main transition-all placeholder:text-variable-muted/30"
-                                            placeholder="Cantidad de alumnos"
-                                        />
-                                    </div>
-
                                 </div>
 
-                                <div className="bg-primary/5 border border-primary/10 p-4 rounded-2xl flex items-start gap-4">
-                                    <AlertCircle className="text-primary size-5 shrink-0 mt-0.5" />
-                                    <p className="text-[11px] text-variable-muted">
-                                        Al enviar este formulario confirmas que los datos proporcionados son correctos para la gestión de la formación bonificada ante FUNDAE.
-                                    </p>
-                                </div>
+                                {/* COLUMNA DERECHA */}
+                                <div className="space-y-6 flex flex-col">
+                                    {/* SECCIÓN 3: Datos Laborales y Representación */}
+                                    <div className="space-y-3 flex-grow">
+                                        <h3 className="text-sm font-bold text-primary uppercase tracking-widest flex items-center gap-2">
+                                            <ClipboardList size={16} /> Laboral y Representación
+                                        </h3>
+                                        <div className="bg-white/5 border border-variable rounded-2xl p-4 sm:p-5 space-y-4">
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                                <div className="space-y-1.5">
+                                                    <label className="text-[11px] font-bold text-variable-muted uppercase tracking-widest ml-1">CNAE (Actividad)</label>
+                                                    <input
+                                                        required
+                                                        value={formData.cnae}
+                                                        onChange={e => setFormData({ ...formData, cnae: e.target.value })}
+                                                        className="w-full bg-black/10 border border-variable rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-primary/50 text-variable-main transition-all placeholder:text-variable-muted/30 font-mono"
+                                                        placeholder="0000"
+                                                    />
+                                                </div>
+                                                <div className="space-y-1.5">
+                                                    <label className="text-[11px] font-bold text-variable-muted uppercase tracking-widest ml-1">Plantilla Media (2025)</label>
+                                                    <input
+                                                        type="number"
+                                                        required
+                                                        value={formData.num_medio_empleados}
+                                                        onChange={e => setFormData({ ...formData, num_medio_empleados: e.target.value })}
+                                                        className="w-full bg-black/10 border border-variable rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-primary/50 text-variable-main transition-all placeholder:text-variable-muted/30"
+                                                        placeholder="Ej. 15"
+                                                    />
+                                                </div>
+                                            </div>
 
-                                <button
-                                    type="submit"
-                                    disabled={submitting}
-                                    className="w-full py-4 bg-primary text-white rounded-2xl font-bold hover:brightness-110 active:scale-[0.98] transition-all shadow-xl shadow-primary/30 flex items-center justify-center gap-2 group disabled:opacity-60 disabled:cursor-not-allowed"
-                                >
-                                    {submitting ? <Loader2 className="animate-spin" /> : <><Save size={20} /> Enviar Formulario</>}
-                                </button>
+                                            <div className="space-y-1.5">
+                                                <label className="text-[11px] font-bold text-variable-muted uppercase tracking-widest ml-1">Convenio de Referencia</label>
+                                                <input
+                                                    required
+                                                    value={formData.convenio_referencia}
+                                                    onChange={e => setFormData({ ...formData, convenio_referencia: e.target.value })}
+                                                    className="w-full bg-black/10 border border-variable rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-primary/50 text-variable-main transition-all placeholder:text-variable-muted/30"
+                                                    placeholder="Ej. Convenio Oficinas y Despachos"
+                                                />
+                                            </div>
+
+                                            <div className="space-y-1.5">
+                                                <label className="text-[11px] font-bold text-variable-muted uppercase tracking-widest ml-1">Cód. Cuenta Cotización (CCC)</label>
+                                                <input
+                                                    required
+                                                    value={formData.ccc}
+                                                    onChange={e => setFormData({ ...formData, ccc: e.target.value })}
+                                                    className="w-full bg-black/10 border border-variable rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-primary/50 text-variable-main transition-all placeholder:text-variable-muted/30 font-mono"
+                                                    placeholder="00000000000"
+                                                />
+                                            </div>
+
+                                            <div className="pt-4 border-t border-variable/50 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                                <div className="space-y-1.5 sm:col-span-2">
+                                                    <label className="text-[11px] font-bold text-variable-muted uppercase tracking-widest ml-1">Nombre (Representante Legal)</label>
+                                                    <input
+                                                        required
+                                                        value={formData.representante_nombre}
+                                                        onChange={e => setFormData({ ...formData, representante_nombre: e.target.value })}
+                                                        className="w-full bg-black/10 border border-variable rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-primary/50 text-variable-main transition-all placeholder:text-variable-muted/30"
+                                                        placeholder="Nombre(s)"
+                                                    />
+                                                </div>
+                                                <div className="space-y-1.5">
+                                                    <label className="text-[11px] font-bold text-variable-muted uppercase tracking-widest ml-1">Primer Apellido</label>
+                                                    <input
+                                                        required
+                                                        value={formData.representante_apellido1}
+                                                        onChange={e => setFormData({ ...formData, representante_apellido1: e.target.value })}
+                                                        className="w-full bg-black/10 border border-variable rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-primary/50 text-variable-main transition-all placeholder:text-variable-muted/30"
+                                                        placeholder="Primer Apellido"
+                                                    />
+                                                </div>
+                                                <div className="space-y-1.5">
+                                                    <label className="text-[11px] font-bold text-variable-muted uppercase tracking-widest ml-1">Segundo Apellido</label>
+                                                    <input
+                                                        value={formData.representante_apellido2}
+                                                        onChange={e => setFormData({ ...formData, representante_apellido2: e.target.value })}
+                                                        className="w-full bg-black/10 border border-variable rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-primary/50 text-variable-main transition-all placeholder:text-variable-muted/30"
+                                                        placeholder="Segundo Apellido"
+                                                    />
+                                                </div>
+                                                <div className="space-y-1.5 sm:col-span-2">
+                                                    <label className="text-[11px] font-bold text-variable-muted uppercase tracking-widest ml-1">NIF/NIE Rep.</label>
+                                                    <input
+                                                        required
+                                                        value={formData.nif_nie_representante}
+                                                        onChange={e => setFormData({ ...formData, nif_nie_representante: e.target.value })}
+                                                        className="w-full bg-black/10 border border-variable rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-primary/50 text-variable-main transition-all placeholder:text-variable-muted/30 font-mono"
+                                                        placeholder="12345678Z"
+                                                    />
+                                                </div>
+                                            </div>
+                                            <div className="space-y-1.5 pt-4 border-t border-variable/50">
+                                                <label className="text-[11px] font-bold text-variable-muted uppercase tracking-widest ml-1">Trabajadores a Formar (Estimado)</label>
+                                                <input
+                                                    type="number"
+                                                    required
+                                                    value={formData.num_asistentes}
+                                                    onChange={e => setFormData({ ...formData, num_asistentes: e.target.value })}
+                                                    className="w-full sm:w-1/2 bg-black/10 border border-variable rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-primary/50 text-variable-main transition-all placeholder:text-variable-muted/30"
+                                                    placeholder="Ej. 5"
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Submit Botón y Alerta */}
+                                    <div className="space-y-4 pt-2">
+                                        <div className="bg-primary/5 border border-primary/10 p-4 rounded-2xl flex items-start gap-3 shadow-inner">
+                                            <AlertCircle className="text-primary size-5 shrink-0 mt-0.5" />
+                                            <p className="text-[12px] text-variable-muted leading-relaxed">
+                                                Al enviar este formulario confirmas que los datos proporcionados son veraces y correctos para la gestión de la formación bonificada.
+                                            </p>
+                                        </div>
+
+                                        <button
+                                            type="submit"
+                                            disabled={submitting}
+                                            className="w-full py-4 bg-primary text-white rounded-2xl font-bold hover:brightness-110 active:scale-[0.98] transition-all shadow-xl shadow-primary/30 flex items-center justify-center gap-2 group disabled:opacity-60 disabled:cursor-not-allowed"
+                                        >
+                                            {submitting ? <Loader2 className="animate-spin" /> : <><Save size={20} /> Guardar Expediente</>}
+                                        </button>
+                                    </div>
+                                </div>
                             </form>
                         </motion.div>
                     )}
