@@ -136,12 +136,11 @@ export default function FundaePublicForm() {
         if (cooldown > 0) return;
         setResending(true);
         try {
-            const webhookUrl = import.meta.env.VITE_WEBHOOK_FORMULARIO_FUNDAE_URL;
+            const webhookUrl = import.meta.env.VITE_CODIGO_FUNDAE;
             const res = await fetch(webhookUrl, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    action: 'generate_verification_code',
                     token: token,
                     fundae_id: tokenData.fundae_id,
                     email: tokenData.email,
