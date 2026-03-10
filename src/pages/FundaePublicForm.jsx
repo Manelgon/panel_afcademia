@@ -74,12 +74,13 @@ export default function FundaePublicForm() {
                 }
 
                 setTokenData(tData);
-                setFundaeRecord(tData.fundae_seguimiento);
+                const fundae = tData.fundae_seguimiento || {};
+                setFundaeRecord(fundae);
                 setFormData({
-                    empresa: tData.fundae_seguimiento.empresa || '',
-                    cif: tData.fundae_seguimiento.cif || '',
-                    telefono: tData.fundae_seguimiento.telefono || '',
-                    num_asistentes: tData.fundae_seguimiento.num_asistentes || '',
+                    empresa: fundae.empresa || '',
+                    cif: fundae.cif || '',
+                    telefono: fundae.telefono || '',
+                    num_asistentes: fundae.num_asistentes || '',
                     email: tData.email || ''
                 });
 
