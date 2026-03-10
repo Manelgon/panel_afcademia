@@ -507,43 +507,46 @@ export default function FundaePublicForm() {
                                         <h3 className="text-sm font-bold text-primary uppercase tracking-widest flex items-center gap-2">
                                             <Mail size={16} /> Domicilio y Contacto
                                         </h3>
-                                        <div className="bg-white/5 border border-variable rounded-2xl p-4 sm:p-5 space-y-4">
-                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                                <div className="space-y-1.5">
-                                                    <label className="text-[11px] font-bold text-variable-muted uppercase tracking-widest ml-1">Teléfono</label>
-                                                    <div className="flex gap-2">
-                                                        <select
-                                                            value={formData.prefijo_telefono}
-                                                            onChange={e => setFormData({ ...formData, prefijo_telefono: e.target.value })}
-                                                            className="w-[100px] bg-black/10 border border-variable rounded-xl px-2 py-2.5 text-sm focus:outline-none focus:border-primary/50 text-variable-main transition-all appearance-none"
-                                                        >
-                                                            <option value="+34" className="text-black bg-white">+34 (ES)</option>
-                                                            <option value="+33" className="text-black bg-white">+33 (FR)</option>
-                                                            <option value="+351" className="text-black bg-white">+351 (PT)</option>
-                                                            <option value="+44" className="text-black bg-white">+44 (UK)</option>
-                                                            <option value="+1" className="text-black bg-white">+1 (US)</option>
-                                                        </select>
-                                                        <input
-                                                            required
-                                                            value={formData.telefono}
-                                                            onChange={e => setFormData({ ...formData, telefono: e.target.value })}
-                                                            className="flex-1 bg-black/10 border border-variable rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-primary/50 text-variable-main transition-all placeholder:text-variable-muted/30"
-                                                            placeholder="600 000 000"
-                                                        />
-                                                    </div>
-                                                </div>
-                                                <div className="space-y-1.5">
-                                                    <label className="text-[11px] font-bold text-variable-muted uppercase tracking-widest ml-1">Email de Contacto</label>
+                                        <div className="bg-white/5 border border-variable rounded-2xl p-4 sm:p-5 space-y-6">
+                                            {/* Teléfono */}
+                                            <div className="space-y-1.5">
+                                                <label className="text-[11px] font-bold text-variable-muted uppercase tracking-widest ml-1">Teléfono</label>
+                                                <div className="flex gap-2">
+                                                    <select
+                                                        value={formData.prefijo_telefono}
+                                                        onChange={e => setFormData({ ...formData, prefijo_telefono: e.target.value })}
+                                                        className="w-[100px] bg-black/10 border border-variable rounded-xl px-2 py-2.5 text-sm focus:outline-none focus:border-primary/50 text-variable-main transition-all appearance-none"
+                                                    >
+                                                        <option value="+34" className="text-black bg-white">+34 (ES)</option>
+                                                        <option value="+33" className="text-black bg-white">+33 (FR)</option>
+                                                        <option value="+351" className="text-black bg-white">+351 (PT)</option>
+                                                        <option value="+44" className="text-black bg-white">+44 (UK)</option>
+                                                        <option value="+1" className="text-black bg-white">+1 (US)</option>
+                                                    </select>
                                                     <input
-                                                        type="email"
                                                         required
-                                                        value={formData.email}
-                                                        onChange={e => setFormData({ ...formData, email: e.target.value })}
-                                                        className="w-full bg-black/10 border border-variable rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-primary/50 text-variable-main transition-all placeholder:text-variable-muted/30"
-                                                        placeholder="empresa@mail.com"
+                                                        value={formData.telefono}
+                                                        onChange={e => setFormData({ ...formData, telefono: e.target.value })}
+                                                        className="flex-1 bg-black/10 border border-variable rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-primary/50 text-variable-main transition-all placeholder:text-variable-muted/30"
+                                                        placeholder="600 000 000"
                                                     />
                                                 </div>
                                             </div>
+
+                                            {/* Email Solo debajo */}
+                                            <div className="space-y-1.5">
+                                                <label className="text-[11px] font-bold text-variable-muted uppercase tracking-widest ml-1">Email de Contacto</label>
+                                                <input
+                                                    type="email"
+                                                    required
+                                                    value={formData.email}
+                                                    onChange={e => setFormData({ ...formData, email: e.target.value })}
+                                                    className="w-full bg-black/10 border border-variable rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-primary/50 text-variable-main transition-all placeholder:text-variable-muted/30"
+                                                    placeholder="empresa@mail.com"
+                                                />
+                                            </div>
+
+                                            {/* Domicilio - Línea 1: Tipo + Nombre */}
                                             <div className="space-y-1.5">
                                                 <label className="text-[11px] font-bold text-variable-muted uppercase tracking-widest ml-1">Domicilio Social</label>
                                                 <div className="grid grid-cols-12 gap-2">
@@ -557,48 +560,49 @@ export default function FundaePublicForm() {
                                                         <option value="Avenida" className="text-black bg-white">Avenida</option>
                                                         <option value="Plaza" className="text-black bg-white">Plaza</option>
                                                         <option value="Paseo" className="text-black bg-white">Paseo</option>
-                                                        <option value="Carretera" className="text-black bg-white">Carretera</option>
-                                                        <option value="Camino" className="text-black bg-white">Camino</option>
                                                     </select>
                                                     <input
                                                         required
                                                         value={formData.nombre_via}
                                                         onChange={e => setFormData({ ...formData, nombre_via: e.target.value })}
-                                                        className="col-span-12 sm:col-span-5 bg-black/10 border border-variable rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-primary/50 text-variable-main transition-all placeholder:text-variable-muted/30"
+                                                        className="col-span-12 sm:col-span-9 bg-black/10 border border-variable rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-primary/50 text-variable-main transition-all placeholder:text-variable-muted/30"
                                                         placeholder="Nombre de la vía"
-                                                    />
-                                                    <input
-                                                        required
-                                                        value={formData.numero_via}
-                                                        onChange={e => setFormData({ ...formData, numero_via: e.target.value })}
-                                                        className="col-span-4 sm:col-span-2 bg-black/10 border border-variable rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-primary/50 text-variable-main transition-all placeholder:text-variable-muted/30"
-                                                        placeholder="Nº"
-                                                    />
-                                                    <input
-                                                        value={formData.piso}
-                                                        onChange={e => setFormData({ ...formData, piso: e.target.value })}
-                                                        className="col-span-4 sm:col-span-1 bg-black/10 border border-variable rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-primary/50 text-variable-main transition-all placeholder:text-variable-muted/30"
-                                                        placeholder="Piso"
-                                                    />
-                                                    <input
-                                                        value={formData.puerta}
-                                                        onChange={e => setFormData({ ...formData, puerta: e.target.value })}
-                                                        className="col-span-4 sm:col-span-1 bg-black/10 border border-variable rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-primary/50 text-variable-main transition-all placeholder:text-variable-muted/30"
-                                                        placeholder="Pta"
                                                     />
                                                 </div>
                                             </div>
-                                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                                                <div className="space-y-1.5">
-                                                    <label className="text-[11px] font-bold text-variable-muted uppercase tracking-widest ml-1">Localidad</label>
-                                                    <input
-                                                        required
-                                                        value={formData.poblacion}
-                                                        onChange={e => setFormData({ ...formData, poblacion: e.target.value })}
-                                                        className="w-full bg-black/10 border border-variable rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-primary/50 text-variable-main transition-all placeholder:text-variable-muted/30"
-                                                        placeholder="Ej. Madrid"
-                                                    />
-                                                </div>
+
+                                            {/* Domicilio - Línea 2: Número, Piso, Puerta, Localidad */}
+                                            <div className="grid grid-cols-12 gap-2">
+                                                <input
+                                                    required
+                                                    value={formData.numero_via}
+                                                    onChange={e => setFormData({ ...formData, numero_via: e.target.value })}
+                                                    className="col-span-3 sm:col-span-2 bg-black/10 border border-variable rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-primary/50 text-variable-main transition-all placeholder:text-variable-muted/30"
+                                                    placeholder="Nº"
+                                                />
+                                                <input
+                                                    value={formData.piso}
+                                                    onChange={e => setFormData({ ...formData, piso: e.target.value })}
+                                                    className="col-span-3 sm:col-span-2 bg-black/10 border border-variable rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-primary/50 text-variable-main transition-all placeholder:text-variable-muted/30"
+                                                    placeholder="Piso"
+                                                />
+                                                <input
+                                                    value={formData.puerta}
+                                                    onChange={e => setFormData({ ...formData, puerta: e.target.value })}
+                                                    className="col-span-3 sm:col-span-2 bg-black/10 border border-variable rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-primary/50 text-variable-main transition-all placeholder:text-variable-muted/30"
+                                                    placeholder="Pta"
+                                                />
+                                                <input
+                                                    required
+                                                    value={formData.poblacion}
+                                                    onChange={e => setFormData({ ...formData, poblacion: e.target.value })}
+                                                    className="col-span-12 sm:col-span-6 bg-black/10 border border-variable rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-primary/50 text-variable-main transition-all placeholder:text-variable-muted/30"
+                                                    placeholder="Localidad"
+                                                />
+                                            </div>
+
+                                            {/* Domicilio - Línea 3: CP y Provincia Dropdown */}
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                                 <div className="space-y-1.5">
                                                     <label className="text-[11px] font-bold text-variable-muted uppercase tracking-widest ml-1">C.P.</label>
                                                     <input
@@ -611,13 +615,17 @@ export default function FundaePublicForm() {
                                                 </div>
                                                 <div className="space-y-1.5">
                                                     <label className="text-[11px] font-bold text-variable-muted uppercase tracking-widest ml-1">Provincia</label>
-                                                    <input
+                                                    <select
                                                         required
                                                         value={formData.provincia}
                                                         onChange={e => setFormData({ ...formData, provincia: e.target.value })}
-                                                        className="w-full bg-black/10 border border-variable rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-primary/50 text-variable-main transition-all placeholder:text-variable-muted/30"
-                                                        placeholder="Madrid"
-                                                    />
+                                                        className="w-full bg-black/10 border border-variable rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-primary/50 text-variable-main transition-all appearance-none"
+                                                    >
+                                                        <option value="" disabled className="text-gray-400 bg-white">Selecciona provincia</option>
+                                                        {["Álava", "Albacete", "Alicante", "Almería", "Asturias", "Ávila", "Badajoz", "Baleares", "Barcelona", "Burgos", "Cáceres", "Cádiz", "Cantabria", "Castellón", "Ciudad Real", "Córdoba", "Cuenca", "Gerona", "Granada", "Guadalajara", "Guipúzcoa", "Huelva", "Huesca", "Jaén", "La Coruña", "La Rioja", "Las Palmas", "León", "Lérida", "Lugo", "Madrid", "Málaga", "Murcia", "Navarra", "Orense", "Palencia", "Pontevedra", "Salamanca", "Santa Cruz de Tenerife", "Segovia", "Sevilla", "Soria", "Tarragona", "Teruel", "Toledo", "Valencia", "Valladolid", "Vizcaya", "Zamora", "Zaragoza", "Ceuta", "Melilla"].map(p => (
+                                                            <option key={p} value={p} className="text-black bg-white">{p}</option>
+                                                        ))}
+                                                    </select>
                                                 </div>
                                             </div>
                                         </div>
