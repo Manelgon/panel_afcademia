@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-    ShieldCheck,
     Mail,
     ArrowRight,
     Loader2,
@@ -11,9 +10,11 @@ import {
     RefreshCcw,
     Building2,
     Save,
-    ClipboardList
+    ClipboardList,
+    ShieldAlert
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import logo from '../assets/logo.png';
 
 // ── CONFIGURACIÓN DEL COOLDOWN ──────────────────────────────────────────
 const COOLDOWN_MINUTES = 5;
@@ -144,7 +145,7 @@ export default function FundaePublicForm() {
                     token: token,
                     fundae_id: tokenData.fundae_id,
                     email: tokenData.email,
-                    empresa: fundaeRecord.empresa
+                    empresa: fundaeRecord?.empresa
                 })
             });
 
@@ -266,38 +267,56 @@ export default function FundaePublicForm() {
     // ── VISTAS ────────────────────────────────────────────────────────────
 
     if (loading) return (
-        <div className="min-h-screen bg-black flex items-center justify-center">
-            <Loader2 className="animate-spin text-primary size-12" />
+        <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: 'var(--bg-main)' }}>
+            <div className="size-12 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
         </div>
     );
 
     if (error) return (
-        <div className="min-h-screen bg-black flex items-center justify-center p-6 text-center">
-            <div className="glass p-10 rounded-3xl max-w-md border-rose-500/20">
-                <AlertCircle className="text-rose-500 size-16 mx-auto mb-6" />
-                <h2 className="text-2xl font-bold text-white mb-4">Enlace no válido</h2>
-                <p className="text-gray-400 mb-8">{error}</p>
-                <a href="https://afcademia.com" className="text-primary font-bold hover:underline">Volver a la web principal</a>
+        <div className="min-h-screen flex items-center justify-center p-6" style={{ backgroundColor: 'var(--bg-main)' }}>
+            {/* Fondo */}
+            <div className="fixed inset-0 -z-10 overflow-hidden">
+                <div className="absolute top-[-10%] right-[-10%] size-[500px] rounded-full bg-primary/20 blur-[120px]" />
+                <div className="absolute bottom-[-10%] left-[-10%] size-[500px] rounded-full bg-primary/10 blur-[120px]" />
             </div>
+            <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="w-full max-w-md glass rounded-[2.5rem] p-10 shadow-2xl text-center"
+            >
+                <div className="size-16 rounded-2xl bg-white/5 flex items-center justify-center p-3 shadow-xl border border-variable mb-6 mx-auto">
+                    <img src={logo} alt="Logo AFCademIA" className="w-full h-full object-contain" />
+                </div>
+                <div className="bg-rose-500/10 border border-rose-500/20 rounded-2xl p-5 mb-6">
+                    <AlertCircle className="text-rose-400 size-12 mx-auto mb-4" />
+                    <h2 className="text-xl font-bold text-variable-main mb-2">Enlace no válido</h2>
+                    <p className="text-variable-muted text-sm">{error}</p>
+                </div>
+                <a href="https://afcademia.com" className="text-primary font-bold hover:underline text-sm">
+                    Volver a la web principal
+                </a>
+            </motion.div>
         </div>
     );
 
     return (
-        <div className="min-h-screen bg-[#050505] text-white font-sans overflow-x-hidden flex flex-col items-center justify-center p-4 relative">
+        <div className="min-h-screen overflow-x-hidden flex flex-col items-center justify-center p-4 sm:p-6 relative" style={{ backgroundColor: 'var(--bg-main)', color: 'var(--text-main)' }}>
             {/* Background Decorations */}
-            <div className="absolute top-[-10%] left-[-10%] size-[40vw] bg-primary/10 rounded-full blur-[120px] pointer-events-none" />
-            <div className="absolute bottom-[-10%] right-[-10%] size-[40vw] bg-primary/5 rounded-full blur-[120px] pointer-events-none" />
+            <div className="fixed inset-0 -z-10 overflow-hidden">
+                <div className="absolute top-[-10%] right-[-10%] size-[500px] rounded-full bg-primary/20 blur-[120px]" />
+                <div className="absolute bottom-[-10%] left-[-10%] size-[500px] rounded-full bg-primary/10 blur-[120px]" />
+            </div>
 
             <div className="w-full max-w-xl relative z-10">
-                {/* Header / Logo */}
-                <div className="text-center mb-10">
-                    <div className="inline-flex items-center gap-2 mb-4">
-                        <div className="size-10 bg-primary rounded-xl flex items-center justify-center shadow-lg shadow-primary/20">
-                            <ShieldCheck className="text-white size-6" />
-                        </div>
-                        <span className="text-2xl font-black italic tracking-tighter">AFCADEMIA</span>
+                {/* Header / Logo — Project Standard */}
+                <div className="flex flex-col items-center mb-10 text-center">
+                    <div className="size-16 rounded-2xl bg-white/5 flex items-center justify-center p-3 shadow-xl border border-variable mb-4">
+                        <img src={logo} alt="Logo AFCademIA" className="w-full h-full object-contain" />
                     </div>
-                    <div className="h-1 w-12 bg-primary mx-auto rounded-full" />
+                    <h1 className="text-2xl font-bold font-display text-variable-main mb-1">
+                        Formulario <span className="text-primary italic">FUNDAE</span>
+                    </h1>
+                    <p className="text-variable-muted text-xs font-medium italic">Gestión Profesional AFCademIA</p>
                 </div>
 
                 <AnimatePresence mode="wait">
@@ -308,18 +327,20 @@ export default function FundaePublicForm() {
                             initial={{ opacity: 0, scale: 0.95 }}
                             animate={{ opacity: 1, scale: 1 }}
                             exit={{ opacity: 0, x: -50 }}
-                            className="glass p-8 sm:p-12 rounded-[2.5rem] border-white/5 shadow-2xl text-center"
+                            className="glass rounded-[2.5rem] p-8 sm:p-12 shadow-2xl text-center"
                         >
-                            <Mail className="text-primary size-16 mx-auto mb-6" />
-                            <h1 className="text-3xl font-bold mb-4">Verificación de Identidad</h1>
-                            <p className="text-gray-400 mb-8">
+                            <div className="size-16 bg-primary/10 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                                <Mail className="text-primary size-8" />
+                            </div>
+                            <h2 className="text-2xl sm:text-3xl font-bold text-variable-main mb-3">Verificación de Identidad</h2>
+                            <p className="text-variable-muted text-sm mb-8 leading-relaxed">
                                 Para proteger tus datos, necesitamos verificar tu identidad. Pulsa el botón para recibir un código en tu email:
-                                <br /><span className="text-white font-mono mt-2 block">{tokenData?.email}</span>
+                                <br /><span className="text-primary font-semibold mt-2 block">{tokenData?.email}</span>
                             </p>
                             <button
                                 onClick={handleRequestCode}
                                 disabled={resending}
-                                className="w-full bg-primary hover:brightness-110 disabled:opacity-50 text-white font-bold py-5 rounded-2xl flex items-center justify-center gap-3 transition-all shadow-xl shadow-primary/20 group"
+                                className="w-full py-4 bg-primary text-white rounded-2xl font-bold hover:brightness-110 active:scale-[0.98] transition-all shadow-xl shadow-primary/30 flex items-center justify-center gap-2 group disabled:opacity-60 disabled:cursor-not-allowed"
                             >
                                 {resending ? <Loader2 className="animate-spin" /> : <><RefreshCcw className="group-hover:rotate-180 transition-all duration-700" size={20} /> Solicitar código</>}
                             </button>
@@ -333,12 +354,12 @@ export default function FundaePublicForm() {
                             initial={{ opacity: 0, x: 50 }}
                             animate={{ opacity: 1, x: 0 }}
                             exit={{ opacity: 0, x: -50 }}
-                            className="glass p-8 sm:p-12 rounded-[2.5rem] border-white/5 shadow-2xl text-center"
+                            className="glass rounded-[2.5rem] p-8 sm:p-12 shadow-2xl text-center"
                         >
-                            <h1 className="text-3xl font-bold mb-2">Introduce el código</h1>
-                            <p className="text-gray-400 mb-8">
+                            <h2 className="text-2xl sm:text-3xl font-bold text-variable-main mb-2">Introduce el código</h2>
+                            <p className="text-variable-muted text-sm mb-8">
                                 Hemos enviado un código de 6 dígitos a <br />
-                                <strong className="text-white">{tokenData?.email}</strong>
+                                <strong className="text-primary">{tokenData?.email}</strong>
                             </p>
 
                             <div className="flex justify-between gap-2 sm:gap-4 mb-8">
@@ -351,7 +372,7 @@ export default function FundaePublicForm() {
                                         value={digit}
                                         onChange={e => handleOtpChange(e.target.value, i)}
                                         onKeyDown={e => handleOtpKeyDown(e, i)}
-                                        className="size-12 sm:size-14 glass text-center text-xl font-bold rounded-xl border-white/10 focus:border-primary/50 focus:outline-none transition-all"
+                                        className="size-12 sm:size-14 bg-white/5 border border-variable text-center text-xl font-bold rounded-2xl focus:border-primary/50 focus:outline-none transition-all text-variable-main"
                                         autoFocus={i === 0}
                                     />
                                 ))}
@@ -360,17 +381,17 @@ export default function FundaePublicForm() {
                             <button
                                 onClick={handleVerify}
                                 disabled={verifying || otp.some(v => v === '')}
-                                className="w-full bg-primary hover:brightness-110 disabled:opacity-30 text-white font-bold py-5 rounded-2xl flex items-center justify-center gap-3 transition-all shadow-xl shadow-primary/20 mb-6"
+                                className="w-full py-4 bg-primary text-white rounded-2xl font-bold hover:brightness-110 active:scale-[0.98] transition-all shadow-xl shadow-primary/30 flex items-center justify-center gap-2 group disabled:opacity-60 disabled:cursor-not-allowed mb-6"
                             >
-                                {verifying ? <Loader2 className="animate-spin" /> : <>Verificar Código <ArrowRight size={20} /></>}
+                                {verifying ? <Loader2 className="animate-spin" /> : <>Verificar Código <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" /></>}
                             </button>
 
-                            <div className="pt-6 border-t border-white/5">
-                                <p className="text-xs text-gray-500 mb-4">¿No has recibido nada? Revisa el correo no deseado.</p>
+                            <div className="pt-6 border-t border-variable">
+                                <p className="text-xs text-variable-muted mb-4">¿No has recibido nada? Revisa el correo no deseado.</p>
                                 <button
                                     onClick={handleRequestCode}
                                     disabled={resending || cooldown > 0}
-                                    className="text-sm font-bold text-gray-400 hover:text-primary disabled:text-gray-700 transition-colors flex items-center gap-2 mx-auto"
+                                    className="text-sm font-bold text-variable-muted hover:text-primary disabled:opacity-40 transition-colors flex items-center gap-2 mx-auto"
                                 >
                                     <RefreshCcw size={14} className={resending ? 'animate-spin' : ''} />
                                     {cooldown > 0 ? `Reenviar en ${formatCooldown(cooldown)}` : 'Solicitar un nuevo código'}
@@ -386,77 +407,77 @@ export default function FundaePublicForm() {
                             initial={{ opacity: 0, y: 30 }}
                             animate={{ opacity: 1, y: 0 }}
                             exit={{ opacity: 0, scale: 0.95 }}
-                            className="glass p-8 sm:p-12 rounded-[2.5rem] border-white/5 shadow-2xl"
+                            className="glass rounded-[2.5rem] p-8 sm:p-12 shadow-2xl"
                         >
                             <div className="flex items-center gap-4 mb-8">
-                                <div className="size-12 bg-primary/20 rounded-2xl flex items-center justify-center">
+                                <div className="size-12 bg-primary/10 rounded-2xl flex items-center justify-center">
                                     <ClipboardList className="text-primary size-6" />
                                 </div>
                                 <div>
-                                    <h1 className="text-2xl font-bold">Datos del Expediente</h1>
-                                    <p className="text-xs text-variable-muted uppercase font-black tracking-widest">Formulario Oficial FUNDAE</p>
+                                    <h2 className="text-2xl font-bold text-variable-main">Datos del Expediente</h2>
+                                    <p className="text-[10px] text-variable-muted uppercase font-black tracking-widest">Formulario Oficial FUNDAE</p>
                                 </div>
                             </div>
 
                             <form onSubmit={handleSubmitForm} className="space-y-6">
                                 <div className="space-y-4">
-                                    <div className="space-y-1.5">
-                                        <label className="text-[10px] font-black uppercase tracking-widest text-gray-500 ml-1">Nombre de la Empresa</label>
-                                        <div className="relative">
-                                            <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 size-5" />
+                                    <div className="space-y-2">
+                                        <label className="text-xs font-bold text-variable-muted uppercase tracking-widest ml-1">Nombre de la Empresa</label>
+                                        <div className="relative group">
+                                            <Building2 className="absolute left-5 top-1/2 -translate-y-1/2 text-variable-muted group-focus-within:text-primary transition-colors" size={18} />
                                             <input
                                                 required
                                                 value={formData.empresa}
                                                 onChange={e => setFormData({ ...formData, empresa: e.target.value })}
-                                                className="w-full pl-12 pr-6 py-4 glass border-white/5 rounded-2xl focus:border-primary/50 focus:outline-none transition-all"
+                                                className="w-full bg-white/5 border border-variable rounded-2xl pl-14 pr-6 py-4 focus:outline-none focus:border-primary/50 text-variable-main transition-all placeholder:text-variable-muted/30"
                                                 placeholder="Ej. Mi Empresa S.L."
                                             />
                                         </div>
                                     </div>
 
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                        <div className="space-y-1.5">
-                                            <label className="text-[10px] font-black uppercase tracking-widest text-gray-500 ml-1">CIF / NIF</label>
+                                        <div className="space-y-2">
+                                            <label className="text-xs font-bold text-variable-muted uppercase tracking-widest ml-1">CIF / NIF</label>
                                             <input
                                                 required
                                                 value={formData.cif}
                                                 onChange={e => setFormData({ ...formData, cif: e.target.value })}
-                                                className="w-full px-6 py-4 glass border-white/5 rounded-2xl focus:border-primary/50 focus:outline-none transition-all font-mono"
+                                                className="w-full bg-white/5 border border-variable rounded-2xl px-6 py-4 focus:outline-none focus:border-primary/50 text-variable-main transition-all placeholder:text-variable-muted/30 font-mono"
                                                 placeholder="B12345678"
                                             />
                                         </div>
-                                        <div className="space-y-1.5">
-                                            <label className="text-[10px] font-black uppercase tracking-widest text-gray-500 ml-1">Nº Trabajadores / Alumnos</label>
+                                        <div className="space-y-2">
+                                            <label className="text-xs font-bold text-variable-muted uppercase tracking-widest ml-1">Nº Trabajadores / Alumnos</label>
                                             <input
                                                 type="number"
                                                 required
                                                 value={formData.num_asistentes}
                                                 onChange={e => setFormData({ ...formData, num_asistentes: e.target.value })}
-                                                className="w-full px-6 py-4 glass border-white/5 rounded-2xl focus:border-primary/50 focus:outline-none transition-all"
+                                                className="w-full bg-white/5 border border-variable rounded-2xl px-6 py-4 focus:outline-none focus:border-primary/50 text-variable-main transition-all placeholder:text-variable-muted/30"
                                                 placeholder="0"
                                             />
                                         </div>
                                     </div>
 
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                        <div className="space-y-1.5">
-                                            <label className="text-[10px] font-black uppercase tracking-widest text-gray-500 ml-1">Email de Contacto</label>
+                                        <div className="space-y-2">
+                                            <label className="text-xs font-bold text-variable-muted uppercase tracking-widest ml-1">Email de Contacto</label>
                                             <input
                                                 type="email"
                                                 required
                                                 value={formData.email}
                                                 onChange={e => setFormData({ ...formData, email: e.target.value })}
-                                                className="w-full px-6 py-4 glass border-white/5 rounded-2xl focus:border-primary/50 focus:outline-none transition-all"
+                                                className="w-full bg-white/5 border border-variable rounded-2xl px-6 py-4 focus:outline-none focus:border-primary/50 text-variable-main transition-all placeholder:text-variable-muted/30"
                                                 placeholder="empresa@mail.com"
                                             />
                                         </div>
-                                        <div className="space-y-1.5">
-                                            <label className="text-[10px] font-black uppercase tracking-widest text-gray-500 ml-1">Teléfono</label>
+                                        <div className="space-y-2">
+                                            <label className="text-xs font-bold text-variable-muted uppercase tracking-widest ml-1">Teléfono</label>
                                             <input
                                                 required
                                                 value={formData.telefono}
                                                 onChange={e => setFormData({ ...formData, telefono: e.target.value })}
-                                                className="w-full px-6 py-4 glass border-white/5 rounded-2xl focus:border-primary/50 focus:outline-none transition-all"
+                                                className="w-full bg-white/5 border border-variable rounded-2xl px-6 py-4 focus:outline-none focus:border-primary/50 text-variable-main transition-all placeholder:text-variable-muted/30"
                                                 placeholder="+34"
                                             />
                                         </div>
@@ -465,7 +486,7 @@ export default function FundaePublicForm() {
 
                                 <div className="bg-primary/5 border border-primary/10 p-4 rounded-2xl flex items-start gap-4">
                                     <AlertCircle className="text-primary size-5 shrink-0 mt-0.5" />
-                                    <p className="text-[11px] text-gray-400">
+                                    <p className="text-[11px] text-variable-muted">
                                         Al enviar este formulario confirmas que los datos proporcionados son correctos para la gestión de la formación bonificada ante FUNDAE.
                                     </p>
                                 </div>
@@ -473,7 +494,7 @@ export default function FundaePublicForm() {
                                 <button
                                     type="submit"
                                     disabled={submitting}
-                                    className="w-full bg-primary hover:brightness-110 disabled:opacity-50 text-white font-bold py-5 rounded-2xl flex items-center justify-center gap-3 transition-all shadow-xl shadow-primary/20"
+                                    className="w-full py-4 bg-primary text-white rounded-2xl font-bold hover:brightness-110 active:scale-[0.98] transition-all shadow-xl shadow-primary/30 flex items-center justify-center gap-2 group disabled:opacity-60 disabled:cursor-not-allowed"
                                 >
                                     {submitting ? <Loader2 className="animate-spin" /> : <><Save size={20} /> Enviar Formulario</>}
                                 </button>
@@ -487,24 +508,24 @@ export default function FundaePublicForm() {
                             key="step3"
                             initial={{ opacity: 0, scale: 0.9 }}
                             animate={{ opacity: 1, scale: 1 }}
-                            className="glass p-8 sm:p-12 rounded-[2.5rem] border-white/5 shadow-2xl text-center"
+                            className="glass rounded-[2.5rem] p-8 sm:p-12 shadow-2xl text-center"
                         >
-                            <div className="size-24 bg-emerald-500/20 rounded-full flex items-center justify-center mx-auto mb-8 relative">
+                            <div className="size-24 bg-emerald-500/10 rounded-full flex items-center justify-center mx-auto mb-8 relative">
                                 <CheckCircle className="text-emerald-500 size-12" />
                                 <motion.div
                                     initial={{ scale: 0 }}
                                     animate={{ scale: 1.5, opacity: 0 }}
                                     transition={{ repeat: Infinity, duration: 2 }}
-                                    className="absolute inset-0 bg-emerald-500/20 rounded-full"
+                                    className="absolute inset-0 bg-emerald-500/10 rounded-full"
                                 />
                             </div>
-                            <h1 className="text-3xl font-bold mb-4">¡Enviado con éxito!</h1>
-                            <p className="text-gray-400 mb-8 leading-relaxed">
+                            <h2 className="text-3xl font-bold text-variable-main mb-4">¡Enviado con éxito!</h2>
+                            <p className="text-variable-muted mb-8 leading-relaxed text-sm">
                                 Hemos recibido correctamente los datos para el expediente FUNDAE. <br />
                                 Nuestro equipo los revisará y te informaremos sobre los siguientes pasos.
                             </p>
-                            <div className="pt-8 border-t border-white/5">
-                                <p className="text-xs text-gray-600 italic">Ya puedes cerrar esta ventana con seguridad.</p>
+                            <div className="pt-8 border-t border-variable">
+                                <p className="text-xs text-variable-muted italic">Ya puedes cerrar esta ventana con seguridad.</p>
                             </div>
                         </motion.div>
                     )}
@@ -512,7 +533,9 @@ export default function FundaePublicForm() {
 
                 {/* Footer Info */}
                 <div className="mt-12 text-center">
-                    <p className="text-[10px] text-gray-600 uppercase font-black tracking-[0.3em]">Gestión Profesional · AFCADEMIA</p>
+                    <p className="text-[10px] text-variable-muted uppercase font-bold tracking-[0.2em]">
+                        Sistema seguro · <span className="text-primary">AFCademIA</span>
+                    </p>
                 </div>
             </div>
         </div>
