@@ -441,22 +441,30 @@ export default function FundaePublicForm() {
                             exit={{ opacity: 0, scale: 0.95 }}
                             className="glass rounded-[2rem] p-6 lg:p-10 shadow-2xl w-full mx-auto"
                         >
-                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8 pb-6 border-b border-variable">
-                                <div className="flex items-center gap-4">
-                                    <div className="size-14 bg-white/50 rounded-2xl flex items-center justify-center shadow-sm p-2 shrink-0 border border-variable/10 overflow-hidden">
-                                        <img src={logo_fundae} alt="Logo" className="w-full h-full object-contain" />
-                                    </div>
-                                    <div className="flex flex-col">
-                                        <div className="flex items-center gap-2 select-none">
-                                            <span className="text-xl sm:text-2xl font-bold text-[#004b90] tracking-tight">Formulario</span>
-                                            <span className="text-2xl sm:text-3xl font-black italic text-[#ff7900] leading-none">FUNDAE</span>
-                                        </div>
-                                        <div className="h-1 w-24 bg-gradient-to-r from-[#004b90] to-[#ff7900] rounded-full mt-1 opacity-20"></div>
+                            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 mb-8 pb-6 border-b border-variable">
+                                {/* Left: AFCademIA Logo */}
+                                <div className="flex items-center justify-start shrink-0">
+                                    <div className="size-16 bg-white/80 rounded-2xl flex items-center justify-center shadow-sm p-3 border border-variable/10 overflow-hidden backdrop-blur-sm">
+                                        <img src={logo} alt="AFCademIA" className="w-full h-full object-contain" />
                                     </div>
                                 </div>
-                                <div className="text-right">
+
+                                {/* Center: Formulario [FUNDAE LOGO] FUNDAE */}
+                                <div className="flex flex-1 items-center justify-center gap-4">
+                                    <span className="text-xl sm:text-2xl font-bold text-[#004b90] tracking-tight whitespace-nowrap">Formulario</span>
+                                    <div className="size-12 bg-white/90 rounded-xl flex items-center justify-center shadow-inner p-2 border border-variable/10 overflow-hidden">
+                                        <img src={logo_fundae} alt="FUNDAE" className="w-full h-full object-contain" />
+                                    </div>
+                                    <div className="flex flex-col">
+                                        <span className="text-2xl sm:text-3xl font-black italic text-[#ff7900] leading-none select-none">FUNDAE</span>
+                                        <div className="h-1 w-full bg-gradient-to-r from-[#004b90] to-[#ff7900] rounded-full mt-1 opacity-20"></div>
+                                    </div>
+                                </div>
+
+                                {/* Right: Datos del Expediente */}
+                                <div className="lg:text-right shrink-0">
                                     <h2 className="text-xl sm:text-2xl font-bold text-variable-main">Datos del Expediente</h2>
-                                    <p className="hidden sm:block text-[10px] text-variable-muted uppercase font-black tracking-wider mt-0.5 opacity-50">Gestión de Formación</p>
+                                    <p className="text-[10px] text-variable-muted uppercase font-black tracking-wider mt-0.5 opacity-50">Gestión de Formación</p>
                                 </div>
                             </div>
 
