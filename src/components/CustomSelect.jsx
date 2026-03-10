@@ -43,47 +43,37 @@ export default function CustomSelect({
             className={`relative ${className}`}
             style={width ? { width } : undefined}
         >
-            {/* ---- Trigger button ---- */}
             <button
                 type="button"
                 onClick={() => setOpen((v) => !v)}
                 className="
-                    w-full flex items-center gap-2
-                    bg-white/5 text-variable-main
-                    border-[1.5px] border-[var(--primary)]/40
-                    rounded-2xl px-4 py-3
-                    focus:outline-none
-                    transition-all duration-200
-                    cursor-pointer select-none
-                    hover:border-[var(--primary)]/70
+                    w-full flex items-center justify-between gap-2 px-4 py-3
+                    rounded-[14px] text-xs font-bold uppercase tracking-widest
+                    transition-all border
                 "
                 style={{
-                    borderColor: open
-                        ? 'var(--primary)'
-                        : 'rgba(243,121,27,0.35)',
+                    borderColor: open ? 'var(--primary)' : 'rgba(243,121,27,0.25)',
+                    backgroundColor: open ? 'rgba(243,121,27,0.1)' : 'rgba(255,255,255,0.03)',
+                    color: open ? 'var(--primary)' : 'var(--text-main)',
                     boxShadow: open
-                        ? '0 0 0 3px rgba(243,121,27,0.12), 0 0 16px rgba(243,121,27,0.1)'
+                        ? '0 0 0 3px rgba(243,121,27,0.1), 0 0 12px rgba(243,121,27,0.08)'
                         : 'none',
                 }}
             >
-                {Icon && (
-                    <Icon
-                        size={18}
-                        className="text-variable-muted shrink-0"
-                    />
-                )}
-                <span className="flex-1 text-left truncate text-sm">
-                    {selected ? selected.label : (
-                        <span className="text-variable-muted">{placeholder}</span>
-                    )}
-                </span>
+                <div className="flex items-center gap-2 overflow-hidden">
+                    {Icon && <Icon size={15} className="shrink-0" />}
+                    <span className="truncate">
+                        {selected ? selected.label : (
+                            <span style={{ color: 'var(--text-muted)' }}>{placeholder}</span>
+                        )}
+                    </span>
+                </div>
                 <ChevronDown
                     size={16}
-                    className={`text-primary shrink-0 transition-transform duration-200 ${open ? 'rotate-180' : ''}`}
+                    className={`shrink-0 transition-transform duration-200 ${open ? 'rotate-180' : ''}`}
+                    style={{ color: 'var(--primary)' }}
                 />
             </button>
-
-            {/* ---- Dropdown panel ---- */}
             {open && (
                 <div
                     className="absolute z-[100] mt-2 w-full rounded-2xl overflow-hidden shadow-2xl"
@@ -96,7 +86,7 @@ export default function CustomSelect({
                 >
                     <ul
                         className="custom-select-list overflow-y-auto py-1"
-                        style={{ maxHeight: '220px' }}
+                        style={{ maxHeight: '260px' }}
                     >
                         {options.map((opt) => {
                             const isActive = opt.value === value;
@@ -108,7 +98,7 @@ export default function CustomSelect({
                                             onChange(opt.value);
                                             setOpen(false);
                                         }}
-                                        className="w-full text-left px-4 py-2.5 text-sm font-medium transition-colors duration-150"
+                                        className="w-full flex justify-start items-center gap-3 px-4 py-2.5 text-sm font-medium transition-colors duration-150"
                                         style={{
                                             backgroundColor: isActive ? 'rgba(243,121,27,0.15)' : 'transparent',
                                             color: isActive ? 'var(--primary)' : 'var(--text-main)',

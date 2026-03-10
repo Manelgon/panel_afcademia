@@ -14,7 +14,7 @@ import { useGlobalLoading } from '../context/LoadingContext';
 
 export default function Calendar() {
     const { profile } = useAuth();
-    const { showNotification } = useNotifications();
+    const { showNotification, confirm } = useNotifications();
     const { withLoading } = useGlobalLoading();
     const [milestones, setMilestones] = useState([]);
     const [projects, setProjects] = useState([]);
@@ -212,7 +212,13 @@ export default function Calendar() {
 
     const handleDelete = async () => {
         if (!selectedEvent) return;
-        if (!window.confirm('¿Eliminar este hito?')) return;
+        const confirmed = await confirm({
+            title: '¿Eliminar Hito?',
+            message: '¿Estás seguro de que deseas eliminar este hito del calendario?',
+            confirmText: 'Eliminar',
+            cancelText: 'Cancelar'
+        });
+        if (!confirmed) return;
 
         await withLoading(async () => {
             try {

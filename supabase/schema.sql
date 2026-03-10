@@ -267,6 +267,77 @@ CREATE POLICY "flujos_delete" ON public.flujos_embudo
   FOR DELETE TO authenticated
   USING (public.is_admin());
 
+-- ═══════════════════════════════════════
+-- 6.5 AMPLIACIÓN LEADS: Datos de Empresa
+-- ═══════════════════════════════════════
+
+ALTER TABLE public.leads
+ADD COLUMN IF NOT EXISTS cif_nif       text,
+ADD COLUMN IF NOT EXISTS direccion     text,
+ADD COLUMN IF NOT EXISTS codigo_postal text,
+ADD COLUMN IF NOT EXISTS provincia     text;
+
+
+-- ═══════════════════════════════════════
+-- 6.6 TABLA: lead_billing (Facturación)
+-- ═══════════════════════════════════════
+
+CREATE TABLE IF NOT EXISTS public.lead_billing (
+    id                      uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+    lead_id                 bigint      NOT NULL REFERENCES public.leads(id) ON DELETE CASCADE,
+    razon_social           text,
+    cif                    text,
+    direccion_facturacion  text,
+    poblacion              text,
+    provincia              text,
+    codigo_postal          text,
+    email_facturacion      text,
+    metodo_pago            text,
+    iban                   text,
+    -- Progreso de facturación
+    numero_factura         text,
+    importe_factura        numeric     DEFAULT 0,
+    estado_factura         text        DEFAULT 'pendiente'
+                           CHECK (estado_factura IN ('pendiente', 'enviada', 'pagada', 'cancelada')),
+    fecha_factura_enviada  timestamptz,
+    fecha_factura_pagada   timestamptz,
+    notas_factura          text,
+    updated_at             timestamptz DEFAULT now(),
+    UNIQUE(lead_id)
+);
+
+COMMENT ON TABLE  public.lead_billing IS 'Datos de facturación del lead/cliente';
+
+-- Trigger: auto-update de updated_at
+DROP TRIGGER IF EXISTS set_updated_at_lead_billing ON public.lead_billing;
+CREATE TRIGGER set_updated_at_lead_billing
+    BEFORE UPDATE ON public.lead_billing
+    FOR EACH ROW
+    EXECUTE FUNCTION public.update_updated_at();
+
+-- RLS
+ALTER TABLE public.lead_billing ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "billing_select" ON public.lead_billing;
+CREATE POLICY "billing_select" ON public.lead_billing
+  FOR SELECT TO authenticated
+  USING (true);
+
+DROP POLICY IF EXISTS "billing_insert" ON public.lead_billing;
+CREATE POLICY "billing_insert" ON public.lead_billing
+  FOR INSERT TO authenticated
+  WITH CHECK (true);
+
+DROP POLICY IF EXISTS "billing_update" ON public.lead_billing;
+CREATE POLICY "billing_update" ON public.lead_billing
+  FOR UPDATE TO authenticated
+  USING (true);
+
+DROP POLICY IF EXISTS "billing_delete" ON public.lead_billing;
+CREATE POLICY "billing_delete" ON public.lead_billing
+  FOR DELETE TO authenticated
+  USING (public.is_admin());
+
 
 -- ═══════════════════════════════════════
 -- 7. REALTIME (Sincronización en tiempo real)
@@ -278,7 +349,8 @@ BEGIN;
     public.profiles,
     public.leads,
     public.flujos_embudo,
-    public.segmentacion_despacho;
+    public.segmentacion_despacho,
+    public.lead_billing;
 COMMIT;
 
 
@@ -301,12 +373,12 @@ COMMIT;
 -- Verificar tablas creadas
 SELECT table_name FROM information_schema.tables 
 WHERE table_schema = 'public' 
-AND table_name IN ('profiles', 'leads', 'segmentacion_despacho', 'flujos_embudo')
+AND table_name IN ('profiles', 'leads', 'segmentacion_despacho', 'flujos_embudo', 'lead_billing')
 ORDER BY table_name;
 
--- Verificar políticas RLS (debería haber 16: 4 por tabla)
+-- Verificar políticas RLS
 SELECT tablename, policyname, cmd, roles
 FROM pg_policies 
 WHERE schemaname = 'public'
-AND tablename IN ('profiles', 'leads', 'segmentacion_despacho', 'flujos_embudo')
+AND tablename IN ('profiles', 'leads', 'segmentacion_despacho', 'flujos_embudo', 'lead_billing')
 ORDER BY tablename, cmd;

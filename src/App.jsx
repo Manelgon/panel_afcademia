@@ -8,6 +8,8 @@ import Projects from './pages/Projects';
 import Tasks from './pages/Tasks';
 import Calendar from './pages/Calendar';
 import Login from './pages/Login';
+import Fundae from './pages/Fundae';
+import FundaePublicForm from './pages/FundaePublicForm';
 import { ThemeProvider } from './context/ThemeContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { NotificationProvider } from './context/NotificationContext';
@@ -75,6 +77,14 @@ function App() {
                                         <Leads />
                                     </ProtectedRoute>
                                 } />
+
+                                <Route path="/fundae" element={
+                                    <ProtectedRoute>
+                                        <Fundae />
+                                    </ProtectedRoute>
+                                } />
+
+                                <Route path="/fundae-form/:token" element={<FundaePublicForm />} />
 
                                 {/* Redirect a login por defecto si no encuentra ruta */}
                                 <Route path="*" element={<Navigate to="/" />} />

@@ -16,15 +16,128 @@ import {
     Filter,
     FileDown,
     Trash2,
-    Edit3
+    Edit3,
+    CheckCircle2,
+    MoreHorizontal
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTheme } from '../context/ThemeContext';
 import { supabase } from '../lib/supabase';
 import Sidebar from '../components/Sidebar';
+import Portal from '../components/Portal';
+import CustomSelect from '../components/CustomSelect';
+
+// ── Dropdown Actions Menu ──────────────────────────────────────────────
+function ActionDropdown({ lead, onEdit, onDelete, onConvert, onSendEmail, confirm }) {
+    const [isOpen, setIsOpen] = useState(false);
+    const [coords, setCoords] = useState({ top: 0, left: 0 });
+    const triggerRef = React.useRef(null);
+    const menuRef = React.useRef(null);
+    const status = lead.flujos_embudo?.[0]?.status_actual || 'nuevo';
+    const isConverted = status === 'convertido';
+
+    // Close when clicking outside
+    useEffect(() => {
+        if (!isOpen) return;
+        const handleClick = (e) => {
+            if (
+                triggerRef.current && !triggerRef.current.contains(e.target) &&
+                menuRef.current && !menuRef.current.contains(e.target)
+            ) {
+                setIsOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClick);
+        return () => document.removeEventListener('mousedown', handleClick);
+    }, [isOpen]);
+
+    return (
+        <div className="relative inline-block text-left">
+            <button
+                ref={triggerRef}
+                onClick={() => {
+                    const rect = triggerRef.current.getBoundingClientRect();
+                    setCoords({
+                        top: rect.bottom + window.scrollY,
+                        left: rect.right + window.scrollX - 192 // 192px is w-48
+                    });
+                    setIsOpen(!isOpen);
+                }}
+                className={`p-2 glass rounded-xl transition-all ${isOpen ? 'text-primary border-primary/50' : 'text-variable-muted hover:text-primary'}`}
+            >
+                <MoreHorizontal size={18} />
+            </button>
+
+            <AnimatePresence>
+                {isOpen && (
+                    <Portal>
+                        <motion.div
+                            ref={menuRef}
+                            initial={{ opacity: 0, scale: 0.95, y: 5 }}
+                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                            exit={{ opacity: 0, scale: 0.95, y: 5 }}
+                            style={{
+                                position: 'absolute',
+                                top: coords.top + 8,
+                                left: coords.left,
+                                width: '12rem', // w-48
+                                zIndex: 9999
+                            }}
+                            className="rounded-2xl glass border border-white/10 shadow-2xl overflow-hidden py-2"
+                        >
+                            {!isConverted && (
+                                <button
+                                    onClick={() => { onConvert(lead); setIsOpen(false); }}
+                                    className="w-full text-left px-4 py-2.5 text-xs font-bold text-variable-main hover:bg-emerald-500/10 hover:text-emerald-500 flex items-center gap-3 transition-colors"
+                                >
+                                    <CheckCircle2 size={14} /> Convertir Cliente
+                                </button>
+                            )}
+                            <button
+                                onClick={async () => {
+                                    const confirmed = await confirm({
+                                        title: '¿Enviar email?',
+                                        message: '¿Estás seguro de que deseas enviar el email de contacto?',
+                                        confirmText: 'Enviar email',
+                                        cancelText: 'Cancelar'
+                                    });
+                                    if (confirmed) {
+                                        onSendEmail(lead);
+                                    }
+                                    setIsOpen(false);
+                                }}
+                                className="w-full text-left px-4 py-2.5 text-xs font-bold text-variable-main hover:bg-primary/10 hover:text-primary flex items-center gap-3 transition-colors"
+                            >
+                                <Mail size={14} /> Enviar email
+                            </button>
+                            <button
+                                onClick={() => { onEdit(lead); setIsOpen(false); }}
+                                className="w-full text-left px-4 py-2.5 text-xs font-bold text-variable-main hover:bg-primary/10 hover:text-primary flex items-center gap-3 transition-colors"
+                            >
+                                <Edit3 size={14} /> Editar Detalles
+                            </button>
+                            <div className="h-px bg-white/5 my-1" />
+                            <button
+                                onClick={() => { onDelete(lead); setIsOpen(false); }}
+                                className="w-full text-left px-4 py-2.5 text-xs font-bold text-rose-500 hover:bg-rose-500/10 flex items-center gap-3 transition-colors"
+                            >
+                                <Trash2 size={14} /> Eliminar Lead
+                            </button>
+                        </motion.div>
+                    </Portal>
+                )}
+            </AnimatePresence>
+        </div>
+    );
+}
+
 import DataTable from '../components/DataTable';
 import { useNotifications } from '../context/NotificationContext';
 import { useGlobalLoading } from '../context/LoadingContext';
+
+const PROVINCIAS_ESPANA = [
+    'A Coruña', 'Álava', 'Albacete', 'Alicante', 'Almería', 'Asturias', 'Ávila', 'Badajoz', 'Illes Balears', 'Barcelona', 'Burgos', 'Cáceres', 'Cádiz', 'Cantabria', 'Castellón', 'Ciudad Real', 'Córdoba', 'Cuenca', 'Girona', 'Granada', 'Guadalajara', 'Gipuzkoa', 'Huelva', 'Huesca', 'Jaén', 'La Rioja', 'Las Palmas', 'León', 'Lleida', 'Lugo', 'Madrid', 'Málaga', 'Murcia', 'Navarra', 'Ourense', 'Palencia', 'Pontevedra', 'Salamanca', 'Segovia', 'Sevilla', 'Soria', 'Tarragona', 'Santa Cruz de Tenerife', 'Teruel', 'Toledo', 'Valencia', 'Valladolid', 'Zamora', 'Zaragoza', 'Ceuta', 'Melilla'
+].sort((a, b) => a.localeCompare(b, 'es'));
 
 const INITIAL_FORM_STATE = {
     nombre: '',
@@ -32,6 +145,27 @@ const INITIAL_FORM_STATE = {
     whatsapp: '',
     empresa_nombre: '',
     ciudad: '',
+    // Nuevos campos de empresa
+    cif_nif: '',
+    direccion: '',
+    codigo_postal: '',
+    provincia: '',
+    // Campos de facturación
+    billing_razon_social: '',
+    billing_cif: '',
+    billing_direccion: '',
+    billing_poblacion: '',
+    billing_provincia: '',
+    billing_codigo_postal: '',
+    billing_email: '',
+    billing_metodo_pago: '',
+    billing_iban: '',
+    // Progreso facturación
+    billing_numero_factura: '',
+    billing_importe: '',
+    billing_estado: 'pendiente',
+    billing_notas: '',
+    // Otros
     status_actual: 'nuevo',
     newTag: '',
     newActivity: 'lead_inactivo',
@@ -43,7 +177,7 @@ const INITIAL_FORM_STATE = {
 
 export default function Leads() {
     const { darkMode } = useTheme();
-    const { showNotification } = useNotifications();
+    const { showNotification, confirm } = useNotifications();
     const { withLoading } = useGlobalLoading();
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [loading, setLoading] = useState(false);
@@ -72,7 +206,8 @@ export default function Leads() {
                 .select(`
                     *,
                     flujos_embudo(status_actual, keyword_recibida, tags_proceso, actividad),
-                    segmentacion_despacho(num_comunidades, interes_fundae, software_actual, objetivo_automatizacion)
+                    segmentacion_despacho(num_comunidades, interes_fundae, software_actual, objetivo_automatizacion),
+                    lead_billing(*)
                 `)
                 .order('fecha_creacion', { ascending: false });
 
@@ -113,6 +248,10 @@ export default function Leads() {
                         whatsapp: formData.whatsapp,
                         empresa_nombre: formData.empresa_nombre,
                         ciudad: formData.ciudad,
+                        cif_nif: formData.cif_nif,
+                        direccion: formData.direccion,
+                        codigo_postal: formData.codigo_postal,
+                        provincia: formData.provincia,
                         source: 'Panel Admin'
                     }])
                     .select()
@@ -141,6 +280,27 @@ export default function Leads() {
                     }]);
                 }
 
+                // 4. Crear facturación si tiene datos
+                const hasBilling = formData.billing_razon_social || formData.billing_cif || formData.billing_iban;
+                if (hasBilling) {
+                    await supabase.from('lead_billing').insert([{
+                        lead_id: newLead.id,
+                        razon_social: formData.billing_razon_social,
+                        cif: formData.billing_cif,
+                        direccion_facturacion: formData.billing_direccion,
+                        poblacion: formData.billing_poblacion,
+                        provincia: formData.billing_provincia,
+                        codigo_postal: formData.billing_codigo_postal,
+                        email_facturacion: formData.billing_email,
+                        metodo_pago: formData.billing_metodo_pago,
+                        iban: formData.billing_iban,
+                        numero_factura: formData.billing_numero_factura || null,
+                        importe_factura: formData.billing_importe || 0,
+                        estado_factura: formData.billing_estado || 'pendiente',
+                        notas_factura: formData.billing_notas || null
+                    }]);
+                }
+
                 handleCloseModal();
                 showNotification('Lead creado con éxito');
                 fetchLeads();
@@ -165,7 +325,11 @@ export default function Leads() {
                         email: formData.email,
                         whatsapp: formData.whatsapp,
                         empresa_nombre: formData.empresa_nombre,
-                        ciudad: formData.ciudad
+                        ciudad: formData.ciudad,
+                        cif_nif: formData.cif_nif,
+                        direccion: formData.direccion,
+                        codigo_postal: formData.codigo_postal,
+                        provincia: formData.provincia
                     })
                     .eq('id', editingLead.id);
 
@@ -196,9 +360,49 @@ export default function Leads() {
                     .from('flujos_embudo')
                     .update({
                         tags_proceso: newTags,
-                        actividad: newActivity === 'null' ? null : newActivity
+                        actividad: newActivity === 'null' ? null : newActivity,
+                        status_actual: formData.status_actual || 'nuevo'
                     })
                     .eq('lead_id', editingLead.id);
+
+                // 3. Update or Insert segmentacion_despacho
+                const segData = {
+                    lead_id: editingLead.id,
+                    num_comunidades: formData.num_comunidades || null,
+                    interes_fundae: formData.interes_fundae || false,
+                    software_actual: formData.software_actual || null,
+                    objetivo_automatizacion: formData.objetivo_automatizacion || null
+                };
+
+                const { error: segError } = await supabase
+                    .from('segmentacion_despacho')
+                    .upsert(segData, { onConflict: 'lead_id' });
+
+                if (segError) console.error('Error updating segmentacion:', segError);
+
+                // 4. Update or Insert lead_billing
+                const billingData = {
+                    lead_id: editingLead.id,
+                    razon_social: formData.billing_razon_social,
+                    cif: formData.billing_cif,
+                    direccion_facturacion: formData.billing_direccion,
+                    poblacion: formData.billing_poblacion,
+                    provincia: formData.billing_provincia,
+                    codigo_postal: formData.billing_codigo_postal,
+                    email_facturacion: formData.billing_email,
+                    metodo_pago: formData.billing_metodo_pago,
+                    iban: formData.billing_iban,
+                    numero_factura: formData.billing_numero_factura || null,
+                    importe_factura: formData.billing_importe || 0,
+                    estado_factura: formData.billing_estado || 'pendiente',
+                    notas_factura: formData.billing_notas || null
+                };
+
+                const { error: billingError } = await supabase
+                    .from('lead_billing')
+                    .upsert(billingData, { onConflict: 'lead_id' });
+
+                if (billingError) console.error('Error updating billing:', billingError);
 
                 handleCloseModal();
                 showNotification('Lead actualizado con éxito');
@@ -223,7 +427,10 @@ export default function Leads() {
         const tags = lead.flujos_embudo?.[0]?.tags_proceso || [];
         const currentActivity = lead.flujos_embudo?.[0]?.actividad || '';
         const currentStatus = lead.flujos_embudo?.[0]?.status_actual || 'nuevo';
-        const seg = lead.segmentacion_despacho || {};
+        const segData = lead.segmentacion_despacho;
+        const seg = (Array.isArray(segData) ? segData[0] : segData) || {};
+        const billData = lead.lead_billing;
+        const bill = (Array.isArray(billData) ? billData[0] : billData) || {};
 
         setFormData({
             nombre: lead.nombre,
@@ -231,6 +438,27 @@ export default function Leads() {
             whatsapp: lead.whatsapp || '',
             empresa_nombre: lead.empresa_nombre || '',
             ciudad: lead.ciudad || '',
+            // Nuevos campos lead
+            cif_nif: lead.cif_nif || '',
+            direccion: lead.direccion || '',
+            codigo_postal: lead.codigo_postal || '',
+            provincia: lead.provincia || '',
+            // Campos billing
+            billing_razon_social: bill.razon_social || '',
+            billing_cif: bill.cif || '',
+            billing_direccion: bill.direccion_facturacion || '',
+            billing_poblacion: bill.poblacion || '',
+            billing_provincia: bill.provincia || '',
+            billing_codigo_postal: bill.codigo_postal || '',
+            billing_email: bill.email_facturacion || '',
+            billing_metodo_pago: bill.metodo_pago || '',
+            billing_iban: bill.iban || '',
+            // Progreso facturación
+            billing_numero_factura: bill.numero_factura || '',
+            billing_importe: bill.importe_factura || '',
+            billing_estado: bill.estado_factura || 'pendiente',
+            billing_notas: bill.notas_factura || '',
+            // Otros
             status_actual: currentStatus,
             newTag: tags.length > 0 ? tags[tags.length - 1] : '',
             newActivity: currentActivity,
@@ -248,6 +476,69 @@ export default function Leads() {
             setEditingLead(null);
             setFormData(INITIAL_FORM_STATE);
         }, 300); // Wait for exit animation
+    };
+
+    const handleConvertLead = async (lead) => {
+        // Already convertido?
+        const currentStatus = lead.flujos_embudo?.[0]?.status_actual;
+        if (currentStatus === 'convertido') {
+            showNotification('Este lead ya está convertido', 'error');
+            return;
+        }
+
+        const seg = Array.isArray(lead.segmentacion_despacho) ? lead.segmentacion_despacho[0] : lead.segmentacion_despacho;
+        const confirmed = await confirm({
+            title: '¿Convertir Lead?',
+            message: `¿Deseas convertir a ${lead.nombre} en cliente?${seg?.interes_fundae ? '\n\nSe iniciará automáticamente el flujo de FUNDAE.' : ''}`,
+            confirmText: 'Convertir',
+            cancelText: 'Cancelar'
+        });
+
+        if (!confirmed) return;
+
+        await withLoading(async () => {
+            try {
+                // 1. Actualizar estado del flujo a 'convertido'
+                const { error: flujoError } = await supabase
+                    .from('flujos_embudo')
+                    .update({ status_actual: 'convertido', actividad: 'lead_activo' })
+                    .eq('lead_id', lead.id);
+
+                if (flujoError) throw flujoError;
+
+                // 2. Si tiene interes_fundae: crear expediente FUNDAE automáticamente
+                const seg = Array.isArray(lead.segmentacion_despacho) ? lead.segmentacion_despacho[0] : lead.segmentacion_despacho;
+                const interesFundae = seg?.interes_fundae;
+                if (interesFundae) {
+                    const { error: fundaeError } = await supabase
+                        .from('fundae_seguimiento')
+                        .insert([{
+                            lead_id: lead.id,
+                            empresa: lead.empresa_nombre || lead.nombre,
+                            email: lead.email,
+                            telefono: lead.whatsapp || null,
+                            // Flujo iniciado: paso 0 pendiente (pendiente de enviar)
+                            estado: 'pendiente',
+                            formulario_pendiente_enviar: true,
+                            formulario_enviado: false,
+                            formulario_recibido: false,
+                            creditos_verificados: false,
+                            factura_enviada: false,
+                            factura_pagada: false,
+                            ficha_alumno_enviada: false
+                        }]);
+
+                    if (fundaeError) console.error('Error creando expediente FUNDAE:', fundaeError);
+                    else showNotification(`✅ ${lead.nombre} convertido. Expediente FUNDAE iniciado automáticamente.`);
+                } else {
+                    showNotification(`✅ ${lead.nombre} convertido correctamente.`);
+                }
+
+                fetchLeads();
+            } catch (err) {
+                showNotification(`Error: ${err.message}`, 'error');
+            }
+        }, 'Convirtiendo lead...');
     };
 
     const handleDeleteLead = async (lead) => {
@@ -410,11 +701,32 @@ export default function Leads() {
                         {
                             key: 'segmentacion',
                             label: 'Comunidades',
-                            render: (lead) => (
-                                <span className="px-2 py-1 rounded bg-blue-500/10 text-blue-500 text-[10px] font-bold">
-                                    {lead.segmentacion_despacho?.num_comunidades || '—'}
-                                </span>
-                            )
+                            render: (lead) => {
+                                const segData = lead.segmentacion_despacho;
+                                const seg = Array.isArray(segData) ? segData[0] : segData;
+                                return (
+                                    <span className="px-2 py-1 rounded bg-blue-500/10 text-blue-500 text-[10px] font-bold">
+                                        {seg?.num_comunidades || '—'}
+                                    </span>
+                                );
+                            }
+                        },
+                        {
+                            key: 'fundae',
+                            label: 'Interés FUNDAE',
+                            align: 'center',
+                            render: (lead) => {
+                                const segData = lead.segmentacion_despacho;
+                                const seg = Array.isArray(segData) ? segData[0] : segData;
+                                const hasInteres = seg?.interes_fundae;
+                                return hasInteres ? (
+                                    <span className="px-2 py-1 rounded bg-emerald-500/10 text-emerald-500 text-[10px] font-bold border border-emerald-500/20">
+                                        SÍ
+                                    </span>
+                                ) : (
+                                    <span className="text-variable-muted text-[10px]">NO</span>
+                                );
+                            }
                         },
                         {
                             key: 'actividad',
@@ -488,11 +800,14 @@ export default function Leads() {
                             label: 'Acciones',
                             align: 'right',
                             render: (lead) => (
-                                <div className="flex gap-2 justify-end">
-                                    <button onClick={() => handleSendEmail(lead)} title="Enviar email de contacto" className="p-2 glass rounded-xl text-variable-muted hover:text-emerald-500 transition-colors"><Send size={16} /></button>
-                                    <button onClick={() => openEditModal(lead)} className="p-2 glass rounded-xl text-variable-muted hover:text-primary transition-colors"><Edit3 size={16} /></button>
-                                    <button onClick={() => handleDeleteLead(lead)} className="p-2 glass rounded-xl text-variable-muted hover:text-rose-500 transition-colors"><Trash2 size={16} /></button>
-                                </div>
+                                <ActionDropdown
+                                    lead={lead}
+                                    onEdit={openEditModal}
+                                    onDelete={handleDeleteLead}
+                                    onConvert={handleConvertLead}
+                                    onSendEmail={handleSendEmail}
+                                    confirm={confirm}
+                                />
                             )
                         }
                     ]}
@@ -531,15 +846,132 @@ export default function Leads() {
                                         <input value={formData.whatsapp} onChange={(e) => setFormData({ ...formData, whatsapp: e.target.value })} className="w-full bg-white/5 border border-variable rounded-2xl px-5 py-4 focus:outline-none focus:border-primary/50 text-variable-main transition-all" placeholder="+34 600 000 000" />
                                     </div>
                                 </div>
+                                {/* === DATOS DE EMPRESA === */}
+                                <p className="text-[10px] font-black text-primary uppercase tracking-[0.2em] border-b border-primary/20 pb-2 pt-2">Datos de Empresa</p>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                                     <div className="space-y-2">
-                                        <label className="text-xs font-bold text-variable-muted uppercase tracking-widest ml-1">Empresa</label>
-                                        <input value={formData.empresa_nombre} onChange={(e) => setFormData({ ...formData, empresa_nombre: e.target.value })} className="w-full bg-white/5 border border-variable rounded-2xl px-5 py-4 focus:outline-none focus:border-primary/50 text-variable-main transition-all" placeholder="Nombre Despacho" />
+                                        <label className="text-xs font-bold text-variable-muted uppercase tracking-widest ml-1">Nombre Empresa</label>
+                                        <input value={formData.empresa_nombre} onChange={(e) => setFormData({ ...formData, empresa_nombre: e.target.value })} className="w-full bg-white/5 border border-variable rounded-2xl px-5 py-4 focus:outline-none focus:border-primary/50 text-variable-main transition-all" placeholder="Nombre del Despacho" />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-xs font-bold text-variable-muted uppercase tracking-widest ml-1">CIF / NIF</label>
+                                        <input value={formData.cif_nif} onChange={(e) => setFormData({ ...formData, cif_nif: e.target.value })} className="w-full bg-white/5 border border-variable rounded-2xl px-5 py-4 focus:outline-none focus:border-primary/50 text-variable-main transition-all" placeholder="B12345678" />
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+                                    <div className="space-y-2">
+                                        <label className="text-xs font-bold text-variable-muted uppercase tracking-widest ml-1">Dirección</label>
+                                        <input value={formData.direccion} onChange={(e) => setFormData({ ...formData, direccion: e.target.value })} className="w-full bg-white/5 border border-variable rounded-2xl px-5 py-4 focus:outline-none focus:border-primary/50 text-variable-main transition-all" placeholder="Calle, número, piso..." />
                                     </div>
                                     <div className="space-y-2">
                                         <label className="text-xs font-bold text-variable-muted uppercase tracking-widest ml-1">Ciudad</label>
                                         <input value={formData.ciudad} onChange={(e) => setFormData({ ...formData, ciudad: e.target.value })} className="w-full bg-white/5 border border-variable rounded-2xl px-5 py-4 focus:outline-none focus:border-primary/50 text-variable-main transition-all" placeholder="Ej: Madrid" />
                                     </div>
+                                    <div className="space-y-2">
+                                        <label className="text-xs font-bold text-variable-muted uppercase tracking-widest ml-1">Provincia</label>
+                                        <CustomSelect
+                                            value={formData.provincia}
+                                            onChange={(val) => setFormData({ ...formData, provincia: val })}
+                                            options={[
+                                                { value: '', label: 'Selecciona una provincia' },
+                                                ...PROVINCIAS_ESPANA.map(p => ({ value: p, label: p }))
+                                            ]}
+                                        />
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                                    <div className="space-y-2">
+                                        <label className="text-xs font-bold text-variable-muted uppercase tracking-widest ml-1">Código Postal</label>
+                                        <input value={formData.codigo_postal} onChange={(e) => setFormData({ ...formData, codigo_postal: e.target.value })} className="w-full bg-white/5 border border-variable rounded-2xl px-5 py-4 focus:outline-none focus:border-primary/50 text-variable-main transition-all" placeholder="28001" />
+                                    </div>
+                                </div>
+
+                                {/* === DATOS DE FACTURACIÓN === */}
+                                <p className="text-[10px] font-black text-primary uppercase tracking-[0.2em] border-b border-primary/20 pb-2 pt-2">Datos de Facturación</p>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                                    <div className="space-y-2">
+                                        <label className="text-xs font-bold text-variable-muted uppercase tracking-widest ml-1">Razón Social</label>
+                                        <input value={formData.billing_razon_social} onChange={(e) => setFormData({ ...formData, billing_razon_social: e.target.value })} className="w-full bg-white/5 border border-variable rounded-2xl px-5 py-4 focus:outline-none focus:border-primary/50 text-variable-main transition-all" placeholder="Razón social de facturación" />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-xs font-bold text-variable-muted uppercase tracking-widest ml-1">CIF Facturación</label>
+                                        <input value={formData.billing_cif} onChange={(e) => setFormData({ ...formData, billing_cif: e.target.value })} className="w-full bg-white/5 border border-variable rounded-2xl px-5 py-4 focus:outline-none focus:border-primary/50 text-variable-main transition-all" placeholder="B12345678" />
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+                                    <div className="space-y-2">
+                                        <label className="text-xs font-bold text-variable-muted uppercase tracking-widest ml-1">Dir. Facturación</label>
+                                        <input value={formData.billing_direccion} onChange={(e) => setFormData({ ...formData, billing_direccion: e.target.value })} className="w-full bg-white/5 border border-variable rounded-2xl px-5 py-4 focus:outline-none focus:border-primary/50 text-variable-main transition-all" placeholder="Calle, número..." />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-xs font-bold text-variable-muted uppercase tracking-widest ml-1">Población</label>
+                                        <input value={formData.billing_poblacion} onChange={(e) => setFormData({ ...formData, billing_poblacion: e.target.value })} className="w-full bg-white/5 border border-variable rounded-2xl px-5 py-4 focus:outline-none focus:border-primary/50 text-variable-main transition-all" placeholder="Ej: Madrid" />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-xs font-bold text-variable-muted uppercase tracking-widest ml-1">Provincia</label>
+                                        <CustomSelect
+                                            value={formData.billing_provincia}
+                                            onChange={(val) => setFormData({ ...formData, billing_provincia: val })}
+                                            options={[
+                                                { value: '', label: 'Selecciona una provincia' },
+                                                ...PROVINCIAS_ESPANA.map(p => ({ value: p, label: p }))
+                                            ]}
+                                        />
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+                                    <div className="space-y-2">
+                                        <label className="text-xs font-bold text-variable-muted uppercase tracking-widest ml-1">Código Postal</label>
+                                        <input value={formData.billing_codigo_postal} onChange={(e) => setFormData({ ...formData, billing_codigo_postal: e.target.value })} className="w-full bg-white/5 border border-variable rounded-2xl px-5 py-4 focus:outline-none focus:border-primary/50 text-variable-main transition-all" placeholder="28001" />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-xs font-bold text-variable-muted uppercase tracking-widest ml-1">Email Facturación</label>
+                                        <input type="email" value={formData.billing_email} onChange={(e) => setFormData({ ...formData, billing_email: e.target.value })} className="w-full bg-white/5 border border-variable rounded-2xl px-5 py-4 focus:outline-none focus:border-primary/50 text-variable-main transition-all" placeholder="facturacion@empresa.com" />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-xs font-bold text-variable-muted uppercase tracking-widest ml-1">Método de Pago</label>
+                                        <CustomSelect
+                                            value={formData.billing_metodo_pago}
+                                            onChange={(val) => setFormData({ ...formData, billing_metodo_pago: val })}
+                                            options={[
+                                                { value: '', label: 'Sin especificar' },
+                                                { value: 'transferencia', label: 'Transferencia' },
+                                                { value: 'domiciliacion', label: 'Domiciliación' },
+                                                { value: 'tarjeta', label: 'Tarjeta' },
+                                                { value: 'efectivo', label: 'Efectivo' }
+                                            ]}
+                                        />
+                                    </div>
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-xs font-bold text-variable-muted uppercase tracking-widest ml-1">IBAN</label>
+                                    <input value={formData.billing_iban} onChange={(e) => setFormData({ ...formData, billing_iban: e.target.value })} className="w-full bg-white/5 border border-variable rounded-2xl px-5 py-4 focus:outline-none focus:border-primary/50 text-variable-main transition-all font-mono tracking-wider" placeholder="ES00 0000 0000 0000 0000 0000" />
+                                </div>
+
+                                {/* === PROGRESO DE FACTURACIÓN === */}
+                                <p className="text-[10px] font-black text-primary uppercase tracking-[0.2em] border-b border-primary/20 pb-2 pt-2">Progreso de Facturación</p>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                                    <div className="space-y-2">
+                                        <label className="text-xs font-bold text-variable-muted uppercase tracking-widest ml-1">Importe €</label>
+                                        <input type="number" step="0.01" value={formData.billing_importe} onChange={(e) => setFormData({ ...formData, billing_importe: e.target.value })} className="w-full bg-white/5 border border-variable rounded-2xl px-5 py-4 focus:outline-none focus:border-primary/50 text-variable-main transition-all" placeholder="0.00" />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-xs font-bold text-variable-muted uppercase tracking-widest ml-1">Estado Factura</label>
+                                        <CustomSelect
+                                            value={formData.billing_estado}
+                                            onChange={(val) => setFormData({ ...formData, billing_estado: val })}
+                                            options={[
+                                                { value: 'pendiente', label: '⏳ Pendiente' },
+                                                { value: 'enviada', label: '📤 Enviada' },
+                                                { value: 'pagada', label: '✅ Pagada' },
+                                                { value: 'cancelada', label: '❌ Cancelada' }
+                                            ]}
+                                        />
+                                    </div>
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-xs font-bold text-variable-muted uppercase tracking-widest ml-1">Notas Facturación</label>
+                                    <textarea value={formData.billing_notas} onChange={(e) => setFormData({ ...formData, billing_notas: e.target.value })} className="w-full bg-white/5 border border-variable rounded-2xl px-5 py-4 focus:outline-none focus:border-primary/50 text-variable-main transition-all resize-none" rows={2} placeholder="Notas sobre la facturación..." />
                                 </div>
 
                                 {/* === EMBUDO Y SEGUIMIENTO === */}
@@ -547,42 +979,42 @@ export default function Leads() {
                                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
                                     <div className="space-y-2">
                                         <label className="text-xs font-bold text-variable-muted uppercase tracking-widest ml-1">Estado</label>
-                                        <select
+                                        <CustomSelect
                                             value={formData.status_actual || 'nuevo'}
-                                            onChange={(e) => setFormData({ ...formData, status_actual: e.target.value })}
-                                            className="w-full bg-white/5 border border-variable rounded-2xl px-5 py-4 focus:outline-none focus:border-primary/50 text-variable-main transition-all appearance-none cursor-pointer"
-                                        >
-                                            <option value="nuevo" className="bg-[#003865]">Nuevo</option>
-                                            <option value="en_proceso" className="bg-[#003865]">En Proceso</option>
-                                            <option value="contactado" className="bg-[#003865]">Contactado</option>
-                                            <option value="convertido" className="bg-[#003865]">Convertido</option>
-                                            <option value="perdido" className="bg-[#003865]">Perdido</option>
-                                        </select>
+                                            onChange={(val) => setFormData({ ...formData, status_actual: val })}
+                                            options={[
+                                                { value: 'nuevo', label: 'Nuevo' },
+                                                { value: 'en_proceso', label: 'En Proceso' },
+                                                { value: 'contactado', label: 'Contactado' },
+                                                { value: 'convertido', label: 'Convertido' },
+                                                { value: 'perdido', label: 'Perdido' }
+                                            ]}
+                                        />
                                     </div>
                                     <div className="space-y-2">
                                         <label className="text-xs font-bold text-variable-muted uppercase tracking-widest ml-1">Tag Proceso</label>
-                                        <select
+                                        <CustomSelect
                                             value={formData.newTag || ''}
-                                            onChange={(e) => setFormData({ ...formData, newTag: e.target.value })}
-                                            className="w-full bg-white/5 border border-variable rounded-2xl px-5 py-4 focus:outline-none focus:border-primary/50 text-variable-main transition-all appearance-none cursor-pointer"
-                                        >
-                                            <option value="" className="bg-[#003865]">Sin tag</option>
-                                            <option value="nuevo" className="bg-[#003865]">NUEVO</option>
-                                            <option value="email_enviado" className="bg-[#003865]">EMAIL ENVIADO</option>
-                                            <option value="respondido" className="bg-[#003865]">RESPONDIDO</option>
-                                        </select>
+                                            onChange={(val) => setFormData({ ...formData, newTag: val })}
+                                            options={[
+                                                { value: '', label: 'Sin tag' },
+                                                { value: 'nuevo', label: 'NUEVO' },
+                                                { value: 'email_enviado', label: 'EMAIL ENVIADO' },
+                                                { value: 'respondido', label: 'RESPONDIDO' }
+                                            ]}
+                                        />
                                     </div>
                                     <div className="space-y-2">
                                         <label className="text-xs font-bold text-variable-muted uppercase tracking-widest ml-1">Actividad</label>
-                                        <select
+                                        <CustomSelect
                                             value={formData.newActivity || ''}
-                                            onChange={(e) => setFormData({ ...formData, newActivity: e.target.value })}
-                                            className="w-full bg-white/5 border border-variable rounded-2xl px-5 py-4 focus:outline-none focus:border-primary/50 text-variable-main transition-all appearance-none cursor-pointer"
-                                        >
-                                            <option value="" className="bg-[#003865]">Sin asignar</option>
-                                            <option value="lead_activo" className="bg-[#003865]">● LEAD ACTIVO</option>
-                                            <option value="lead_inactivo" className="bg-[#003865]">● LEAD INACTIVO</option>
-                                        </select>
+                                            onChange={(val) => setFormData({ ...formData, newActivity: val })}
+                                            options={[
+                                                { value: '', label: 'Sin asignar' },
+                                                { value: 'lead_activo', label: '● LEAD ACTIVO' },
+                                                { value: 'lead_inactivo', label: '● LEAD INACTIVO' }
+                                            ]}
+                                        />
                                     </div>
                                 </div>
 
@@ -591,16 +1023,16 @@ export default function Leads() {
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                                     <div className="space-y-2">
                                         <label className="text-xs font-bold text-variable-muted uppercase tracking-widest ml-1">Nº Comunidades</label>
-                                        <select
+                                        <CustomSelect
                                             value={formData.num_comunidades || ''}
-                                            onChange={(e) => setFormData({ ...formData, num_comunidades: e.target.value })}
-                                            className="w-full bg-white/5 border border-variable rounded-2xl px-5 py-4 focus:outline-none focus:border-primary/50 text-variable-main transition-all appearance-none cursor-pointer"
-                                        >
-                                            <option value="" className="bg-[#003865]">Sin especificar</option>
-                                            <option value="1-10" className="bg-[#003865]">1 - 10</option>
-                                            <option value="11-50" className="bg-[#003865]">11 - 50</option>
-                                            <option value="50+" className="bg-[#003865]">50+</option>
-                                        </select>
+                                            onChange={(val) => setFormData({ ...formData, num_comunidades: val })}
+                                            options={[
+                                                { value: '', label: 'Sin especificar' },
+                                                { value: '1-10', label: '1 - 10' },
+                                                { value: '11-50', label: '11 - 50' },
+                                                { value: '50+', label: '50+' }
+                                            ]}
+                                        />
                                     </div>
                                     <div className="space-y-2">
                                         <label className="text-xs font-bold text-variable-muted uppercase tracking-widest ml-1">Software Actual</label>

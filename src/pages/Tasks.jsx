@@ -14,6 +14,7 @@ import { useTheme } from '../context/ThemeContext';
 import Sidebar from '../components/Sidebar';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useGlobalLoading } from '../context/LoadingContext';
+import { useNotifications } from '../context/NotificationContext';
 
 /* ─── Constantes ─── */
 const PRIORITIES = [
@@ -509,6 +510,7 @@ export default function Tasks() {
     const { profile: currentProfile } = useAuth();
     const { darkMode, toggleTheme } = useTheme();
     const { withLoading } = useGlobalLoading();
+    const { showNotification, confirm } = useNotifications();
 
     const [tasks, setTasks] = useState([]);
     const [projects, setProjects] = useState([]);
@@ -683,7 +685,12 @@ export default function Tasks() {
                 fetchData();
             } catch (err) {
                 console.error('Detailed error:', err);
-                alert(`Error al crear el sprint: ${err.message || 'Error desconocido'}`);
+                await confirm({
+                    title: 'Error al crear Sprint',
+                    message: err.message || 'Error desconocido',
+                    confirmText: 'Entendido',
+                    cancelText: ''
+                });
             } finally {
                 setCreatingS(false);
             }
@@ -698,7 +705,14 @@ export default function Tasks() {
 
     /* ─── Eliminar tarea ─── */
     const handleDelete = async (taskId) => {
-        if (!window.confirm('¿Eliminar esta tarea?')) return;
+        const confirmed = await confirm({
+            title: '¿Eliminar Tarea?',
+            message: '¿Estás seguro de que deseas eliminar esta tarea? Esta acción no se puede deshacer.',
+            confirmText: 'Eliminar',
+            cancelText: 'Cancelar'
+        });
+        if (!confirmed) return;
+
         await supabase.from('project_tasks').delete().eq('id', taskId);
         setSelectedTask(null);
         fetchData();
@@ -799,7 +813,12 @@ export default function Tasks() {
                                 const sprintTasks = tasks.filter(t => t.sprint_id === currentSprintObj.id);
                                 const incomplete = sprintTasks.filter(t => t.status !== 'done');
                                 if (incomplete.length > 0) {
-                                    alert(`No se puede completar el sprint. Aún hay ${incomplete.length} tareas pendientes (debes moverlas a "Hecho" o al Backlog/otro Sprint).`);
+                                    await confirm({
+                                        title: 'Pendientes',
+                                        message: `No se puede completar el sprint. Aún hay ${incomplete.length} tareas pendientes (debes moverlas a "Hecho" o al Backlog/otro Sprint).`,
+                                        confirmText: 'Entendido',
+                                        cancelText: ''
+                                    });
                                     return;
                                 }
                             }

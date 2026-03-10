@@ -5,7 +5,8 @@ import {
     Users,
     Settings,
     LogOut,
-    Target
+    Target,
+    BookOpen
 } from 'lucide-react';
 import logo from '../assets/logo.png';
 import { useAuth } from '../context/AuthContext';
@@ -103,6 +104,7 @@ export default function Sidebar() {
                 <div className="flex flex-col gap-6 flex-1 w-full px-4 items-center">
                     <SidebarItem icon={LayoutDashboard} to="/" label="Dashboard" />
                     <SidebarItem icon={Target} to="/leads" label="Leads" />
+                    <SidebarItem icon={BookOpen} to="/fundae" label="Seguimiento FUNDAE" />
                 </div>
 
                 <div className="mt-auto flex flex-col gap-4 items-center w-full px-4">
@@ -159,6 +161,7 @@ export default function Sidebar() {
                 <div className="flex items-center justify-around px-3 py-2">
                     <SidebarItem icon={LayoutDashboard} to="/" label="Dashboard" />
                     <SidebarItem icon={Target} to="/leads" label="Leads" />
+                    <SidebarItem icon={BookOpen} to="/fundae" label="Seguimiento FUNDAE" />
 
                     {/* Mobile config with popover */}
                     <div className="relative" ref={mobileConfigRef}>
