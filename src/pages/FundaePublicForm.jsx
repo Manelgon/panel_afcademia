@@ -461,10 +461,12 @@ export default function FundaePublicForm() {
                                         <p className="hidden sm:block text-[10px] text-variable-muted uppercase font-black tracking-wider mt-1 opacity-50">Gestión de Formación</p>
                                     </div>
                                 </div>
-                                <div className="text-right">
-                                    <p className="text-[11px] text-primary uppercase font-black tracking-[0.2em] bg-primary/5 px-4 py-2 rounded-xl border border-primary/10 inline-block">
-                                        Formulario Oficial FUNDAE
-                                    </p>
+                                <div className="text-right flex flex-col items-end">
+                                    <div className="flex items-center gap-2 select-none">
+                                        <span className="text-xl sm:text-2xl font-bold text-[#004b90] tracking-tight">Formulario</span>
+                                        <span className="text-2xl sm:text-3xl font-black italic text-[#ff7900] leading-none">FUNDAE</span>
+                                    </div>
+                                    <div className="h-1 w-24 bg-gradient-to-r from-[#004b90] to-[#ff7900] rounded-full mt-1 opacity-20"></div>
                                 </div>
                             </div>
 
