@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import logo from '../assets/logo.png';
+import CustomSelect from '../components/CustomSelect';
 
 // ── CONFIGURACIÓN DEL COOLDOWN ──────────────────────────────────────────
 const COOLDOWN_MINUTES = 5;
@@ -450,13 +451,20 @@ export default function FundaePublicForm() {
                             exit={{ opacity: 0, scale: 0.95 }}
                             className="glass rounded-[2rem] p-6 lg:p-10 shadow-2xl w-full mx-auto"
                         >
-                            <div className="flex items-center gap-4 mb-8 pb-6 border-b border-variable">
-                                <div className="size-14 bg-primary/10 rounded-2xl flex items-center justify-center shadow-inner shrink-0">
-                                    <ClipboardList className="text-primary size-7" />
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8 pb-6 border-b border-variable">
+                                <div className="flex items-center gap-4">
+                                    <div className="size-14 bg-primary/10 rounded-2xl flex items-center justify-center shadow-inner shrink-0">
+                                        <ClipboardList className="text-primary size-7" />
+                                    </div>
+                                    <div>
+                                        <h2 className="text-2xl sm:text-3xl font-bold text-variable-main">Datos del Expediente</h2>
+                                        <p className="hidden sm:block text-[10px] text-variable-muted uppercase font-black tracking-wider mt-1 opacity-50">Gestión de Formación</p>
+                                    </div>
                                 </div>
-                                <div>
-                                    <h2 className="text-2xl sm:text-3xl font-bold text-variable-main">Datos del Expediente</h2>
-                                    <p className="text-[11px] text-variable-muted uppercase font-black tracking-wider mt-1">Formulario Oficial FUNDAE</p>
+                                <div className="text-right">
+                                    <p className="text-[11px] text-primary uppercase font-black tracking-[0.2em] bg-primary/5 px-4 py-2 rounded-xl border border-primary/10 inline-block">
+                                        Formulario Oficial FUNDAE
+                                    </p>
                                 </div>
                             </div>
 
@@ -512,17 +520,18 @@ export default function FundaePublicForm() {
                                             <div className="space-y-1.5">
                                                 <label className="text-[11px] font-bold text-variable-muted uppercase tracking-widest ml-1">Teléfono</label>
                                                 <div className="flex gap-2">
-                                                    <select
+                                                    <CustomSelect
                                                         value={formData.prefijo_telefono}
-                                                        onChange={e => setFormData({ ...formData, prefijo_telefono: e.target.value })}
-                                                        className="w-[100px] bg-black/10 border border-variable rounded-xl px-2 py-2.5 text-sm focus:outline-none focus:border-primary/50 text-variable-main transition-all appearance-none"
-                                                    >
-                                                        <option value="+34" className="text-black bg-white">+34 (ES)</option>
-                                                        <option value="+33" className="text-black bg-white">+33 (FR)</option>
-                                                        <option value="+351" className="text-black bg-white">+351 (PT)</option>
-                                                        <option value="+44" className="text-black bg-white">+44 (UK)</option>
-                                                        <option value="+1" className="text-black bg-white">+1 (US)</option>
-                                                    </select>
+                                                        onChange={val => setFormData({ ...formData, prefijo_telefono: val })}
+                                                        options={[
+                                                            { value: '+34', label: '+34 (ES)' },
+                                                            { value: '+33', label: '+33 (FR)' },
+                                                            { value: '+351', label: '+351 (PT)' },
+                                                            { value: '+44', label: '+44 (UK)' },
+                                                            { value: '+1', label: '+1 (US)' }
+                                                        ]}
+                                                        width="120px"
+                                                    />
                                                     <input
                                                         required
                                                         value={formData.telefono}
@@ -550,22 +559,25 @@ export default function FundaePublicForm() {
                                             <div className="space-y-1.5">
                                                 <label className="text-[11px] font-bold text-variable-muted uppercase tracking-widest ml-1">Domicilio Social</label>
                                                 <div className="grid grid-cols-12 gap-2">
-                                                    <select
-                                                        value={formData.tipo_via}
-                                                        onChange={e => setFormData({ ...formData, tipo_via: e.target.value })}
-                                                        className="col-span-12 sm:col-span-3 bg-black/10 border border-variable rounded-xl px-2 py-2.5 text-sm focus:outline-none focus:border-primary/50 text-variable-main transition-all appearance-none"
-                                                    >
-                                                        <option value="" disabled className="text-gray-400 bg-white">Tipo</option>
-                                                        <option value="Calle" className="text-black bg-white">Calle</option>
-                                                        <option value="Avenida" className="text-black bg-white">Avenida</option>
-                                                        <option value="Plaza" className="text-black bg-white">Plaza</option>
-                                                        <option value="Paseo" className="text-black bg-white">Paseo</option>
-                                                    </select>
+                                                    <div className="col-span-12 sm:col-span-4 lg:col-span-3">
+                                                        <CustomSelect
+                                                            value={formData.tipo_via}
+                                                            onChange={val => setFormData({ ...formData, tipo_via: val })}
+                                                            options={[
+                                                                { value: 'Calle', label: 'Calle' },
+                                                                { value: 'Avenida', label: 'Avenida' },
+                                                                { value: 'Plaza', label: 'Plaza' },
+                                                                { value: 'Paseo', label: 'Paseo' },
+                                                                { value: 'Poligono', label: 'Polígono' }
+                                                            ]}
+                                                            placeholder="Tipo"
+                                                        />
+                                                    </div>
                                                     <input
                                                         required
                                                         value={formData.nombre_via}
                                                         onChange={e => setFormData({ ...formData, nombre_via: e.target.value })}
-                                                        className="col-span-12 sm:col-span-9 bg-black/10 border border-variable rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-primary/50 text-variable-main transition-all placeholder:text-variable-muted/30"
+                                                        className="col-span-12 sm:col-span-8 lg:col-span-9 bg-black/10 border border-variable rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-primary/50 text-variable-main transition-all placeholder:text-variable-muted/30"
                                                         placeholder="Nombre de la vía"
                                                     />
                                                 </div>
@@ -615,17 +627,12 @@ export default function FundaePublicForm() {
                                                 </div>
                                                 <div className="space-y-1.5">
                                                     <label className="text-[11px] font-bold text-variable-muted uppercase tracking-widest ml-1">Provincia</label>
-                                                    <select
-                                                        required
+                                                    <CustomSelect
                                                         value={formData.provincia}
-                                                        onChange={e => setFormData({ ...formData, provincia: e.target.value })}
-                                                        className="w-full bg-black/10 border border-variable rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-primary/50 text-variable-main transition-all appearance-none"
-                                                    >
-                                                        <option value="" disabled className="text-gray-400 bg-white">Selecciona provincia</option>
-                                                        {["Álava", "Albacete", "Alicante", "Almería", "Asturias", "Ávila", "Badajoz", "Baleares", "Barcelona", "Burgos", "Cáceres", "Cádiz", "Cantabria", "Castellón", "Ciudad Real", "Córdoba", "Cuenca", "Gerona", "Granada", "Guadalajara", "Guipúzcoa", "Huelva", "Huesca", "Jaén", "La Coruña", "La Rioja", "Las Palmas", "León", "Lérida", "Lugo", "Madrid", "Málaga", "Murcia", "Navarra", "Orense", "Palencia", "Pontevedra", "Salamanca", "Santa Cruz de Tenerife", "Segovia", "Sevilla", "Soria", "Tarragona", "Teruel", "Toledo", "Valencia", "Valladolid", "Vizcaya", "Zamora", "Zaragoza", "Ceuta", "Melilla"].map(p => (
-                                                            <option key={p} value={p} className="text-black bg-white">{p}</option>
-                                                        ))}
-                                                    </select>
+                                                        onChange={val => setFormData({ ...formData, provincia: val })}
+                                                        options={["Álava", "Albacete", "Alicante", "Almería", "Asturias", "Ávila", "Badajoz", "Baleares", "Barcelona", "Burgos", "Cáceres", "Cádiz", "Cantabria", "Castellón", "Ciudad Real", "Córdoba", "Cuenca", "Gerona", "Granada", "Guadalajara", "Guipúzcoa", "Huelva", "Huesca", "Jaén", "La Coruña", "La Rioja", "Las Palmas", "León", "Lérida", "Lugo", "Madrid", "Málaga", "Murcia", "Navarra", "Orense", "Palencia", "Pontevedra", "Salamanca", "Santa Cruz de Tenerife", "Segovia", "Sevilla", "Soria", "Tarragona", "Teruel", "Toledo", "Valencia", "Valladolid", "Vizcaya", "Zamora", "Zaragoza", "Ceuta", "Melilla"].map(p => ({ value: p, label: p }))}
+                                                        placeholder="Selecciona provincia"
+                                                    />
                                                 </div>
                                             </div>
                                         </div>
@@ -741,23 +748,26 @@ export default function FundaePublicForm() {
                                         </div>
                                     </div>
 
-                                    {/* Submit Botón y Alerta */}
-                                    <div className="space-y-4 pt-2">
-                                        <div className="bg-primary/5 border border-primary/10 p-4 rounded-2xl flex items-start gap-3 shadow-inner">
-                                            <AlertCircle className="text-primary size-5 shrink-0 mt-0.5" />
-                                            <p className="text-[12px] text-variable-muted leading-relaxed">
-                                                Al enviar este formulario confirmas que los datos proporcionados son veraces y correctos para la gestión de la formación bonificada.
-                                            </p>
-                                        </div>
+                                </div>
 
-                                        <button
-                                            type="submit"
-                                            disabled={submitting}
-                                            className="w-full py-4 bg-primary text-white rounded-2xl font-bold hover:brightness-110 active:scale-[0.98] transition-all shadow-xl shadow-primary/30 flex items-center justify-center gap-2 group disabled:opacity-60 disabled:cursor-not-allowed"
-                                        >
-                                            {submitting ? <Loader2 className="animate-spin" /> : <><Save size={20} /> Guardar Expediente</>}
-                                        </button>
+                                {/* Submit Botón y Alerta — Ahora fuera del grid para ocupar todo el ancho */}
+                                <div className="xl:col-span-2 space-y-4 pt-6 border-t border-variable/20">
+                                    <div className="bg-primary/5 border border-primary/10 p-5 rounded-3xl flex items-center gap-4 shadow-inner">
+                                        <div className="size-10 bg-primary/10 rounded-2xl flex items-center justify-center shrink-0">
+                                            <AlertCircle className="text-primary size-5" />
+                                        </div>
+                                        <p className="text-[13px] text-variable-muted leading-relaxed font-medium">
+                                            Al enviar este formulario confirmas que los datos proporcionados son veraces y correctos para la gestión de la formación bonificada.
+                                        </p>
                                     </div>
+
+                                    <button
+                                        type="submit"
+                                        disabled={submitting}
+                                        className="w-full py-5 bg-primary text-white rounded-[2rem] font-black text-lg uppercase tracking-[0.2em] hover:brightness-110 active:scale-[0.98] transition-all shadow-2xl shadow-primary/40 flex items-center justify-center gap-3 group disabled:opacity-60 disabled:cursor-not-allowed"
+                                    >
+                                        {submitting ? <Loader2 className="animate-spin" /> : <><Save size={24} className="group-hover:scale-110 transition-transform" /> Guardar Expediente Final</>}
+                                    </button>
                                 </div>
                             </form>
                         </motion.div>
