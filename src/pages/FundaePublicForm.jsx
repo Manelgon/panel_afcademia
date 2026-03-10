@@ -443,16 +443,16 @@ export default function FundaePublicForm() {
                         >
                             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 mb-8 pb-6 border-b border-variable">
                                 {/* Left: AFCademIA Logo + Formulario FUNDAE text */}
-                                <div className="flex items-center gap-6 shrink-0 overflow-hidden">
-                                    <div className="size-24 bg-white/80 rounded-3xl flex items-center justify-center shadow-sm p-4 border border-variable/10 overflow-hidden backdrop-blur-sm shrink-0">
+                                <div className="flex items-center gap-4 shrink-0 overflow-hidden">
+                                    <div className="size-16 bg-white/80 rounded-2xl flex items-center justify-center shadow-sm p-3 border border-variable/10 overflow-hidden backdrop-blur-sm shrink-0">
                                         <img src={logo} alt="AFCademIA" className="w-full h-full object-contain" />
                                     </div>
                                     <div className="flex flex-col">
                                         <div className="flex items-center gap-2 select-none">
-                                            <span className="text-3xl sm:text-4xl font-bold text-[#004b90] tracking-tight">Formulario</span>
-                                            <span className="text-4xl sm:text-5xl font-black italic text-[#ff7900] leading-none">FUNDAE</span>
+                                            <span className="text-lg sm:text-xl font-bold text-[#004b90] tracking-tight">Formulario</span>
+                                            <span className="text-xl sm:text-3xl font-black italic text-[#ff7900] leading-none">FUNDAE</span>
                                         </div>
-                                        <div className="h-2 w-full bg-gradient-to-r from-[#004b90] to-[#ff7900] rounded-full mt-2 opacity-20"></div>
+                                        <div className="h-1.5 w-full bg-gradient-to-r from-[#004b90] to-[#ff7900] rounded-full mt-1 opacity-20"></div>
                                     </div>
                                 </div>
 
@@ -463,7 +463,7 @@ export default function FundaePublicForm() {
 
                                 {/* Right: Datos del Expediente */}
                                 <div className="lg:text-right shrink-0">
-                                    <h2 className="text-xl sm:text-2xl font-bold text-variable-main">Datos del Expediente</h2>
+                                    <h2 className="text-lg sm:text-xl font-bold text-variable-main">Datos del Expediente</h2>
                                     <p className="text-[10px] text-variable-muted uppercase font-black tracking-wider mt-0.5 opacity-50">Gestión de Formación</p>
                                 </div>
                             </div>
