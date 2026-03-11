@@ -477,7 +477,7 @@ export default function FundaePublicForm() {
         setSubmitting(true);
         try {
             // 1. Actualizar el expediente de FUNDAE
-            const { error: fError } = await supabase
+            const { data: updatedRows, error: fError } = await supabase
                 .from('fundae_seguimiento')
                 .update({
                     empresa: formData.empresa,
@@ -507,9 +507,14 @@ export default function FundaePublicForm() {
                     formulario_enviado: true,
                     estado_formulario: 'cumplimentado',
                 })
-                .eq('id', tokenData.fundae_id);
+                .eq('id', tokenData.fundae_id)
+                .select();
 
             if (fError) throw fError;
+            if (!updatedRows || updatedRows.length === 0) {
+                throw new Error('No se pudo guardar en la base de datos. Posible problema de permisos (RLS). Contacte con soporte.');
+            }
+            console.log('✅ Datos guardados correctamente:', updatedRows[0]);
 
             // 2. Marcar el token como usado
             await supabase
@@ -747,7 +752,7 @@ export default function FundaePublicForm() {
                                 </div>
                             </div>
 
-                            <form onSubmit={handleSubmitForm} className="grid grid-cols-1 xl:grid-cols-2 gap-8 xl:gap-12">
+                            <form onSubmit={handleSubmitForm} className="grid grid-cols-1 xl:grid-cols-2 gap-8 xl:gap-12 mt-8">
                                 {/* COLUMNA IZQUIERDA */}
                                 <div className="space-y-6">
                                     {/* SECCIÓN 1: Identificación de la Empresa */}
@@ -827,10 +832,11 @@ export default function FundaePublicForm() {
                                                 <input
                                                     type="email"
                                                     required
+                                                    readOnly
                                                     value={formData.email}
-                                                    onChange={e => setFormData({ ...formData, email: e.target.value })}
-                                                    className="w-full bg-black/10 border border-variable rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-primary/50 text-variable-main transition-all placeholder:text-variable-muted/30"
+                                                    className="w-full bg-black/5 border border-variable/50 rounded-xl px-3 py-2.5 text-sm text-variable-main/60 cursor-not-allowed"
                                                     placeholder="empresa@mail.com"
+                                                    title="El email no se puede modificar"
                                                 />
                                             </div>
 
@@ -999,7 +1005,7 @@ export default function FundaePublicForm() {
                                                         value={formData.representante_apellido2}
                                                         onChange={e => setFormData({ ...formData, representante_apellido2: e.target.value })}
                                                         className="w-full bg-black/10 border border-variable rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-primary/50 text-variable-main transition-all placeholder:text-variable-muted/30"
-                                                        placeholder="Segundo Apellido"
+                                                        placeholder="Segundo Apellido (opcional)"
                                                     />
                                                 </div>
                                                 <div className="space-y-1.5 sm:col-span-2">
