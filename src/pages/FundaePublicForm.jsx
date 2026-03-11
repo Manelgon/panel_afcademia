@@ -665,7 +665,7 @@ export default function FundaePublicForm() {
                                                         required
                                                         value={formData.num_medio_empleados}
                                                         onChange={e => setFormData({ ...formData, num_medio_empleados: e.target.value })}
-                                                        className="w-full bg-black/10 border border-variable rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-primary/50 text-variable-main transition-all placeholder:text-variable-muted/30"
+                                                        className="w-full sm:w-32 bg-black/10 border border-variable rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-primary/50 text-variable-main transition-all placeholder:text-variable-muted/30"
                                                         placeholder="Ej. 15"
                                                     />
                                                 </div>
@@ -741,7 +741,7 @@ export default function FundaePublicForm() {
                                                     required
                                                     value={formData.num_asistentes}
                                                     onChange={e => setFormData({ ...formData, num_asistentes: e.target.value })}
-                                                    className="w-full sm:w-1/2 bg-black/10 border border-variable rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-primary/50 text-variable-main transition-all placeholder:text-variable-muted/30"
+                                                    className="w-full sm:w-32 bg-black/10 border border-variable rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-primary/50 text-variable-main transition-all placeholder:text-variable-muted/30"
                                                     placeholder="Ej. 5"
                                                 />
                                             </div>
