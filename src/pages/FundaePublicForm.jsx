@@ -97,10 +97,10 @@ export default function FundaePublicForm() {
                 const fundae = tData.fundae_seguimiento || {};
                 setFundaeRecord(fundae);
                 setFormData({
-                    empresa: fundae.empresa || '',
+                    empresa: '',
                     razon_social: '',
                     cif: '',
-                    telefono: fundae.telefono || '',
+                    telefono: '',
                     email: tData.email || '',
                     domicilio: '',
                     tipo_via: '',
@@ -775,11 +775,10 @@ export default function FundaePublicForm() {
                                                 <label className="text-[11px] font-bold text-variable-muted uppercase tracking-widest ml-1">Nombre Comercial</label>
                                                 <input
                                                     required
-                                                    readOnly
                                                     value={formData.empresa}
-                                                    className="w-full bg-black/5 border border-variable/50 rounded-xl px-3 py-2.5 text-sm text-variable-main/60 cursor-not-allowed"
+                                                    onChange={e => setFormData({ ...formData, empresa: e.target.value })}
+                                                    className="w-full bg-black/10 border border-variable rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-primary/50 text-variable-main transition-all placeholder:text-variable-muted/30"
                                                     placeholder="Ej. Mi Empresa"
-                                                    title="Este campo no se puede modificar"
                                                 />
                                             </div>
                                             <div className="space-y-1.5">
@@ -819,11 +818,10 @@ export default function FundaePublicForm() {
                                                     />
                                                     <input
                                                         required
-                                                        readOnly
                                                         value={formData.telefono}
-                                                        className="flex-1 bg-black/5 border border-variable/50 rounded-xl px-3 py-2.5 text-sm text-variable-main/60 cursor-not-allowed"
+                                                        onChange={e => setFormData({ ...formData, telefono: e.target.value })}
+                                                        className="flex-1 bg-black/10 border border-variable rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-primary/50 text-variable-main transition-all placeholder:text-variable-muted/30"
                                                         placeholder="600 000 000"
-                                                        title="Este campo no se puede modificar"
                                                     />
                                                 </div>
                                             </div>
