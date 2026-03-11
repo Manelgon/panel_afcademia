@@ -520,6 +520,31 @@ export default function FundaePublicForm() {
             // 3. Generar el PDF
             const blob = await generatePDF(formData);
             setPdfBlob(blob);
+
+            // 4. Convertir PDF a base64 y enviar al webhook de n8n para email
+            try {
+                const reader = new FileReader();
+                reader.readAsDataURL(blob);
+                reader.onloadend = () => {
+                    const base64data = reader.result.split(',')[1]; // quitar "data:application/pdf;base64,"
+                    const webhookUrl = import.meta.env.VITE_WEBHOOK_PDF_EMAIL;
+                    if (webhookUrl) {
+                        fetch(webhookUrl, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                email: formData.email,
+                                empresa: formData.empresa,
+                                representante: [formData.representante_nombre, formData.representante_apellido1, formData.representante_apellido2].filter(Boolean).join(' '),
+                                cif: formData.cif,
+                                pdf_base64: base64data,
+                                pdf_filename: `Expediente_FUNDAE_${formData.empresa || 'empresa'}_${new Date().getFullYear()}.pdf`
+                            })
+                        }).catch(() => { }); // fire-and-forget
+                    }
+                };
+            } catch (_) { } // No bloquear si falla el envío por email
+
             setShowSuccessModal(true);
 
         } catch (err) {
