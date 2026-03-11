@@ -962,17 +962,17 @@ export default function Fundae() {
                                     <Coins size={32} />
                                 </div>
                                 <div>
-                                    <h3 className="text-2xl font-black text-variable-main uppercase tracking-tight">Verificar Cr\u00e9ditos</h3>
+                                    <h3 className="text-2xl font-black text-variable-main uppercase tracking-tight">Verificar Créditos</h3>
                                     <p className="text-xs font-bold text-primary uppercase tracking-widest leading-tight">Expediente: {creditsInputData.record?.empresa}</p>
                                 </div>
                             </div>
 
                             <p className="text-sm text-variable-muted mb-8 leading-relaxed font-medium">
-                                Para avanzar al siguiente paso, es necesario indicar el importe de los cr\u00e9ditos de FUNDAE calculados para esta empresa.
+                                Para avanzar al siguiente paso, es necesario indicar el importe de los créditos de FUNDAE calculados para esta empresa.
                             </p>
 
                             <div className="space-y-3 mb-10">
-                                <label className="text-[10px] font-black text-primary uppercase tracking-[0.2em] ml-1">Importe de Cr\u00e9ditos (\u20ac)</label>
+                                <label className="text-[10px] font-black text-primary uppercase tracking-[0.2em] ml-1">Importe de Créditos (€)</label>
                                 <div className="relative group">
                                     <input
                                         type="number"
@@ -984,7 +984,7 @@ export default function Fundae() {
                                         className="w-full bg-white/5 border-2 border-variable rounded-2xl px-6 py-5 focus:outline-none focus:border-primary text-xl font-bold text-variable-main transition-all group-hover:border-primary/30"
                                         placeholder="0.00"
                                     />
-                                    <div className="absolute right-6 top-1/2 -translate-y-1/2 text-variable-muted font-bold text-lg">\u20ac</div>
+                                    <div className="absolute right-6 top-1/2 -translate-y-1/2 text-variable-muted font-bold text-lg">€</div>
                                 </div>
                             </div>
 

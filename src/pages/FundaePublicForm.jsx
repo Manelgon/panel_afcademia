@@ -106,6 +106,7 @@ export default function FundaePublicForm() {
                     tipo_via: '',
                     nombre_via: '',
                     numero_via: '',
+                    bloque: '',
                     piso: '',
                     puerta: '',
                     poblacion: '',
@@ -292,6 +293,7 @@ export default function FundaePublicForm() {
 
         const domicilioCompleto = [
             data.tipo_via, data.nombre_via, data.numero_via,
+            data.bloque ? `Blq. ${data.bloque}` : '',
             data.piso ? `Piso ${data.piso}` : '',
             data.puerta ? `Pta. ${data.puerta}` : ''
         ].filter(Boolean).join(' ');
@@ -476,6 +478,18 @@ export default function FundaePublicForm() {
         e.preventDefault();
         setSubmitting(true);
         try {
+            const partesDomicilio = [
+                formData.tipo_via,
+                formData.nombre_via,
+                formData.numero_via ? `Nº ${formData.numero_via}` : '',
+                formData.bloque ? `Blq. ${formData.bloque}` : '',
+                formData.piso ? `Piso ${formData.piso}` : '',
+                formData.puerta ? `Pta. ${formData.puerta}` : ''
+            ].filter(Boolean).join(' ');
+            
+            const domicilioCalculado = `${partesDomicilio}, ${formData.codigo_postal || ''} ${formData.poblacion || ''}, ${formData.provincia || ''}`.replace(/\s+/g, ' ').replace(/ ,/g, ',').replace(/^, /, '').trim();
+            const representanteCalculado = `${formData.representante_nombre || ''} ${formData.representante_apellido1 || ''} ${formData.representante_apellido2 || ''}`.trim();
+
             // 1. Actualizar el expediente de FUNDAE
             const { data: updatedRows, error: fError } = await supabase
                 .from('fundae_seguimiento')
@@ -494,6 +508,7 @@ export default function FundaePublicForm() {
                     poblacion: formData.poblacion,
                     codigo_postal: formData.codigo_postal,
                     provincia: formData.provincia,
+                    domicilio: domicilioCalculado,
                     convenio_referencia: formData.convenio_referencia,
                     cnae: formData.cnae,
                     ccc: formData.ccc,
@@ -503,6 +518,7 @@ export default function FundaePublicForm() {
                     representante_apellido1: formData.representante_apellido1,
                     representante_apellido2: formData.representante_apellido2,
                     nif_nie_representante: formData.nif_nie_representante,
+                    representante_empresa: representanteCalculado,
                     formulario_cumplimentado: true,
                     formulario_enviado: true,
                     estado_formulario: 'cumplimentado',
@@ -516,10 +532,38 @@ export default function FundaePublicForm() {
             }
             console.log('✅ Datos guardados correctamente:', updatedRows[0]);
 
-            // 2. Marcar el token como usado
+            // 1.5 Sincronizar con la tabla leads si existe lead_id
+            if (tokenData.fundae_seguimiento?.lead_id) {
+                await supabase
+                    .from('leads')
+                    .update({
+                        empresa_nombre: formData.empresa,
+                        razon_social: formData.razon_social,
+                        cif: formData.cif,
+                        telefono_empresa: formData.telefono,
+                        domicilio: domicilioCalculado,
+                        ciudad: formData.poblacion,
+                        codigo_postal: formData.codigo_postal,
+                        provincia: formData.provincia,
+                        convenio_referencia: formData.convenio_referencia,
+                        cnae: formData.cnae,
+                        ccc: formData.ccc,
+                        num_medio_empleados: formData.num_medio_empleados,
+                        representante_empresa: representanteCalculado,
+                        nif_nie_representante: formData.nif_nie_representante
+                    })
+                    .eq('id', tokenData.fundae_seguimiento.lead_id)
+                    .catch(err => console.error('Error sincronizando con leads:', err));
+            }
+
+            // 2. Marcar el token como usado y guardar valores calculados
             await supabase
                 .from('fundae_form_tokens')
-                .update({ used: true })
+                .update({ 
+                    used: true,
+                    representante_empresa: representanteCalculado,
+                    domicilio: domicilioCalculado
+                })
                 .eq('token', token);
 
             // 3. Generar el PDF
@@ -868,32 +912,40 @@ export default function FundaePublicForm() {
                                                 </div>
                                             </div>
 
-                                            {/* Domicilio - Línea 2: Número, Piso, Puerta, Localidad */}
+                                            {/* Domicilio - Línea 2: Número, Bloque, Piso, Puerta */}
                                             <div className="grid grid-cols-12 gap-2">
                                                 <input
                                                     required
                                                     value={formData.numero_via}
                                                     onChange={e => setFormData({ ...formData, numero_via: e.target.value })}
-                                                    className="col-span-3 sm:col-span-2 bg-black/10 border border-variable rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-primary/50 text-variable-main transition-all placeholder:text-variable-muted/30"
+                                                    className="col-span-3 bg-black/10 border border-variable rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-primary/50 text-variable-main transition-all placeholder:text-variable-muted/30"
                                                     placeholder="Nº"
+                                                />
+                                                <input
+                                                    value={formData.bloque}
+                                                    onChange={e => setFormData({ ...formData, bloque: e.target.value })}
+                                                    className="col-span-3 bg-black/10 border border-variable rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-primary/50 text-variable-main transition-all placeholder:text-variable-muted/30"
+                                                    placeholder="Blq"
                                                 />
                                                 <input
                                                     value={formData.piso}
                                                     onChange={e => setFormData({ ...formData, piso: e.target.value })}
-                                                    className="col-span-3 sm:col-span-2 bg-black/10 border border-variable rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-primary/50 text-variable-main transition-all placeholder:text-variable-muted/30"
+                                                    className="col-span-3 bg-black/10 border border-variable rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-primary/50 text-variable-main transition-all placeholder:text-variable-muted/30"
                                                     placeholder="Piso"
                                                 />
                                                 <input
                                                     value={formData.puerta}
                                                     onChange={e => setFormData({ ...formData, puerta: e.target.value })}
-                                                    className="col-span-3 sm:col-span-2 bg-black/10 border border-variable rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-primary/50 text-variable-main transition-all placeholder:text-variable-muted/30"
+                                                    className="col-span-3 bg-black/10 border border-variable rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-primary/50 text-variable-main transition-all placeholder:text-variable-muted/30"
                                                     placeholder="Pta"
                                                 />
+                                            </div>
+                                            <div className="grid grid-cols-1 gap-2">
                                                 <input
                                                     required
                                                     value={formData.poblacion}
                                                     onChange={e => setFormData({ ...formData, poblacion: e.target.value })}
-                                                    className="col-span-12 sm:col-span-6 bg-black/10 border border-variable rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-primary/50 text-variable-main transition-all placeholder:text-variable-muted/30"
+                                                    className="w-full bg-black/10 border border-variable rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-primary/50 text-variable-main transition-all placeholder:text-variable-muted/30"
                                                     placeholder="Localidad"
                                                 />
                                             </div>
