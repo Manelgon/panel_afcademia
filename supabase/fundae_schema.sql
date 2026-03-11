@@ -103,6 +103,7 @@ CREATE TABLE IF NOT EXISTS public.fundae_seguimiento (
     -- ── Pasos booleanos del flujo ────────────────────────────────────
     formulario_pendiente_enviar boolean DEFAULT false,
     formulario_enviado          boolean DEFAULT false,
+    formulario_cumplimentado    boolean DEFAULT false,
     formulario_recibido         boolean DEFAULT false,
     creditos_verificados        boolean DEFAULT false,
     factura_enviada             boolean DEFAULT false,
@@ -144,6 +145,7 @@ ALTER TABLE public.fundae_seguimiento ADD COLUMN IF NOT EXISTS representante_ape
 ALTER TABLE public.fundae_seguimiento ADD COLUMN IF NOT EXISTS nif_nie_representante   text;
 ALTER TABLE public.fundae_seguimiento ADD COLUMN IF NOT EXISTS formulario_pendiente_enviar boolean DEFAULT false;
 ALTER TABLE public.fundae_seguimiento ADD COLUMN IF NOT EXISTS formulario_enviado      boolean DEFAULT false;
+ALTER TABLE public.fundae_seguimiento ADD COLUMN IF NOT EXISTS formulario_cumplimentado boolean DEFAULT false;
 ALTER TABLE public.fundae_seguimiento ADD COLUMN IF NOT EXISTS formulario_recibido     boolean DEFAULT false;
 ALTER TABLE public.fundae_seguimiento ADD COLUMN IF NOT EXISTS creditos_verificados    boolean DEFAULT false;
 ALTER TABLE public.fundae_seguimiento ADD COLUMN IF NOT EXISTS factura_enviada         boolean DEFAULT false;
@@ -160,8 +162,9 @@ COMMENT ON COLUMN public.fundae_seguimiento.lead_id IS 'Lead de origen (converti
 COMMENT ON COLUMN public.fundae_seguimiento.estado_formulario IS 'Estado del formulario público: pendiente | cumplimentado | firmado | archivado';
 COMMENT ON COLUMN public.fundae_seguimiento.formulario_pendiente_enviar IS '0. El formulario está pendiente de enviar';
 COMMENT ON COLUMN public.fundae_seguimiento.formulario_enviado IS '1. Se envió el formulario al cliente';
-COMMENT ON COLUMN public.fundae_seguimiento.formulario_recibido IS '2. El cliente devolvió el formulario cumplimentado';
-COMMENT ON COLUMN public.fundae_seguimiento.creditos_verificados IS '3. Se verificó que el cliente tiene créditos FUNDAE';
+COMMENT ON COLUMN public.fundae_seguimiento.formulario_cumplimentado IS '2. El cliente rellenó el formulario (pero no firmado)';
+COMMENT ON COLUMN public.fundae_seguimiento.formulario_recibido IS '3. El cliente devolvió el formulario firmado';
+COMMENT ON COLUMN public.fundae_seguimiento.creditos_verificados IS '4. Se verificó que el cliente tiene créditos FUNDAE';
 COMMENT ON COLUMN public.fundae_seguimiento.factura_enviada IS '4. Se envió la factura al cliente';
 COMMENT ON COLUMN public.fundae_seguimiento.factura_pagada IS '5. El cliente ha pagado la factura';
 COMMENT ON COLUMN public.fundae_seguimiento.ficha_alumno_enviada IS '6. Se envió la ficha de alumno';

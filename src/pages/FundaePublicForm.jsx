@@ -98,30 +98,30 @@ export default function FundaePublicForm() {
                 setFundaeRecord(fundae);
                 setFormData({
                     empresa: fundae.empresa || '',
-                    razon_social: fundae.razon_social || '',
-                    cif: fundae.cif || '',
+                    razon_social: '',
+                    cif: '',
                     telefono: fundae.telefono || '',
                     email: tData.email || '',
-                    domicilio: fundae.domicilio || '',
-                    tipo_via: fundae.tipo_via || '',
-                    nombre_via: fundae.nombre_via || '',
-                    numero_via: fundae.numero_via || '',
-                    piso: fundae.piso || '',
-                    puerta: fundae.puerta || '',
-                    poblacion: fundae.poblacion || '',
-                    codigo_postal: fundae.codigo_postal || '',
-                    provincia: fundae.provincia || '',
-                    convenio_referencia: fundae.convenio_referencia || '',
-                    cnae: fundae.cnae || '',
-                    ccc: fundae.ccc || '',
-                    num_medio_empleados: fundae.num_medio_empleados || '',
-                    num_asistentes: fundae.num_asistentes || '',
+                    domicilio: '',
+                    tipo_via: '',
+                    nombre_via: '',
+                    numero_via: '',
+                    piso: '',
+                    puerta: '',
+                    poblacion: '',
+                    codigo_postal: '',
+                    provincia: '',
+                    convenio_referencia: '',
+                    cnae: '',
+                    ccc: '',
+                    num_medio_empleados: '',
+                    num_asistentes: '',
                     prefijo_telefono: fundae.prefijo_telefono || '+34',
-                    representante_empresa: fundae.representante_empresa || '',
-                    representante_nombre: fundae.representante_nombre || '',
-                    representante_apellido1: fundae.representante_apellido1 || '',
-                    representante_apellido2: fundae.representante_apellido2 || '',
-                    nif_nie_representante: fundae.nif_nie_representante || ''
+                    representante_empresa: '',
+                    representante_nombre: '',
+                    representante_apellido1: '',
+                    representante_apellido2: '',
+                    nif_nie_representante: ''
                 });
 
                 // Determinar el paso inicial
@@ -503,7 +503,7 @@ export default function FundaePublicForm() {
                     representante_apellido1: formData.representante_apellido1,
                     representante_apellido2: formData.representante_apellido2,
                     nif_nie_representante: formData.nif_nie_representante,
-                    formulario_recibido: true,
+                    formulario_cumplimentado: true,
                     formulario_enviado: true,
                     estado_formulario: 'cumplimentado',
                 })
@@ -775,10 +775,11 @@ export default function FundaePublicForm() {
                                                 <label className="text-[11px] font-bold text-variable-muted uppercase tracking-widest ml-1">Nombre Comercial</label>
                                                 <input
                                                     required
+                                                    readOnly
                                                     value={formData.empresa}
-                                                    onChange={e => setFormData({ ...formData, empresa: e.target.value })}
-                                                    className="w-full bg-black/10 border border-variable rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-primary/50 text-variable-main transition-all placeholder:text-variable-muted/30"
+                                                    className="w-full bg-black/5 border border-variable/50 rounded-xl px-3 py-2.5 text-sm text-variable-main/60 cursor-not-allowed"
                                                     placeholder="Ej. Mi Empresa"
+                                                    title="Este campo no se puede modificar"
                                                 />
                                             </div>
                                             <div className="space-y-1.5">
@@ -818,10 +819,11 @@ export default function FundaePublicForm() {
                                                     />
                                                     <input
                                                         required
+                                                        readOnly
                                                         value={formData.telefono}
-                                                        onChange={e => setFormData({ ...formData, telefono: e.target.value })}
-                                                        className="flex-1 bg-black/10 border border-variable rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-primary/50 text-variable-main transition-all placeholder:text-variable-muted/30"
+                                                        className="flex-1 bg-black/5 border border-variable/50 rounded-xl px-3 py-2.5 text-sm text-variable-main/60 cursor-not-allowed"
                                                         placeholder="600 000 000"
+                                                        title="Este campo no se puede modificar"
                                                     />
                                                 </div>
                                             </div>
