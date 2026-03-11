@@ -11,12 +11,16 @@ import {
     Building2,
     Save,
     ClipboardList,
-    ShieldAlert
+    ShieldAlert,
+    Download,
+    X
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import logo from '../assets/logo.png';
 import logo_fundae from '../assets/logo_fundae.png';
 import CustomSelect from '../components/CustomSelect';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 // ── CONFIGURACIÓN DEL COOLDOWN ──────────────────────────────────────────
 const COOLDOWN_MINUTES = 5;
@@ -59,6 +63,8 @@ export default function FundaePublicForm() {
         nif_nie_representante: ''
     });
     const [submitting, setSubmitting] = useState(false);
+    const [pdfBlob, setPdfBlob] = useState(null);
+    const [showSuccessModal, setShowSuccessModal] = useState(false);
 
     // ── CARGA INICIAL ─────────────────────────────────────────────────────
     useEffect(() => {
@@ -240,6 +246,231 @@ export default function FundaePublicForm() {
         }
     };
 
+    // ── HELPER: Convertir imagen URL a base64 ────────────────────────
+    const imageToBase64 = async (url) => {
+        const res = await fetch(url);
+        const blob = await res.blob();
+        return new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result);
+            reader.readAsDataURL(blob);
+        });
+    };
+
+    // ── HELPER: Generar el PDF combinado ─────────────────────────────
+    const generatePDF = async (data) => {
+        const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+        const pageW = doc.internal.pageSize.getWidth();
+        const pageH = doc.internal.pageSize.getHeight();
+        const margin = 15;
+
+        // Cargar logos como base64
+        let logoAfcB64 = null;
+        let logoFundaeB64 = null;
+        try { logoAfcB64 = await imageToBase64(logo); } catch (_) { }
+        try { logoFundaeB64 = await imageToBase64(logo_fundae); } catch (_) { }
+
+        // ── Función header (se llama en cada página) ─────────────────
+        const addHeader = () => {
+            if (logoAfcB64) doc.addImage(logoAfcB64, 'PNG', margin, 8, 40, 14);
+            if (logoFundaeB64) doc.addImage(logoFundaeB64, 'PNG', pageW - margin - 40, 8, 40, 14);
+            doc.setDrawColor(230, 90, 30);
+            doc.setLineWidth(0.5);
+            doc.line(margin, 26, pageW - margin, 26);
+        };
+
+        // ──────────────────────────────────────────────────────────────
+        // SECCIÓN 1: FICHA DE EMPRESA
+        // ──────────────────────────────────────────────────────────────
+        addHeader();
+
+        doc.setFontSize(13);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(230, 90, 30);
+        doc.text('FICHA DE EMPRESA', pageW / 2, 34, { align: 'center' });
+        doc.setTextColor(40, 40, 40);
+
+        const domicilioCompleto = [
+            data.tipo_via, data.nombre_via, data.numero_via,
+            data.piso ? `Piso ${data.piso}` : '',
+            data.puerta ? `Pta. ${data.puerta}` : ''
+        ].filter(Boolean).join(' ');
+
+        const representanteNombre = [
+            data.representante_nombre,
+            data.representante_apellido1,
+            data.representante_apellido2
+        ].filter(Boolean).join(' ');
+
+        const fichaRows = [
+            ['Nombre comercial', data.empresa || ''],
+            ['Razón social', data.razon_social || ''],
+            ['C.I.F.', data.cif || ''],
+            ['Teléfono', `${data.prefijo_telefono || ''}${data.telefono ? ' ' + data.telefono : ''}`],
+            ['Email', data.email || ''],
+            ['Domicilio', domicilioCompleto || data.domicilio || ''],
+            ['Localidad / Población', data.poblacion || ''],
+            ['Código Postal', data.codigo_postal || ''],
+            ['Provincia', data.provincia || ''],
+            ['CNAE (Actividad)', data.cnae || ''],
+            ['Cód. Cuenta Cotización (CCC)', data.ccc || ''],
+            ['Plantilla media (2025)', data.num_medio_empleados ? `${data.num_medio_empleados} trabajadores` : ''],
+            ['Convenio de referencia', data.convenio_referencia || ''],
+            ['Trabajadores a formar (estimado)', data.num_asistentes ? `${data.num_asistentes} personas` : ''],
+            ['Representante legal', representanteNombre || ''],
+            ['NIF/NIE representante', data.nif_nie_representante || ''],
+        ];
+
+        autoTable(doc, {
+            startY: 38,
+            head: [],
+            body: fichaRows,
+            theme: 'striped',
+            styles: { fontSize: 9.5, cellPadding: 3.5, textColor: [40, 40, 40] },
+            columnStyles: {
+                0: { fontStyle: 'bold', fillColor: [255, 247, 242], textColor: [180, 65, 10], cellWidth: 72 },
+                1: { cellWidth: pageW - margin * 2 - 72 }
+            },
+            margin: { left: margin, right: margin },
+        });
+
+        // ──────────────────────────────────────────────────────────────
+        // SECCIÓN 2: ADHESIÓN CONTRATO DE ENCOMIENDA
+        // ──────────────────────────────────────────────────────────────
+        doc.addPage();
+        addHeader();
+
+        doc.setFontSize(13);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(230, 90, 30);
+        doc.text('ADHESIÓN AL CONTRATO DE ENCOMIENDA DE FORMACIÓN', pageW / 2, 34, { align: 'center' });
+        doc.setTextColor(40, 40, 40);
+
+        // Texto legal del contrato
+        const empresa = data.empresa || '_______________________';
+        const cif = data.cif || '___________';
+        const representante = representanteNombre || '_______________________';
+        const nifRep = data.nif_nie_representante || '___________';
+        const hoy = new Date();
+        const fechaStr = `${hoy.getDate()} de ${hoy.toLocaleString('es-ES', { month: 'long' })} de ${hoy.getFullYear()}`;
+
+        const textoContrato = [
+            `En _____________, a ${fechaStr}.`,
+            '',
+            'REUNIDOS',
+            '',
+            `De una parte, D./Dña. ${representante}, con NIF/NIE ${nifRep}, actuando en nombre y representación de la empresa ${empresa} con C.I.F. ${cif}, en adelante «LA EMPRESA».`,
+            '',
+            `De otra parte, AFC Academia S.L., en adelante «AFC ACADEMIA», actuando en calidad de entidad organizadora de acciones formativas bonificadas al amparo del sistema de formación profesional para el empleo.`,
+            '',
+            'EXPONEN',
+            '',
+            '1.º Que AFC Academia S.L. está debidamente inscrita en el registro correspondiente para la organización e impartición de formación bonificada a través de la Fundación Estatal para la Formación en el Empleo (FUNDAE).',
+            '',
+            '2.º Que La Empresa desea realizar acciones formativas para sus trabajadores con cargo a la bonificación a la que tiene derecho según la normativa vigente de formación profesional para el empleo.',
+            '',
+            '3.º Que ambas partes tienen plena capacidad jurídica para suscribir el presente documento.',
+            '',
+            'ACUERDAN',
+            '',
+            'PRIMERO. La Empresa encomienda a AFC Academia S.L. la organización y gestión de las acciones formativas para sus trabajadores, incluyendo la tramitación de las bonificaciones ante FUNDAE.',
+            '',
+            'SEGUNDO. AFC Academia S.L. se compromete a realizar las gestiones necesarias para la correcta tramitación de la formación bonificada, conforme a la legislación vigente.',
+            '',
+            'TERCERO. La Empresa autoriza expresamente a AFC Academia S.L. a actuar en su nombre ante FUNDAE para todos los trámites relacionados con las acciones formativas objeto del presente acuerdo.',
+            '',
+            'CUARTO. Ambas partes se comprometen a facilitar mutuamente la información y documentación necesaria para el correcto desarrollo de las acciones formativas.',
+            '',
+            'QUINTO. El presente acuerdo tendrá vigencia durante el ejercicio en curso y podrá prorrogarse mediante acuerdo expreso de ambas partes.',
+            '',
+            'Y en prueba de conformidad, firman el presente documento por duplicado en el lugar y fecha indicados.',
+        ];
+
+        let yPos = 40;
+        const lineHeight = 5.2;
+        const maxWidth = pageW - margin * 2;
+
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(9.5);
+
+        for (const line of textoContrato) {
+            // Detectar títulos en mayúsculas
+            const isTitle = line === 'REUNIDOS' || line === 'EXPONEN' || line === 'ACUERDAN';
+            if (isTitle) {
+                doc.setFont('helvetica', 'bold');
+                doc.setTextColor(230, 90, 30);
+            } else {
+                doc.setFont('helvetica', 'normal');
+                doc.setTextColor(40, 40, 40);
+            }
+
+            if (line === '') {
+                yPos += lineHeight * 0.5;
+                continue;
+            }
+
+            const lines = doc.splitTextToSize(line, maxWidth);
+            for (const l of lines) {
+                if (yPos + lineHeight > pageH - 50) {
+                    doc.addPage();
+                    addHeader();
+                    yPos = 34;
+                }
+                doc.text(l, margin, yPos);
+                yPos += lineHeight;
+            }
+        }
+
+        // ── Bloques de firma ──────────────────────────────────────────
+        if (yPos + 50 > pageH - 10) {
+            doc.addPage();
+            addHeader();
+            yPos = 34;
+        }
+
+        yPos += 10;
+        const col1X = margin;
+        const col2X = pageW / 2 + 5;
+        const colW = pageW / 2 - margin - 5;
+
+        doc.setFontSize(9);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(40, 40, 40);
+
+        // Títulos de firma
+        doc.text('Por La Empresa', col1X, yPos);
+        doc.text('Por AFC Academia S.L.', col2X, yPos);
+        yPos += 5;
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(8);
+        doc.text('(Sello y firma)', col1X, yPos);
+        doc.text('(Sello y firma)', col2X, yPos);
+        yPos += 28;
+
+        // Líneas de firma
+        doc.setDrawColor(100, 100, 100);
+        doc.setLineWidth(0.3);
+        doc.line(col1X, yPos, col1X + colW, yPos);
+        doc.line(col2X, yPos, col2X + colW, yPos);
+        yPos += 5;
+
+        doc.setFontSize(8);
+        doc.setTextColor(80, 80, 80);
+        doc.text(representante || 'Representante de la empresa', col1X, yPos);
+        doc.text('AFC Academia S.L.', col2X, yPos);
+
+        // Número de página en cada página
+        const totalPages = doc.internal.getNumberOfPages();
+        for (let i = 1; i <= totalPages; i++) {
+            doc.setPage(i);
+            doc.setFontSize(7);
+            doc.setTextColor(150, 150, 150);
+            doc.text(`Página ${i} de ${totalPages}`, pageW / 2, pageH - 6, { align: 'center' });
+        }
+
+        return doc.output('blob');
+    };
+
     // 3. Enviar Formulario
     const handleSubmitForm = async (e) => {
         e.preventDefault();
@@ -253,8 +484,13 @@ export default function FundaePublicForm() {
                     razon_social: formData.razon_social,
                     cif: formData.cif,
                     telefono: formData.telefono,
+                    prefijo_telefono: formData.prefijo_telefono,
                     email: formData.email,
-                    domicilio: formData.domicilio,
+                    tipo_via: formData.tipo_via,
+                    nombre_via: formData.nombre_via,
+                    numero_via: formData.numero_via,
+                    piso: formData.piso,
+                    puerta: formData.puerta,
                     poblacion: formData.poblacion,
                     codigo_postal: formData.codigo_postal,
                     provincia: formData.provincia,
@@ -263,10 +499,13 @@ export default function FundaePublicForm() {
                     ccc: formData.ccc,
                     num_medio_empleados: formData.num_medio_empleados,
                     num_asistentes: parseInt(formData.num_asistentes) || 0,
-                    representante_empresa: formData.representante_empresa,
+                    representante_nombre: formData.representante_nombre,
+                    representante_apellido1: formData.representante_apellido1,
+                    representante_apellido2: formData.representante_apellido2,
                     nif_nie_representante: formData.nif_nie_representante,
                     formulario_recibido: true,
-                    formulario_enviado: true // Aseguramos que el paso 1 esté a true
+                    formulario_enviado: true,
+                    estado_formulario: 'cumplimentado',
                 })
                 .eq('id', tokenData.fundae_id);
 
@@ -278,12 +517,27 @@ export default function FundaePublicForm() {
                 .update({ used: true })
                 .eq('token', token);
 
-            setStep(3);
+            // 3. Generar el PDF
+            const blob = await generatePDF(formData);
+            setPdfBlob(blob);
+            setShowSuccessModal(true);
+
         } catch (err) {
             alert('Error al enviar: ' + err.message);
         } finally {
             setSubmitting(false);
         }
+    };
+
+    // ── HELPER: Descargar PDF ─────────────────────────────────────────
+    const handleDownloadPDF = () => {
+        if (!pdfBlob) return;
+        const url = URL.createObjectURL(pdfBlob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `Expediente_FUNDAE_${formData.empresa || 'empresa'}_${new Date().getFullYear()}.pdf`;
+        a.click();
+        URL.revokeObjectURL(url);
     };
 
     // ── RENDERIZADO OTP ───────────────────────────────────────────────────
@@ -773,8 +1027,8 @@ export default function FundaePublicForm() {
                         </motion.div>
                     )}
 
-                    {/* Pantalla 3: Éxito */}
-                    {step === 3 && (
+                    {/* Pantalla 3: Éxito (legacy fallback) */}
+                    {step === 3 && !showSuccessModal && (
                         <motion.div
                             key="step3"
                             initial={{ opacity: 0, scale: 0.9 }}
@@ -783,12 +1037,6 @@ export default function FundaePublicForm() {
                         >
                             <div className="size-24 bg-emerald-500/10 rounded-full flex items-center justify-center mx-auto mb-8 relative">
                                 <CheckCircle className="text-emerald-500 size-12" />
-                                <motion.div
-                                    initial={{ scale: 0 }}
-                                    animate={{ scale: 1.5, opacity: 0 }}
-                                    transition={{ repeat: Infinity, duration: 2 }}
-                                    className="absolute inset-0 bg-emerald-500/10 rounded-full"
-                                />
                             </div>
                             <h2 className="text-3xl font-bold text-variable-main mb-4">¡Enviado con éxito!</h2>
                             <p className="text-variable-muted mb-8 leading-relaxed text-sm">
@@ -798,6 +1046,75 @@ export default function FundaePublicForm() {
                             <div className="pt-8 border-t border-variable">
                                 <p className="text-xs text-variable-muted italic">Ya puedes cerrar esta ventana con seguridad.</p>
                             </div>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
+
+                {/* ── MODAL DE ÉXITO CON PDF ────────────────────────────── */}
+                <AnimatePresence>
+                    {showSuccessModal && (
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            className="fixed inset-0 z-50 flex items-center justify-center p-4"
+                            style={{ backdropFilter: 'blur(12px)', backgroundColor: 'rgba(0,0,0,0.6)' }}
+                        >
+                            <motion.div
+                                initial={{ scale: 0.8, opacity: 0, y: 30 }}
+                                animate={{ scale: 1, opacity: 1, y: 0 }}
+                                exit={{ scale: 0.8, opacity: 0 }}
+                                transition={{ type: 'spring', stiffness: 300, damping: 28 }}
+                                className="relative bg-white dark:bg-zinc-900 rounded-[2.5rem] p-8 sm:p-12 shadow-2xl max-w-md w-full text-center border border-primary/10"
+                            >
+                                {/* Icono animado */}
+                                <div className="relative size-24 mx-auto mb-6">
+                                    <div className="size-24 bg-emerald-500/10 rounded-full flex items-center justify-center">
+                                        <CheckCircle className="text-emerald-500 size-12" />
+                                    </div>
+                                    <motion.div
+                                        initial={{ scale: 1, opacity: 0.5 }}
+                                        animate={{ scale: 1.8, opacity: 0 }}
+                                        transition={{ repeat: Infinity, duration: 2, ease: 'easeOut' }}
+                                        className="absolute inset-0 bg-emerald-500/20 rounded-full"
+                                    />
+                                </div>
+
+                                <h2 className="text-2xl sm:text-3xl font-black text-zinc-800 dark:text-white mb-3">
+                                    ¡Expediente Guardado!
+                                </h2>
+                                <p className="text-zinc-500 dark:text-zinc-400 text-sm leading-relaxed mb-2">
+                                    Los datos han sido guardados correctamente en el sistema.
+                                </p>
+                                <p className="text-zinc-500 dark:text-zinc-400 text-sm leading-relaxed mb-8">
+                                    Descarga el PDF con la <strong className="text-primary">Ficha de Empresa</strong> y el <strong className="text-primary">Contrato de Encomienda</strong> para firmarlo y enviárnoslo.
+                                </p>
+
+                                {/* Botones */}
+                                <div className="flex flex-col sm:flex-row gap-3">
+                                    <button
+                                        onClick={handleDownloadPDF}
+                                        className="flex-1 flex items-center justify-center gap-2 py-3.5 px-6 bg-primary text-white rounded-2xl font-bold text-sm uppercase tracking-wider hover:brightness-110 active:scale-[0.98] transition-all shadow-lg shadow-primary/30"
+                                    >
+                                        <Download size={18} />
+                                        Descargar PDF
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            setShowSuccessModal(false);
+                                            setStep(3);
+                                        }}
+                                        className="flex-1 flex items-center justify-center gap-2 py-3.5 px-6 bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 rounded-2xl font-bold text-sm uppercase tracking-wider hover:bg-zinc-200 dark:hover:bg-zinc-700 active:scale-[0.98] transition-all"
+                                    >
+                                        <X size={18} />
+                                        Salir
+                                    </button>
+                                </div>
+
+                                <p className="text-xs text-zinc-400 mt-6 italic">
+                                    Nuestro equipo revisará la documentación y se pondrá en contacto contigo.
+                                </p>
+                            </motion.div>
                         </motion.div>
                     )}
                 </AnimatePresence>
