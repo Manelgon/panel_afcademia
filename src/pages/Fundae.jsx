@@ -11,7 +11,8 @@ import {
     Send,
     AlertTriangle,
     Ban,
-    Trash2
+    Trash2,
+    Coins
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../lib/supabase';
@@ -163,6 +164,10 @@ export default function Fundae() {
         status: '', // 'incidencia', 'cancelado', 'completado'
         comment: ''
     });
+
+    // Credits Modal State
+    const [isCreditsModalOpen, setIsCreditsModalOpen] = useState(false);
+    const [creditsInputData, setCreditsInputData] = useState({ record: null, amount: '' });
 
     const fetchRecords = async () => {
         setLoading(true);
@@ -362,7 +367,12 @@ export default function Fundae() {
         if (currentStep.key === 'creditos_verificados') {
             const creditValue = parseFloat(record.creditos_fundae) || 0;
             if (creditValue <= 0) {
-                showNotification('No se puede verificar el paso: introduce primero el importe de Créditos FUNDAE.', 'error');
+                // Open credits modal instead of just showing an error notification
+                setCreditsInputData({
+                    record: record,
+                    amount: ''
+                });
+                setIsCreditsModalOpen(true);
                 return;
             }
         }
@@ -395,6 +405,36 @@ export default function Fundae() {
                 showNotification(`Error: ${err.message}`, 'error');
             }
         }, `Avanzando paso...`);
+    };
+
+    const handleSaveAndAdvanceCredits = async () => {
+        const amount = parseFloat(creditsInputData.amount);
+        if (isNaN(amount) || amount <= 0) {
+            showNotification('Por favor, indica un importe de cr\u00e9ditos v\u00e1lido.', 'error');
+            return;
+        }
+
+        await withLoading(async () => {
+            try {
+                // 1. Actualizar en Supabase (Cr\u00e9ditos e marcar paso como completado)
+                const { error } = await supabase
+                    .from('fundae_seguimiento')
+                    .update({ 
+                        creditos_fundae: amount,
+                        creditos_verificados: true 
+                    })
+                    .eq('id', creditsInputData.record.id);
+
+                if (error) throw error;
+
+                showNotification('Cr\u00e9ditos verificados y paso actualizado.', 'success');
+                setIsCreditsModalOpen(false);
+                fetchRecords(); // Actualizar tabla
+            } catch (err) {
+                console.error('Error saving credits:', err);
+                showNotification(`Error: ${err.message}`, 'error');
+            }
+        }, 'Guardando y avanzando...');
     };
 
     useEffect(() => {
@@ -899,6 +939,67 @@ export default function Fundae() {
                                     className={`flex-[2] py-4 rounded-2xl font-bold text-white transition-all shadow-lg ${commentData.status === 'incidencia' ? 'bg-rose-500 shadow-rose-500/20' : 'bg-gray-600 shadow-gray-600/20'} disabled:opacity-50 disabled:grayscale`}
                                 >
                                     Confirmar Cambio
+                                </button>
+                            </div>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
+
+            {/* Credits Verification Modal */}
+            <AnimatePresence>
+                {isCreditsModalOpen && (
+                    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+                        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsCreditsModalOpen(false)} className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+                        <motion.div
+                            initial={{ scale: 0.9, opacity: 0, y: 20 }}
+                            animate={{ scale: 1, opacity: 1, y: 0 }}
+                            exit={{ scale: 0.9, opacity: 0, y: 20 }}
+                            className="relative w-full max-w-lg glass rounded-[2rem] p-10 shadow-2xl"
+                        >
+                            <div className="flex items-center gap-4 mb-8">
+                                <div className="p-3 rounded-2xl bg-primary/20 text-primary">
+                                    <Coins size={32} />
+                                </div>
+                                <div>
+                                    <h3 className="text-2xl font-black text-variable-main uppercase tracking-tight">Verificar Cr\u00e9ditos</h3>
+                                    <p className="text-xs font-bold text-primary uppercase tracking-widest leading-tight">Expediente: {creditsInputData.record?.empresa}</p>
+                                </div>
+                            </div>
+
+                            <p className="text-sm text-variable-muted mb-8 leading-relaxed font-medium">
+                                Para avanzar al siguiente paso, es necesario indicar el importe de los cr\u00e9ditos de FUNDAE calculados para esta empresa.
+                            </p>
+
+                            <div className="space-y-3 mb-10">
+                                <label className="text-[10px] font-black text-primary uppercase tracking-[0.2em] ml-1">Importe de Cr\u00e9ditos (\u20ac)</label>
+                                <div className="relative group">
+                                    <input
+                                        type="number"
+                                        step="0.01"
+                                        autoFocus
+                                        value={creditsInputData.amount}
+                                        onChange={e => setCreditsInputData(prev => ({ ...prev, amount: e.target.value }))}
+                                        onKeyDown={e => e.key === 'Enter' && handleSaveAndAdvanceCredits()}
+                                        className="w-full bg-white/5 border-2 border-variable rounded-2xl px-6 py-5 focus:outline-none focus:border-primary text-xl font-bold text-variable-main transition-all group-hover:border-primary/30"
+                                        placeholder="0.00"
+                                    />
+                                    <div className="absolute right-6 top-1/2 -translate-y-1/2 text-variable-muted font-bold text-lg">\u20ac</div>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <button
+                                    onClick={() => setIsCreditsModalOpen(false)}
+                                    className="py-5 glass rounded-2xl font-black text-[11px] uppercase tracking-[0.15em] text-variable-muted hover:text-variable-main transition-all hover:bg-white/10"
+                                >
+                                    Cancelar
+                                </button>
+                                <button
+                                    onClick={() => handleSaveAndAdvanceCredits()}
+                                    className="py-5 bg-primary text-white rounded-2xl font-black text-[11px] uppercase tracking-[0.15em] hover:brightness-110 active:scale-[0.98] transition-all shadow-xl shadow-primary/20"
+                                >
+                                    Guardar y Avanzar
                                 </button>
                             </div>
                         </motion.div>
