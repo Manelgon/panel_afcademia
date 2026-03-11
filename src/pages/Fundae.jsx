@@ -304,7 +304,7 @@ export default function Fundae() {
         if (currentStep.key === 'formulario_pendiente_enviar' || currentStep.key === 'formulario_enviado') {
             const confirmed = await confirm({
                 title: 'Enviar Formulario FUNDAE',
-                message: '¿Quieres enviar el formulario de FUNDAE automáticamente por webhook?',
+                message: '¿Quieres enviar el formulario de FUNDAE (generando automáticamente el enlace y lanzando el correo)?',
                 confirmText: 'Sí, enviar',
                 cancelText: 'Cancelar'
             });
@@ -312,6 +312,48 @@ export default function Fundae() {
             if (!confirmed) {
                 return; // Bloqueamos la ejecución si cancela
             }
+
+            await withLoading(async () => {
+                try {
+                    const emailToSend = record.email || record.leads?.email;
+                    if (!emailToSend) {
+                        showNotification('No se puede enviar: el expediente no tiene un email válido vinculado.', 'error');
+                        return;
+                    }
+
+                    // 1. Insertar directamente en la tabla (esto disparará el Webhook nativo de Supabase)
+                    const { error } = await supabase
+                        .from('fundae_form_tokens')
+                        .insert([
+                            {
+                                fundae_id: record.id,
+                                email: emailToSend
+                            }
+                        ]);
+
+                    if (error) {
+                        console.error('Error insertando token:', error);
+                        showNotification('Error al crear el token en base de datos. Verifica RLS o los datos.', 'error');
+                        throw error;
+                    }
+
+                    showNotification('Formulario enviado (token generado y webhook disparado).', 'success');
+
+                    // 2. Opcional pero recomendado: Actualizar el paso en local para que avance la UI "formulario_enviado = true"
+                    const { error: updateErr } = await supabase
+                        .from('fundae_seguimiento')
+                        .update({ formulario_enviado: true, formulario_pendiente_enviar: true })
+                        .eq('id', record.id);
+
+                    if (updateErr) console.error('Error al actualizar el estado:', updateErr);
+
+                    fetchRecords(); // Refrescar la tabla
+                } catch (err) {
+                    showNotification(`Error: ${err.message}`, 'error');
+                }
+            }, `Enviando formulario a ${record.empresa}...`);
+
+            return; // FINALIZAR para que no ejecute el fetch() de webhooks genéricos justo abajo
         }
 
         // Validation for Créditos Verificados: must have numerical credit value
