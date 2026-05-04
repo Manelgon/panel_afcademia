@@ -185,38 +185,30 @@ export default function Fundae() {
         }
     };
 
-    // ── Enviar formulario FUNDAE al lead vía webhook ──────────────────────
+    // ── Enviar formulario FUNDAE al lead (inserta token → trigger Supabase dispara n8n) ──
     const handleSendFormulario = async (record) => {
-        const webhookUrl = import.meta.env.VITE_WEBHOOK_FORMULARIO_FUNDAE_URL;
-        if (!webhookUrl) {
-            showNotification('Webhook FUNDAE no configurado en .env (VITE_WEBHOOK_FORMULARIO_FUNDAE_URL)', 'error');
+        const emailToSend = record.email || record.leads?.email;
+        if (!emailToSend) {
+            showNotification('No se puede enviar: el expediente no tiene un email válido vinculado.', 'error');
             return;
         }
 
         await withLoading(async () => {
             try {
-                const payload = {
-                    action: 'send_form',
-                    fundae_id: record.id,
-                    lead_id: record.lead_id,
-                    empresa: record.empresa,
-                    cif: record.cif,
-                    email: record.email || record.leads?.email,
-                    telefono: record.telefono || record.leads?.whatsapp,
-                    creditos_fundae: record.creditos_fundae,
-                    num_asistentes: record.num_asistentes,
-                    fecha_inicio: record.fecha_inicio,
-                };
+                const { error: tokenError } = await supabase
+                    .from('fundae_form_tokens')
+                    .insert([{ fundae_id: record.id, email: emailToSend }]);
 
-                const res = await fetch(webhookUrl, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
+                if (tokenError) throw tokenError;
 
-                if (!res.ok) throw new Error(`Webhook respondió con ${res.status}`);
+                const { error: updateError } = await supabase
+                    .from('fundae_seguimiento')
+                    .update({ formulario_enviado: true, formulario_pendiente_enviar: true })
+                    .eq('id', record.id);
 
-                showNotification(`✅ Solicitud de envío de formulario para ${record.empresa} procesada`);
+                if (updateError) console.error('Error al actualizar el estado:', updateError);
+
+                showNotification(`✅ Formulario enviado a ${record.empresa}`);
                 fetchRecords();
             } catch (err) {
                 showNotification(`Error al enviar formulario: ${err.message}`, 'error');
@@ -255,34 +247,21 @@ export default function Fundae() {
     };
 
     const triggerStatusWebhook = async (record, data) => {
-        const webhookUrl = import.meta.env.VITE_WEBHOOK_FORMULARIO_FUNDAE_URL;
-        if (!webhookUrl) {
-            showNotification('Webhook FUNDAE no configurado.', 'error');
-            return;
-        }
-
         await withLoading(async () => {
             try {
-                const payload = {
-                    action: 'update_status',
-                    fundae_id: record.id,
-                    lead_id: record.lead_id,
-                    empresa: record.empresa,
-                    cif: record.cif,
-                    email: record.email || record.leads?.email,
-                    telefono: record.telefono || record.leads?.whatsapp,
-                    ...data
-                };
+                const updatePayload = { estado: data.status };
+                if (data.comentarios !== undefined) updatePayload.comentarios = data.comentarios;
 
-                const res = await fetch(webhookUrl, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
+                const { error } = await supabase
+                    .from('fundae_seguimiento')
+                    .update(updatePayload)
+                    .eq('id', record.id);
 
-                if (!res.ok) throw new Error(`Error: ${res.status}`);
-                showNotification(`Solicitud de estado "${newStatus || 'actualizado'}" enviada.`);
+                if (error) throw error;
+
+                showNotification(`Estado actualizado a "${data.status}".`);
                 setIsCommentModalOpen(false);
+                fetchRecords();
             } catch (err) {
                 showNotification(`Error: ${err.message}`, 'error');
             }
@@ -291,13 +270,6 @@ export default function Fundae() {
 
     // ── Avanzar paso secuencialmente ────────────────────────────────────────
     const handleAdvanceStep = async (record) => {
-        const webhookUrl = import.meta.env.VITE_WEBHOOK_FORMULARIO_FUNDAE_URL;
-
-        if (!webhookUrl) {
-            showNotification('Webhook FUNDAE no configurado.', 'error');
-            return;
-        }
-
         const currentStepIndex = FLOW_STEPS.findIndex(s => !record[s.key]);
         const currentStep = currentStepIndex !== -1 ? FLOW_STEPS[currentStepIndex] : null;
 
@@ -379,28 +351,15 @@ export default function Fundae() {
 
         await withLoading(async () => {
             try {
-                const payload = {
-                    action: 'advance_step_request',
-                    step: currentStep.key,
-                    fundae_id: record.id,
-                    lead_id: record.lead_id,
-                    empresa: record.empresa,
-                    cif: record.cif,
-                    email: record.email || record.leads?.email,
-                    telefono: record.telefono || record.leads?.whatsapp,
-                    creditos_fundae: record.creditos_fundae || 0,
-                    num_asistentes: record.num_asistentes || 0,
-                    fecha_inicio: record.fecha_inicio,
-                };
+                const { error } = await supabase
+                    .from('fundae_seguimiento')
+                    .update({ [currentStep.key]: true })
+                    .eq('id', record.id);
 
-                const res = await fetch(webhookUrl, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
+                if (error) throw error;
 
-                if (!res.ok) throw new Error(`Error: ${res.status}`);
-                showNotification(`Solicitud para "${currentStep.short}" enviada.`);
+                showNotification(`Paso "${currentStep.short}" avanzado.`);
+                fetchRecords();
             } catch (err) {
                 showNotification(`Error: ${err.message}`, 'error');
             }
