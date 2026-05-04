@@ -4,6 +4,8 @@ import Dashboard from './pages/Dashboard';
 import ProjectDetail from './pages/ProjectDetail';
 import Users from './pages/Users';
 import Leads from './pages/Leads';
+import Clientes from './pages/Clientes';
+import ClienteDetail from './pages/ClienteDetail';
 import Projects from './pages/Projects';
 import Tasks from './pages/Tasks';
 import Calendar from './pages/Calendar';
@@ -75,6 +77,18 @@ function App() {
                                 <Route path="/leads" element={
                                     <ProtectedRoute>
                                         <Leads />
+                                    </ProtectedRoute>
+                                } />
+
+                                <Route path="/clientes" element={
+                                    <ProtectedRoute>
+                                        <Clientes />
+                                    </ProtectedRoute>
+                                } />
+
+                                <Route path="/clientes/:id" element={
+                                    <ProtectedRoute>
+                                        <ClienteDetail />
                                     </ProtectedRoute>
                                 } />
 

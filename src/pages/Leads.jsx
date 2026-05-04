@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
     Users as UsersIcon,
     UserPlus,
@@ -177,6 +178,7 @@ const INITIAL_FORM_STATE = {
 
 export default function Leads() {
     const { darkMode } = useTheme();
+    const navigate = useNavigate();
     const { showNotification, confirm } = useNotifications();
     const { withLoading } = useGlobalLoading();
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -187,12 +189,12 @@ export default function Leads() {
     const [editingLead, setEditingLead] = useState(null);
     const [formData, setFormData] = useState(INITIAL_FORM_STATE);
 
+    // Pipeline activo: convertidos viven ahora en /clientes
     const tabs = [
         { id: 'todos', label: 'Todos' },
         { id: 'nuevo', label: 'Nuevos' },
         { id: 'en_proceso', label: 'En Proceso' },
         { id: 'contactado', label: 'Contactados' },
-        { id: 'convertido', label: 'Convertidos' },
         { id: 'perdido', label: 'Perdidos' }
     ];
 
@@ -221,18 +223,20 @@ export default function Leads() {
         }
     };
 
+    // Pipeline activo: excluimos convertidos (viven en /clientes)
+    const activeLeads = leadsList.filter(l => l.flujos_embudo?.[0]?.status_actual !== 'convertido');
+
     const stats = {
-        todos: leadsList.length,
-        nuevo: leadsList.filter(l => (l.flujos_embudo?.[0]?.status_actual || 'nuevo') === 'nuevo').length,
-        contactado: leadsList.filter(l => l.flujos_embudo?.[0]?.status_actual === 'contactado').length,
-        en_proceso: leadsList.filter(l => l.flujos_embudo?.[0]?.status_actual === 'en_proceso').length,
-        convertido: leadsList.filter(l => l.flujos_embudo?.[0]?.status_actual === 'convertido').length,
-        perdido: leadsList.filter(l => l.flujos_embudo?.[0]?.status_actual === 'perdido').length
+        todos: activeLeads.length,
+        nuevo: activeLeads.filter(l => (l.flujos_embudo?.[0]?.status_actual || 'nuevo') === 'nuevo').length,
+        contactado: activeLeads.filter(l => l.flujos_embudo?.[0]?.status_actual === 'contactado').length,
+        en_proceso: activeLeads.filter(l => l.flujos_embudo?.[0]?.status_actual === 'en_proceso').length,
+        perdido: activeLeads.filter(l => l.flujos_embudo?.[0]?.status_actual === 'perdido').length
     };
 
     const filteredLeads = activeTab === 'todos'
-        ? leadsList
-        : leadsList.filter(l => (l.flujos_embudo?.[0]?.status_actual || 'nuevo') === activeTab);
+        ? activeLeads
+        : activeLeads.filter(l => (l.flujos_embudo?.[0]?.status_actual || 'nuevo') === activeTab);
 
     const handleCreateLead = async (e) => {
         e.preventDefault();
@@ -489,7 +493,7 @@ export default function Leads() {
         const seg = Array.isArray(lead.segmentacion_despacho) ? lead.segmentacion_despacho[0] : lead.segmentacion_despacho;
         const confirmed = await confirm({
             title: '¿Convertir Lead?',
-            message: `¿Deseas convertir a ${lead.nombre} en cliente?${seg?.interes_fundae ? '\n\nSe iniciará automáticamente el flujo de FUNDAE.' : ''}`,
+            message: `¿Deseas convertir a ${lead.nombre} en cliente? Pasará a la sección de Clientes.${seg?.interes_fundae ? '\n\nSe iniciará automáticamente el flujo de FUNDAE.' : ''}`,
             confirmText: 'Convertir',
             cancelText: 'Cancelar'
         });
@@ -535,6 +539,8 @@ export default function Leads() {
                 }
 
                 fetchLeads();
+                // Llevar al usuario directamente a la ficha del nuevo cliente
+                navigate(`/clientes/${lead.id}`);
             } catch (err) {
                 showNotification(`Error: ${err.message}`, 'error');
             }
