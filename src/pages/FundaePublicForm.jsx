@@ -534,7 +534,7 @@ export default function FundaePublicForm() {
 
             // 1.5 Sincronizar con la tabla leads si existe lead_id
             if (tokenData.fundae_seguimiento?.lead_id) {
-                await supabase
+                const { error: leadsSyncError } = await supabase
                     .from('leads')
                     .update({
                         empresa_nombre: formData.empresa,
@@ -552,8 +552,8 @@ export default function FundaePublicForm() {
                         representante_empresa: representanteCalculado,
                         nif_nie_representante: formData.nif_nie_representante
                     })
-                    .eq('id', tokenData.fundae_seguimiento.lead_id)
-                    .catch(err => console.error('Error sincronizando con leads:', err));
+                    .eq('id', tokenData.fundae_seguimiento.lead_id);
+                if (leadsSyncError) console.error('Error sincronizando con leads:', leadsSyncError);
             }
 
             // 2. Marcar el token como usado y guardar valores calculados

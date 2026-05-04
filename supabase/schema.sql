@@ -340,6 +340,34 @@ CREATE POLICY "billing_delete" ON public.lead_billing
 
 
 -- ═══════════════════════════════════════
+-- 6.7 MIGRACIÓN IDEMPOTENTE: columnas de progreso de facturación
+-- ──────────────────────────────────────────────────────────────
+-- Para BDs creadas antes de añadir estas columnas al CREATE TABLE.
+-- Seguro de re-ejecutar (IF NOT EXISTS).
+-- ═══════════════════════════════════════
+
+ALTER TABLE public.lead_billing
+  ADD COLUMN IF NOT EXISTS numero_factura        text,
+  ADD COLUMN IF NOT EXISTS importe_factura       numeric     DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS estado_factura        text        DEFAULT 'pendiente',
+  ADD COLUMN IF NOT EXISTS fecha_factura_enviada timestamptz,
+  ADD COLUMN IF NOT EXISTS fecha_factura_pagada  timestamptz,
+  ADD COLUMN IF NOT EXISTS notas_factura         text;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'lead_billing_estado_factura_check'
+  ) THEN
+    ALTER TABLE public.lead_billing
+      ADD CONSTRAINT lead_billing_estado_factura_check
+      CHECK (estado_factura IN ('pendiente', 'enviada', 'pagada', 'cancelada'));
+  END IF;
+END $$;
+
+
+-- ═══════════════════════════════════════
 -- 7. REALTIME (Sincronización en tiempo real)
 -- ═══════════════════════════════════════
 
