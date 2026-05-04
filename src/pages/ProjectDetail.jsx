@@ -1993,7 +1993,7 @@ export default function ProjectDetail() {
                                     <button disabled={formLoading} type="submit" className="w-full py-4 bg-primary text-white rounded-2xl font-bold shadow-xl shadow-primary/30 hover:brightness-110 transition-all">
                                         {formLoading ? 'Guardando...' : 'Añadir Línea'}
                                     </button>
-                                </form>}
+                                </form>
                             </motion.div>
                         </div>
                     )
