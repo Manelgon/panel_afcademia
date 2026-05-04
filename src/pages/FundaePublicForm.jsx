@@ -70,14 +70,23 @@ export default function FundaePublicForm() {
     useEffect(() => {
         const loadTokenData = async () => {
             try {
-                // 1. Buscar el token
+                const rawToken = (token || '').trim();
+                if (!rawToken) {
+                    setError('Este enlace no es válido o ya no existe.');
+                    return;
+                }
+
+                // 1. Buscar el token (+ expediente embed; requiere RLS anon SELECT en fundae_seguimiento)
                 const { data: tData, error: tError } = await supabase
                     .from('fundae_form_tokens')
                     .select('*, fundae_seguimiento(*)')
-                    .eq('token', token)
-                    .single();
+                    .eq('token', rawToken)
+                    .maybeSingle();
 
                 if (tError || !tData) {
+                    if (import.meta.env.DEV && tError) {
+                        console.error('FUNDAE token:', tError.message, tError);
+                    }
                     setError('Este enlace no es válido o ya no existe.');
                     return;
                 }
@@ -171,32 +180,112 @@ export default function FundaePublicForm() {
 
     // ── ACCIONES ─────────────────────────────────────────────────────────
 
-    // 1. Solicitar/Regenerar Código
+    // 1. Solicitar código: UPDATE directo en Supabase (anon); el código queda en verification_code al instante.
+    // Email opcional: si existe VITE_CODIGO_FUNDAE, notifica a n8n con el mismo payload + code (plantilla Gmail).
     const handleRequestCode = async () => {
         if (cooldown > 0) return;
         setResending(true);
         try {
-            const webhookUrl = import.meta.env.VITE_CODIGO_FUNDAE;
-            const res = await fetch(webhookUrl, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    token: token,
-                    fundae_id: tokenData.fundae_id,
-                    email: tokenData.email,
-                    empresa: fundaeRecord?.empresa
+            const rawToken = (token || '').trim();
+
+            const tryRpcFirst = async () => {
+                const { data, error: rpcError } = await supabase.rpc('solicitar_fundae_codigo_publico', {
+                    p_token: rawToken
+                });
+                if (rpcError) return { ok: false, rpcError };
+                if (!data?.success) {
+                    const errKey = data?.error || 'unknown';
+                    if (errKey === 'cooldown' && typeof data.seconds_left === 'number') {
+                        return { ok: false, cooldown: Math.max(0, data.seconds_left) };
+                    }
+                    const messages = {
+                        missing_token: 'Enlace no válido.',
+                        invalid_token: 'Enlace no válido.',
+                        already_used: 'Este formulario ya fue enviado.',
+                        expired: 'Este enlace ha caducado. Solicita uno nuevo al gestor.',
+                        unknown: 'No se pudo generar el código.'
+                    };
+                    return { ok: false, message: messages[errKey] || messages.unknown };
+                }
+                return { ok: true, via: 'rpc' };
+            };
+
+            const rpcResult = await tryRpcFirst();
+            if (rpcResult.ok) {
+                setCooldown(COOLDOWN_MINUTES * 60);
+                setStep(1);
+                setOtp(['', '', '', '', '', '']);
+                return;
+            }
+            if ('cooldown' in rpcResult && rpcResult.cooldown != null) {
+                setCooldown(rpcResult.cooldown);
+                alert(
+                    `Debes esperar antes de pedir otro código (aprox. ${formatCooldown(rpcResult.cooldown)}).`
+                );
+                return;
+            }
+            if ('message' in rpcResult && rpcResult.message) {
+                alert(rpcResult.message);
+                return;
+            }
+
+            const sentAt = tokenData?.code_sent_at;
+            if (sentAt) {
+                const diffMs = Date.now() - new Date(sentAt).getTime();
+                const windowMs = COOLDOWN_MINUTES * 60 * 1000;
+                if (diffMs >= 0 && diffMs < windowMs) {
+                    const secondsLeft = Math.ceil((windowMs - diffMs) / 1000);
+                    setCooldown(secondsLeft);
+                    alert(
+                        `Debes esperar antes de pedir otro código (aprox. ${formatCooldown(secondsLeft)}).`
+                    );
+                    return;
+                }
+            }
+
+            const verificationCode = String(Math.floor(Math.random() * 1_000_000)).padStart(6, '0');
+            const codeSentAt = new Date().toISOString();
+
+            const { data: updated, error: upErr } = await supabase
+                .from('fundae_form_tokens')
+                .update({
+                    verification_code: verificationCode,
+                    code_sent_at: codeSentAt,
+                    attempts: 0
                 })
-            });
+                .eq('token', rawToken)
+                .select('id')
+                .maybeSingle();
 
-            if (!res.ok) throw new Error('Error al generar código');
+            if (upErr) throw new Error(upErr.message);
+            if (!updated) throw new Error('No se pudo guardar el código para este enlace.');
 
-            // Actualizar estado local (simulamos actualización de cooldown)
+            setTokenData((prev) =>
+                prev ? { ...prev, code_sent_at: codeSentAt, attempts: 0 } : prev
+            );
+
+            const webhookUrl = import.meta.env.VITE_CODIGO_FUNDAE;
+            if (webhookUrl && String(webhookUrl).trim()) {
+                fetch(webhookUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        otp_email: true,
+                        code: verificationCode,
+                        token: rawToken,
+                        fundae_id: tokenData?.fundae_id,
+                        email: tokenData?.email,
+                        empresa: fundaeRecord?.empresa,
+                        public_url: `${window.location.origin}/fundae-form/${rawToken}`
+                    })
+                }).catch(() => {});
+            }
+
             setCooldown(COOLDOWN_MINUTES * 60);
             setStep(1);
-            setOtp(['', '', '', '', '', '']); // Limpiar OTP
-
+            setOtp(['', '', '', '', '', '']);
         } catch (err) {
-            alert('Error: ' + err.message);
+            alert('Error: ' + (err.message || 'No se pudo generar el código'));
         } finally {
             setResending(false);
         }

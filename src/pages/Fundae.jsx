@@ -185,7 +185,7 @@ export default function Fundae() {
         }
     };
 
-    // ── Enviar formulario FUNDAE al lead (inserta token → trigger Supabase dispara n8n) ──
+    // ── Enviar formulario FUNDAE al lead (RPC send_fundae_form en BD: token + pasos + estado en_curso; un solo webhook notify_n8n) ──
     const handleSendFormulario = async (record) => {
         const emailToSend = record.email || record.leads?.email;
         if (!emailToSend) {
@@ -195,18 +195,11 @@ export default function Fundae() {
 
         await withLoading(async () => {
             try {
-                const { error: tokenError } = await supabase
-                    .from('fundae_form_tokens')
-                    .insert([{ fundae_id: record.id, email: emailToSend }]);
+                const { error } = await supabase.rpc('send_fundae_form', {
+                    p_fundae_id: record.id
+                });
 
-                if (tokenError) throw tokenError;
-
-                const { error: updateError } = await supabase
-                    .from('fundae_seguimiento')
-                    .update({ formulario_enviado: true, formulario_pendiente_enviar: true })
-                    .eq('id', record.id);
-
-                if (updateError) console.error('Error al actualizar el estado:', updateError);
+                if (error) throw error;
 
                 showNotification(`✅ Formulario enviado a ${record.empresa}`);
                 fetchRecords();
@@ -300,33 +293,18 @@ export default function Fundae() {
                         return;
                     }
 
-                    // 1. Insertar directamente en la tabla (esto disparará el Webhook nativo de Supabase)
-                    const { error } = await supabase
-                        .from('fundae_form_tokens')
-                        .insert([
-                            {
-                                fundae_id: record.id,
-                                email: emailToSend
-                            }
-                        ]);
+                    const { error } = await supabase.rpc('send_fundae_form', {
+                        p_fundae_id: record.id
+                    });
 
                     if (error) {
-                        console.error('Error insertando token:', error);
-                        showNotification('Error al crear el token en base de datos. Verifica RLS o los datos.', 'error');
+                        console.error('Error RPC send_fundae_form:', error);
+                        showNotification('Error al crear el token / actualizar expediente.', 'error');
                         throw error;
                     }
 
                     showNotification('Formulario enviado (token generado y webhook disparado).', 'success');
-
-                    // 2. Opcional pero recomendado: Actualizar el paso en local para que avance la UI "formulario_enviado = true"
-                    const { error: updateErr } = await supabase
-                        .from('fundae_seguimiento')
-                        .update({ formulario_enviado: true, formulario_pendiente_enviar: true })
-                        .eq('id', record.id);
-
-                    if (updateErr) console.error('Error al actualizar el estado:', updateErr);
-
-                    fetchRecords(); // Refrescar la tabla
+                    fetchRecords();
                 } catch (err) {
                     showNotification(`Error: ${err.message}`, 'error');
                 }
