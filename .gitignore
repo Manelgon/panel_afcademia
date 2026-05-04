@@ -36,3 +36,13 @@ dist-ssr
 # Stitch temp files
 dashboard_raw.html
 project_detailed_raw.html
+
+# MCP config (contiene tokens de acceso, NO commitear)
+.mcp.json
+
+# Claude Code / SaaS Factory artifacts (no aplican al stack Vite)
+.claude/
+
+# OS / OneDrive
+Thumbs.db
+desktop.ini
