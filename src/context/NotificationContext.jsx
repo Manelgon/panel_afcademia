@@ -113,7 +113,7 @@ export const NotificationProvider = ({ children }) => {
                             animate={{ opacity: 1 }}
                             exit={{ opacity: 0 }}
                             className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-                            onClick={() => confirmState.resolve(false)}
+                            onClick={() => confirmState.resolve(confirmState.secondaryText ? 'cancel' : false)}
                         />
                         <motion.div
                             initial={{ scale: 0.9, opacity: 0, y: 20 }}
@@ -130,13 +130,21 @@ export const NotificationProvider = ({ children }) => {
                             <p className="text-variable-muted text-sm sm:text-base mb-8 leading-relaxed">
                                 {confirmState.message}
                             </p>
-                            <div className="flex gap-4">
+                            <div className="flex flex-col sm:flex-row gap-3">
                                 <button
-                                    onClick={() => confirmState.resolve(false)}
+                                    onClick={() => confirmState.resolve(confirmState.secondaryText ? 'cancel' : false)}
                                     className="flex-1 py-4 glass rounded-2xl font-bold text-variable-main hover:bg-white/5 transition-all"
                                 >
                                     {confirmState.cancelText || 'Cancelar'}
                                 </button>
+                                {confirmState.secondaryText && (
+                                    <button
+                                        onClick={() => confirmState.resolve('secondary')}
+                                        className="flex-1 py-4 glass border border-variable rounded-2xl font-bold text-variable-main hover:bg-white/5 transition-all"
+                                    >
+                                        {confirmState.secondaryText}
+                                    </button>
+                                )}
                                 <button
                                     onClick={() => confirmState.resolve(true)}
                                     className="flex-1 py-4 bg-primary text-white rounded-2xl font-bold hover:brightness-110 shadow-xl shadow-primary/20 transition-all"

@@ -491,14 +491,32 @@ export default function Leads() {
         }
 
         const seg = Array.isArray(lead.segmentacion_despacho) ? lead.segmentacion_despacho[0] : lead.segmentacion_despacho;
-        const confirmed = await confirm({
-            title: '¿Convertir Lead?',
-            message: `¿Deseas convertir a ${lead.nombre} en cliente? Pasará a la sección de Clientes.${seg?.interes_fundae ? '\n\nSe iniciará automáticamente el flujo de FUNDAE.' : ''}`,
-            confirmText: 'Convertir',
-            cancelText: 'Cancelar'
-        });
+        const hasInteresFundae = !!seg?.interes_fundae;
 
-        if (!confirmed) return;
+        let confirmed;
+        let createFundae = false;
+
+        if (hasInteresFundae) {
+            const choice = await confirm({
+                title: '¿Convertir Lead y crear expediente FUNDAE?',
+                message: `¿Deseas convertir a ${lead.nombre} en cliente y crear automáticamente el expediente FUNDAE?\n\n• Sí: convertir y crear expediente FUNDAE.\n• No: convertir sin crear expediente.\n• Cancelar: no hacer nada.`,
+                confirmText: 'Sí',
+                secondaryText: 'No',
+                cancelText: 'Cancelar'
+            });
+
+            if (choice === 'cancel' || choice === false) return;
+            confirmed = true;
+            createFundae = choice === true;
+        } else {
+            confirmed = await confirm({
+                title: '¿Convertir Lead?',
+                message: `¿Deseas convertir a ${lead.nombre} en cliente? Pasará a la sección de Clientes.`,
+                confirmText: 'Convertir',
+                cancelText: 'Cancelar'
+            });
+            if (!confirmed) return;
+        }
 
         await withLoading(async () => {
             try {
@@ -510,10 +528,8 @@ export default function Leads() {
 
                 if (flujoError) throw flujoError;
 
-                // 2. Si tiene interes_fundae: crear expediente FUNDAE automáticamente
-                const seg = Array.isArray(lead.segmentacion_despacho) ? lead.segmentacion_despacho[0] : lead.segmentacion_despacho;
-                const interesFundae = seg?.interes_fundae;
-                if (interesFundae) {
+                // 2. Si el usuario eligió "Sí" en el modal FUNDAE: crear expediente
+                if (createFundae) {
                     const { error: fundaeError } = await supabase
                         .from('fundae_seguimiento')
                         .insert([{

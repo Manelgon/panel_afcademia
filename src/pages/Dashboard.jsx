@@ -8,7 +8,9 @@ import {
     Activity,
     UserPlus,
     CheckCircle2,
-    ArrowUpRight
+    ArrowUpRight,
+    ChevronLeft,
+    ChevronRight
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Link, useNavigate } from 'react-router-dom';
@@ -119,21 +121,41 @@ export default function Dashboard() {
         fetchData();
     }, []);
 
+    const sourceBadgeStyle = (source) => {
+        const s = (source || '').toLowerCase();
+        if (s.includes('panel')) return 'bg-indigo-500/15 text-indigo-400 border-indigo-500/30';
+        if (s.includes('fundae')) return 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30';
+        if (s.includes('landing')) return 'bg-blue-500/15 text-blue-400 border-blue-500/30';
+        if (s.includes('referral') || s.includes('referido')) return 'bg-amber-500/15 text-amber-400 border-amber-500/30';
+        return 'bg-primary/15 text-primary border-primary/30';
+    };
+
     const activityFeed = useMemo(() => {
-        const items = [];
-        leads.slice(0, 5).forEach(l => {
-            items.push({
-                id: `lead-${l.id}`,
-                icon: UserPlus,
-                color: 'text-primary',
-                bg: 'bg-primary/10',
-                text: `Nuevo lead: ${l.nombre}`,
-                sub: l.empresa_nombre || l.email,
-                date: l.fecha_creacion
-            });
-        });
+        const items = leads.map((l) => ({
+            id: `lead-${l.id}`,
+            icon: UserPlus,
+            color: 'text-primary',
+            bg: 'bg-primary/10',
+            text: `Nuevo lead: ${l.nombre}`,
+            sub: l.empresa_nombre || l.email,
+            source: l.source || 'Landing Page',
+            date: l.fecha_creacion
+        }));
         return items.sort((a, b) => new Date(b.date) - new Date(a.date));
     }, [leads]);
+
+    const ACTIVITY_PAGE_SIZE = 5;
+    const [activityPage, setActivityPage] = useState(0);
+    const activityTotalPages = Math.max(1, Math.ceil(activityFeed.length / ACTIVITY_PAGE_SIZE));
+    const activityVisible = activityFeed.slice(
+        activityPage * ACTIVITY_PAGE_SIZE,
+        (activityPage + 1) * ACTIVITY_PAGE_SIZE
+    );
+
+    // Si cambian los leads y la página actual queda fuera, vuelve a la primera
+    useEffect(() => {
+        if (activityPage >= activityTotalPages) setActivityPage(0);
+    }, [activityTotalPages, activityPage]);
 
     const userName = profile?.nombre || 'Admin';
 
@@ -183,7 +205,7 @@ export default function Dashboard() {
                             {activityFeed.length === 0 ? (
                                 <p className="text-center text-variable-muted py-10">No hay actividad reciente</p>
                             ) : (
-                                activityFeed.map(item => (
+                                activityVisible.map(item => (
                                     <div key={item.id} className="flex items-center justify-between p-4 rounded-2xl bg-white/5 border border-variable mb-3 hover:bg-white/10 transition-all cursor-pointer" onClick={() => navigate('/leads')}>
                                         <div className="flex items-center gap-4">
                                             <div className={`p-3 rounded-xl ${item.bg} ${item.color}`}>
@@ -194,11 +216,42 @@ export default function Dashboard() {
                                                 <p className="text-xs text-variable-muted">{item.sub}</p>
                                             </div>
                                         </div>
-                                        <span className="text-[10px] text-variable-muted font-bold uppercase">{new Date(item.date).toLocaleDateString()}</span>
+                                        <div className="flex flex-col items-end gap-1.5">
+                                            {item.source && (
+                                                <span className={`px-2.5 py-1 rounded-lg border text-[10px] font-bold uppercase tracking-wider leading-tight ${sourceBadgeStyle(item.source)}`}>
+                                                    {item.source}
+                                                </span>
+                                            )}
+                                            <span className="text-[10px] text-variable-muted font-bold uppercase">{new Date(item.date).toLocaleDateString()}</span>
+                                        </div>
                                     </div>
                                 ))
                             )}
                         </div>
+
+                        {activityTotalPages > 1 && (
+                            <div className="flex items-center justify-between mt-6 pt-4 border-t border-variable">
+                                <span className="text-xs text-variable-muted font-bold uppercase tracking-wider">
+                                    Página {activityPage + 1} de {activityTotalPages}
+                                </span>
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        onClick={() => setActivityPage((p) => Math.max(0, p - 1))}
+                                        disabled={activityPage === 0}
+                                        className="p-2 rounded-xl bg-white/5 border border-variable text-variable-muted hover:text-primary hover:border-primary/40 transition disabled:opacity-30 disabled:cursor-not-allowed"
+                                    >
+                                        <ChevronLeft size={16} />
+                                    </button>
+                                    <button
+                                        onClick={() => setActivityPage((p) => Math.min(activityTotalPages - 1, p + 1))}
+                                        disabled={activityPage >= activityTotalPages - 1}
+                                        className="p-2 rounded-xl bg-white/5 border border-variable text-variable-muted hover:text-primary hover:border-primary/40 transition disabled:opacity-30 disabled:cursor-not-allowed"
+                                    >
+                                        <ChevronRight size={16} />
+                                    </button>
+                                </div>
+                            </div>
+                        )}
                     </motion.div>
 
                     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }} className="glass rounded-[2.5rem] p-8">

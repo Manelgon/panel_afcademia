@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
     BookOpen,
     Plus,
@@ -12,7 +12,10 @@ import {
     AlertTriangle,
     Ban,
     Trash2,
-    Coins
+    Coins,
+    Download,
+    Upload,
+    FileSignature
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../lib/supabase';
@@ -169,6 +172,10 @@ export default function Fundae() {
     const [isCreditsModalOpen, setIsCreditsModalOpen] = useState(false);
     const [creditsInputData, setCreditsInputData] = useState({ record: null, amount: '' });
 
+    // PDF firmado: input file oculto + record activo (sobre cuál se está subiendo)
+    const fileInputRef = useRef(null);
+    const [uploadingFor, setUploadingFor] = useState(null);
+
     const fetchRecords = async () => {
         setLoading(true);
         try {
@@ -183,6 +190,79 @@ export default function Fundae() {
         } finally {
             setLoading(false);
         }
+    };
+
+    // ── Descargar el PDF del expediente (firmado si existe, si no el pendiente) ──
+    const handleDownloadExpediente = async (record) => {
+        const path = record.expediente_firmado_path || record.expediente_pdf_path;
+        if (!path) {
+            showNotification('Este expediente todavía no tiene PDF generado.', 'error');
+            return;
+        }
+        try {
+            const { data, error } = await supabase.storage
+                .from('fundae-docs')
+                .createSignedUrl(path, 60); // 60 segundos
+            if (error) throw error;
+            window.open(data.signedUrl, '_blank', 'noopener');
+        } catch (err) {
+            showNotification(`No se pudo descargar el PDF: ${err.message}`, 'error');
+        }
+    };
+
+    // ── Click en botón de subir PDF firmado: abre el input file ──
+    const handleUploadFirmadoClick = (record) => {
+        if (!record.expediente_pdf_path) {
+            showNotification('No hay un PDF base en este expediente. El cliente debe cumplimentar el formulario primero.', 'error');
+            return;
+        }
+        setUploadingFor(record);
+        if (fileInputRef.current) {
+            fileInputRef.current.value = '';
+            fileInputRef.current.click();
+        }
+    };
+
+    // ── Sube el PDF firmado, sobreescribe el pendiente y avanza el paso "formulario_recibido" ──
+    const handleFirmadoFileChange = async (e) => {
+        const file = e.target.files?.[0];
+        const record = uploadingFor;
+        e.target.value = '';
+        if (!file || !record) return;
+
+        if (file.type !== 'application/pdf') {
+            showNotification('El archivo debe ser un PDF.', 'error');
+            setUploadingFor(null);
+            return;
+        }
+
+        await withLoading(async () => {
+            try {
+                const path = `${record.id}/expediente_firmado.pdf`;
+                const { error: upErr } = await supabase.storage
+                    .from('fundae-docs')
+                    .upload(path, file, { contentType: 'application/pdf', upsert: true });
+                if (upErr) throw upErr;
+
+                const { error: updErr } = await supabase
+                    .from('fundae_seguimiento')
+                    .update({
+                        expediente_firmado_path: path,
+                        expediente_estado: 'firmado',
+                        expediente_firmado_at: new Date().toISOString(),
+                        formulario_recibido: true
+                    })
+                    .eq('id', record.id);
+                if (updErr) throw updErr;
+
+                showNotification('✅ PDF firmado subido. Paso "Formulario recibido" marcado.');
+                fetchRecords();
+            } catch (err) {
+                showNotification(`Error subiendo PDF firmado: ${err.message}`, 'error');
+            } finally {
+                setUploadingFor(null);
+            }
+        }, 'Subiendo PDF firmado...');
     };
 
     // ── Enviar formulario FUNDAE al lead (RPC send_fundae_form en BD: token + pasos + estado en_curso; un solo webhook notify_n8n) ──
@@ -508,6 +588,15 @@ export default function Fundae() {
         <div className="flex min-h-screen transition-colors duration-300 overflow-hidden">
             <Sidebar />
 
+            {/* Input file oculto para subir PDF firmado */}
+            <input
+                ref={fileInputRef}
+                type="file"
+                accept="application/pdf"
+                onChange={handleFirmadoFileChange}
+                className="hidden"
+            />
+
             <main className="flex-1 p-4 sm:p-10 overflow-y-auto pb-32 md:pb-10">
                 <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6 mb-8 sm:mb-12">
                     <div>
@@ -574,6 +663,12 @@ export default function Fundae() {
                                 <div>
                                     <p className="font-bold text-variable-main">{r.empresa || r.leads?.empresa_nombre || '—'}</p>
                                     {r.leads?.nombre && <p className="text-[10px] text-variable-muted uppercase font-black tracking-widest">{r.leads.nombre}</p>}
+                                    {r.expediente_estado && (
+                                        <span className={`inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded-md border text-[9px] font-black uppercase tracking-wider ${r.expediente_estado === 'firmado' ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/30' : 'bg-amber-500/10 text-amber-500 border-amber-500/30'}`}>
+                                            <FileSignature size={10} />
+                                            {r.expediente_estado === 'firmado' ? 'Firmado' : 'Pend. firma'}
+                                        </span>
+                                    )}
                                 </div>
                             )
                         },
@@ -680,6 +775,28 @@ export default function Fundae() {
                                                 className="p-2 glass rounded-xl text-variable-muted hover:text-primary transition-colors border border-transparent hover:border-primary/20"
                                             >
                                                 <Send size={15} />
+                                            </button>
+                                        )}
+
+                                        {/* Descargar PDF (firmado si existe, si no pendiente) */}
+                                        {r.expediente_pdf_path && (
+                                            <button
+                                                onClick={() => handleDownloadExpediente(r)}
+                                                title={r.expediente_estado === 'firmado' ? 'Descargar PDF firmado' : 'Descargar PDF (pendiente de firma)'}
+                                                className={`p-2 glass rounded-xl transition-colors border border-transparent ${r.expediente_estado === 'firmado' ? 'text-emerald-500 hover:bg-emerald-500/10' : 'text-amber-500 hover:bg-amber-500/10'}`}
+                                            >
+                                                <Download size={15} />
+                                            </button>
+                                        )}
+
+                                        {/* Subir PDF firmado (solo si hay pendiente y aún no firmado) */}
+                                        {r.expediente_pdf_path && r.expediente_estado !== 'firmado' && (
+                                            <button
+                                                onClick={() => handleUploadFirmadoClick(r)}
+                                                title="Subir PDF firmado por el cliente"
+                                                className="p-2 glass rounded-xl text-variable-muted hover:text-primary transition-colors border border-transparent hover:border-primary/20"
+                                            >
+                                                <Upload size={15} />
                                             </button>
                                         )}
                                         <button onClick={() => openEditModal(r)} className="p-2 glass rounded-xl text-variable-muted hover:text-primary transition-colors text-xs font-bold px-3">

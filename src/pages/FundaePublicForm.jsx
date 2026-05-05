@@ -347,6 +347,17 @@ export default function FundaePublicForm() {
         });
     };
 
+    // Devuelve { dataUrl, width, height } para poder respetar el aspect ratio en el PDF
+    const imageToBase64WithSize = async (url) => {
+        const dataUrl = await imageToBase64(url);
+        return new Promise((resolve, reject) => {
+            const img = new Image();
+            img.onload = () => resolve({ dataUrl, width: img.naturalWidth, height: img.naturalHeight });
+            img.onerror = reject;
+            img.src = dataUrl;
+        });
+    };
+
     // ── HELPER: Generar el PDF combinado ─────────────────────────────
     const generatePDF = async (data) => {
         const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
@@ -357,7 +368,7 @@ export default function FundaePublicForm() {
         // Cargar logos como base64
         let logoAfcB64 = null;
         let logoFundaeB64 = null;
-        let firmaB64 = null;
+        let firmaImg = null; // { dataUrl, width, height }
         try { logoAfcB64 = await imageToBase64(logo); } catch (_) { }
         try { logoFundaeB64 = await imageToBase64(logo_fundae); } catch (_) { }
 
@@ -367,17 +378,44 @@ export default function FundaePublicForm() {
                 .from('doc-assets')
                 .getPublicUrl('company/firma.png');
             if (firmaCfg?.publicUrl) {
-                firmaB64 = await imageToBase64(`${firmaCfg.publicUrl}?t=${Date.now()}`);
+                firmaImg = await imageToBase64WithSize(`${firmaCfg.publicUrl}?t=${Date.now()}`);
             }
         } catch (_) { }
 
         // ── Función header (se llama en cada página) ─────────────────
+        // Dimensiones que respetan las proporciones reales de cada logo:
+        // - Logo AFC: ~1:1 (cuadrado) → 16 x 16 mm
+        // - Logo FUNDAE: ~2.4:1 (horizontal) → 38 x 16 mm
         const addHeader = () => {
-            if (logoAfcB64) doc.addImage(logoAfcB64, 'PNG', margin, 8, 40, 14);
-            if (logoFundaeB64) doc.addImage(logoFundaeB64, 'PNG', pageW - margin - 40, 8, 40, 14);
+            const logoH = 16;
+            const afcW = 16;
+            const fundaeW = 38;
+            const headerY = 8;
+
+            if (logoAfcB64) doc.addImage(logoAfcB64, 'PNG', margin, headerY, afcW, logoH);
+
+            // Texto "Formulario FUNDAE" junto al logo AFC (réplica del header web)
+            const textX = margin + afcW + 4;
+            const textY = headerY + logoH / 2;
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(11);
+            doc.setTextColor(0, 75, 144); // #004b90
+            doc.text('Formulario', textX, textY - 0.5);
+            doc.setFont('helvetica', 'bolditalic');
+            doc.setFontSize(15);
+            doc.setTextColor(255, 121, 0); // #ff7900
+            const formularioW = doc.getTextWidth('Formulario');
+            doc.text('FUNDAE', textX + formularioW + 2, textY + 0.5);
+
+            if (logoFundaeB64) doc.addImage(logoFundaeB64, 'PNG', pageW - margin - fundaeW, headerY, fundaeW, logoH);
+
             doc.setDrawColor(230, 90, 30);
             doc.setLineWidth(0.5);
-            doc.line(margin, 26, pageW - margin, 26);
+            doc.line(margin, headerY + logoH + 2, pageW - margin, headerY + logoH + 2);
+
+            // Reset para el contenido posterior
+            doc.setTextColor(40, 40, 40);
+            doc.setFont('helvetica', 'normal');
         };
 
         // ──────────────────────────────────────────────────────────────
@@ -550,12 +588,20 @@ export default function FundaePublicForm() {
         yPos += 4;
 
         // Firma del emisor (Por AFC Academia S.L.) — solo si hay imagen configurada
-        if (firmaB64) {
-            const firmaH = 22;
-            const firmaW = Math.min(colW, 50);
-            doc.addImage(firmaB64, 'PNG', col2X, yPos, firmaW, firmaH);
+        if (firmaImg?.dataUrl) {
+            // Caja máxima 50×30 mm, ajustando dentro manteniendo aspect ratio real
+            const maxW = Math.min(colW, 50);
+            const maxH = 30;
+            const ratio = firmaImg.width / firmaImg.height;
+            let drawW = maxW;
+            let drawH = drawW / ratio;
+            if (drawH > maxH) {
+                drawH = maxH;
+                drawW = drawH * ratio;
+            }
+            doc.addImage(firmaImg.dataUrl, 'PNG', col2X, yPos, drawW, drawH);
         }
-        yPos += 24;
+        yPos += 32;
 
         // Líneas de firma
         doc.setDrawColor(100, 100, 100);
@@ -677,6 +723,33 @@ export default function FundaePublicForm() {
             // 3. Generar el PDF
             const blob = await generatePDF(formData);
             setPdfBlob(blob);
+
+            // 3.5 Subir el PDF al bucket privado fundae-docs/{fundae_id}/expediente_pendiente.pdf
+            //     y registrar la ruta + estado "pendiente_firma" en el expediente
+            try {
+                const fundaeId = tokenData.fundae_id;
+                const pdfPath = `${fundaeId}/expediente_pendiente.pdf`;
+                const { error: uploadErr } = await supabase.storage
+                    .from('fundae-docs')
+                    .upload(pdfPath, blob, {
+                        contentType: 'application/pdf',
+                        upsert: true
+                    });
+                if (uploadErr) {
+                    console.error('Error subiendo PDF al storage:', uploadErr);
+                } else {
+                    await supabase
+                        .from('fundae_seguimiento')
+                        .update({
+                            expediente_pdf_path: pdfPath,
+                            expediente_estado: 'pendiente_firma',
+                            expediente_pdf_generado_at: new Date().toISOString()
+                        })
+                        .eq('id', fundaeId);
+                }
+            } catch (uErr) {
+                console.error('Error guardando PDF expediente:', uErr);
+            }
 
             // 4. Convertir PDF a base64 y enviar al webhook de n8n para email
             try {
