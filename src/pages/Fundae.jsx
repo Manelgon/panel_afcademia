@@ -236,6 +236,7 @@ export default function Fundae() {
             return;
         }
 
+        let success = false;
         await withLoading(async () => {
             try {
                 const path = `${record.id}/expediente_firmado.pdf`;
@@ -256,13 +257,18 @@ export default function Fundae() {
                 if (updErr) throw updErr;
 
                 showNotification('✅ PDF firmado subido. Paso "Formulario recibido" marcado.');
-                fetchRecords();
+                success = true;
             } catch (err) {
                 showNotification(`Error subiendo PDF firmado: ${err.message}`, 'error');
             } finally {
                 setUploadingFor(null);
             }
         }, 'Subiendo PDF firmado...');
+
+        if (success) {
+            // Pequeño retraso para que el usuario vea la notificación de éxito antes del reload
+            setTimeout(() => window.location.reload(), 800);
+        }
     };
 
     // ── Enviar formulario FUNDAE al lead (RPC send_fundae_form en BD: token + pasos + estado en_curso; un solo webhook notify_n8n) ──
@@ -391,6 +397,20 @@ export default function Fundae() {
             }, `Enviando formulario a ${record.empresa}...`);
 
             return; // FINALIZAR para que no ejecute el fetch() de webhooks genéricos justo abajo
+        }
+
+        // Validación para "Formulario recibido": exige PDF firmado por el cliente
+        if (currentStep.key === 'formulario_recibido' && !record.expediente_firmado_path) {
+            const choice = await confirm({
+                title: 'Documento firmado pendiente',
+                message: 'Para avanzar debes subir el documento firmado por el cliente. ¿Quieres subirlo ahora?',
+                confirmText: 'Sí, subir',
+                cancelText: 'Cancelar'
+            });
+            if (!choice) return;
+            // Reutiliza el flujo existente: handleFirmadoFileChange ya marca formulario_recibido=true
+            handleUploadFirmadoClick(record);
+            return;
         }
 
         // Validation for Créditos Verificados: must have numerical credit value
@@ -662,7 +682,6 @@ export default function Fundae() {
                             render: (r) => (
                                 <div>
                                     <p className="font-bold text-variable-main">{r.empresa || r.leads?.empresa_nombre || '—'}</p>
-                                    {r.leads?.nombre && <p className="text-[10px] text-variable-muted uppercase font-black tracking-widest">{r.leads.nombre}</p>}
                                     {r.expediente_estado && (
                                         <span className={`inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded-md border text-[9px] font-black uppercase tracking-wider ${r.expediente_estado === 'firmado' ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/30' : 'bg-amber-500/10 text-amber-500 border-amber-500/30'}`}>
                                             <FileSignature size={10} />
@@ -671,6 +690,20 @@ export default function Fundae() {
                                     )}
                                 </div>
                             )
+                        },
+                        {
+                            key: 'contacto',
+                            label: 'Contacto',
+                            render: (r) => {
+                                const nombre = r.leads?.nombre || r.representante_empresa || '—';
+                                const email = r.leads?.email || r.email;
+                                return (
+                                    <div>
+                                        <p className="font-medium text-variable-main text-sm">{nombre}</p>
+                                        {email && <p className="text-[11px] text-variable-muted">{email}</p>}
+                                    </div>
+                                );
+                            }
                         },
                         {
                             key: 'creditos_fundae',

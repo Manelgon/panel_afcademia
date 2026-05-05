@@ -106,32 +106,32 @@ export default function FundaePublicForm() {
                 const fundae = tData.fundae_seguimiento || {};
                 setFundaeRecord(fundae);
                 setFormData({
-                    empresa: '',
-                    razon_social: '',
-                    cif: '',
-                    telefono: '',
-                    email: tData.email || '',
-                    domicilio: '',
-                    tipo_via: '',
-                    nombre_via: '',
-                    numero_via: '',
-                    bloque: '',
-                    piso: '',
-                    puerta: '',
-                    poblacion: '',
-                    codigo_postal: '',
-                    provincia: '',
-                    convenio_referencia: '',
-                    cnae: '',
-                    ccc: '',
-                    num_medio_empleados: '',
-                    num_asistentes: '',
+                    empresa: fundae.empresa || '',
+                    razon_social: fundae.razon_social || '',
+                    cif: fundae.cif || '',
+                    telefono: fundae.telefono || '',
+                    email: fundae.email || tData.email || '',
+                    domicilio: fundae.domicilio || '',
+                    tipo_via: fundae.tipo_via || '',
+                    nombre_via: fundae.nombre_via || '',
+                    numero_via: fundae.numero_via || '',
+                    bloque: fundae.bloque || '',
+                    piso: fundae.piso || '',
+                    puerta: fundae.puerta || '',
+                    poblacion: fundae.poblacion || '',
+                    codigo_postal: fundae.codigo_postal || '',
+                    provincia: fundae.provincia || '',
+                    convenio_referencia: fundae.convenio_referencia || '',
+                    cnae: fundae.cnae || '',
+                    ccc: fundae.ccc || '',
+                    num_medio_empleados: fundae.num_medio_empleados || '',
+                    num_asistentes: fundae.num_asistentes || '',
                     prefijo_telefono: fundae.prefijo_telefono || '+34',
-                    representante_empresa: '',
-                    representante_nombre: '',
-                    representante_apellido1: '',
-                    representante_apellido2: '',
-                    nif_nie_representante: ''
+                    representante_empresa: fundae.representante_empresa || '',
+                    representante_nombre: fundae.representante_nombre || '',
+                    representante_apellido1: fundae.representante_apellido1 || '',
+                    representante_apellido2: fundae.representante_apellido2 || '',
+                    nif_nie_representante: fundae.nif_nie_representante || ''
                 });
 
                 // Determinar el paso inicial
@@ -177,6 +177,21 @@ export default function FundaePublicForm() {
         const s = seconds % 60;
         return `${m}:${s.toString().padStart(2, '0')}`;
     };
+
+    // Campos de "empresa": si llegan ya con valor desde BD se bloquean para no sobrescribir
+    // datos previamente acordados. El representante / contacto siempre es editable.
+    const COMPANY_FIELDS = new Set([
+        'empresa', 'razon_social', 'cif',
+        'tipo_via', 'nombre_via', 'numero_via', 'bloque', 'piso', 'puerta',
+        'poblacion', 'codigo_postal', 'provincia',
+        'cnae', 'ccc', 'num_medio_empleados', 'convenio_referencia'
+    ]);
+    const isCompanyFieldLocked = (field) => {
+        if (!COMPANY_FIELDS.has(field)) return false;
+        const val = fundaeRecord?.[field];
+        return val !== null && val !== undefined && String(val).trim() !== '';
+    };
+    const lockedInputClass = 'opacity-70 cursor-not-allowed';
 
     // ── ACCIONES ─────────────────────────────────────────────────────────
 
@@ -369,7 +384,23 @@ export default function FundaePublicForm() {
         let logoAfcB64 = null;
         let logoFundaeB64 = null;
         let firmaImg = null; // { dataUrl, width, height }
-        try { logoAfcB64 = await imageToBase64(logo); } catch (_) { }
+
+        // Logo AFC: configurable en /ajustes-emisor (doc-assets/company/logo.png).
+        // Si no existe o falla, usa el logo estático del repositorio.
+        try {
+            const { data: logoCfg } = await supabase.storage
+                .from('doc-assets')
+                .getPublicUrl('company/logo.png');
+            if (logoCfg?.publicUrl) {
+                try {
+                    logoAfcB64 = await imageToBase64(`${logoCfg.publicUrl}?t=${Date.now()}`);
+                } catch (_) { }
+            }
+        } catch (_) { }
+        if (!logoAfcB64) {
+            try { logoAfcB64 = await imageToBase64(logo); } catch (_) { }
+        }
+
         try { logoFundaeB64 = await imageToBase64(logo_fundae); } catch (_) { }
 
         // Firma del emisor (configurable en /ajustes-emisor → bucket doc-assets/company/firma.png)
@@ -1005,9 +1036,10 @@ export default function FundaePublicForm() {
                                                 <label className="text-[11px] font-bold text-variable-muted uppercase tracking-widest ml-1">Razón Social</label>
                                                 <input
                                                     required
+                                                    readOnly={isCompanyFieldLocked('razon_social')}
                                                     value={formData.razon_social}
                                                     onChange={e => setFormData({ ...formData, razon_social: e.target.value })}
-                                                    className="w-full bg-black/10 border border-variable rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-primary/50 text-variable-main transition-all placeholder:text-variable-muted/30"
+                                                    className={`w-full bg-black/10 border border-variable rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-primary/50 text-variable-main transition-all placeholder:text-variable-muted/30 ${isCompanyFieldLocked('razon_social') ? lockedInputClass : ''}`}
                                                     placeholder="Ej. Mi Empresa S.L."
                                                 />
                                             </div>
@@ -1015,9 +1047,10 @@ export default function FundaePublicForm() {
                                                 <label className="text-[11px] font-bold text-variable-muted uppercase tracking-widest ml-1">Nombre Comercial</label>
                                                 <input
                                                     required
+                                                    readOnly={isCompanyFieldLocked('empresa')}
                                                     value={formData.empresa}
                                                     onChange={e => setFormData({ ...formData, empresa: e.target.value })}
-                                                    className="w-full bg-black/10 border border-variable rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-primary/50 text-variable-main transition-all placeholder:text-variable-muted/30"
+                                                    className={`w-full bg-black/10 border border-variable rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-primary/50 text-variable-main transition-all placeholder:text-variable-muted/30 ${isCompanyFieldLocked('empresa') ? lockedInputClass : ''}`}
                                                     placeholder="Ej. Mi Empresa"
                                                 />
                                             </div>
@@ -1025,9 +1058,10 @@ export default function FundaePublicForm() {
                                                 <label className="text-[11px] font-bold text-variable-muted uppercase tracking-widest ml-1">CIF / NIF</label>
                                                 <input
                                                     required
+                                                    readOnly={isCompanyFieldLocked('cif')}
                                                     value={formData.cif}
                                                     onChange={e => setFormData({ ...formData, cif: e.target.value })}
-                                                    className="w-full bg-black/10 border border-variable rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-primary/50 text-variable-main transition-all placeholder:text-variable-muted/30 font-mono"
+                                                    className={`w-full bg-black/10 border border-variable rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-primary/50 text-variable-main transition-all placeholder:text-variable-muted/30 font-mono ${isCompanyFieldLocked('cif') ? lockedInputClass : ''}`}
                                                     placeholder="B12345678"
                                                 />
                                             </div>
@@ -1084,7 +1118,7 @@ export default function FundaePublicForm() {
                                             <div className="space-y-1.5">
                                                 <label className="text-[11px] font-bold text-variable-muted uppercase tracking-widest ml-1">Domicilio Social</label>
                                                 <div className="grid grid-cols-12 gap-2">
-                                                    <div className="col-span-12 sm:col-span-4 lg:col-span-3">
+                                                    <div className={`col-span-12 sm:col-span-4 lg:col-span-3 ${isCompanyFieldLocked('tipo_via') ? 'pointer-events-none opacity-70' : ''}`}>
                                                         <CustomSelect
                                                             value={formData.tipo_via}
                                                             onChange={val => setFormData({ ...formData, tipo_via: val })}
@@ -1100,9 +1134,10 @@ export default function FundaePublicForm() {
                                                     </div>
                                                     <input
                                                         required
+                                                        readOnly={isCompanyFieldLocked('nombre_via')}
                                                         value={formData.nombre_via}
                                                         onChange={e => setFormData({ ...formData, nombre_via: e.target.value })}
-                                                        className="col-span-12 sm:col-span-8 lg:col-span-9 bg-black/10 border border-variable rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-primary/50 text-variable-main transition-all placeholder:text-variable-muted/30"
+                                                        className={`col-span-12 sm:col-span-8 lg:col-span-9 bg-black/10 border border-variable rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-primary/50 text-variable-main transition-all placeholder:text-variable-muted/30 ${isCompanyFieldLocked('nombre_via') ? lockedInputClass : ''}`}
                                                         placeholder="Nombre de la vía"
                                                     />
                                                 </div>
@@ -1112,36 +1147,41 @@ export default function FundaePublicForm() {
                                             <div className="grid grid-cols-12 gap-2">
                                                 <input
                                                     required
+                                                    readOnly={isCompanyFieldLocked('numero_via')}
                                                     value={formData.numero_via}
                                                     onChange={e => setFormData({ ...formData, numero_via: e.target.value })}
-                                                    className="col-span-3 bg-black/10 border border-variable rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-primary/50 text-variable-main transition-all placeholder:text-variable-muted/30"
+                                                    className={`col-span-3 bg-black/10 border border-variable rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-primary/50 text-variable-main transition-all placeholder:text-variable-muted/30 ${isCompanyFieldLocked('numero_via') ? lockedInputClass : ''}`}
                                                     placeholder="Nº"
                                                 />
                                                 <input
+                                                    readOnly={isCompanyFieldLocked('bloque')}
                                                     value={formData.bloque}
                                                     onChange={e => setFormData({ ...formData, bloque: e.target.value })}
-                                                    className="col-span-3 bg-black/10 border border-variable rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-primary/50 text-variable-main transition-all placeholder:text-variable-muted/30"
+                                                    className={`col-span-3 bg-black/10 border border-variable rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-primary/50 text-variable-main transition-all placeholder:text-variable-muted/30 ${isCompanyFieldLocked('bloque') ? lockedInputClass : ''}`}
                                                     placeholder="Blq"
                                                 />
                                                 <input
+                                                    readOnly={isCompanyFieldLocked('piso')}
                                                     value={formData.piso}
                                                     onChange={e => setFormData({ ...formData, piso: e.target.value })}
-                                                    className="col-span-3 bg-black/10 border border-variable rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-primary/50 text-variable-main transition-all placeholder:text-variable-muted/30"
+                                                    className={`col-span-3 bg-black/10 border border-variable rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-primary/50 text-variable-main transition-all placeholder:text-variable-muted/30 ${isCompanyFieldLocked('piso') ? lockedInputClass : ''}`}
                                                     placeholder="Piso"
                                                 />
                                                 <input
+                                                    readOnly={isCompanyFieldLocked('puerta')}
                                                     value={formData.puerta}
                                                     onChange={e => setFormData({ ...formData, puerta: e.target.value })}
-                                                    className="col-span-3 bg-black/10 border border-variable rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-primary/50 text-variable-main transition-all placeholder:text-variable-muted/30"
+                                                    className={`col-span-3 bg-black/10 border border-variable rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-primary/50 text-variable-main transition-all placeholder:text-variable-muted/30 ${isCompanyFieldLocked('puerta') ? lockedInputClass : ''}`}
                                                     placeholder="Pta"
                                                 />
                                             </div>
                                             <div className="grid grid-cols-1 gap-2">
                                                 <input
                                                     required
+                                                    readOnly={isCompanyFieldLocked('poblacion')}
                                                     value={formData.poblacion}
                                                     onChange={e => setFormData({ ...formData, poblacion: e.target.value })}
-                                                    className="w-full bg-black/10 border border-variable rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-primary/50 text-variable-main transition-all placeholder:text-variable-muted/30"
+                                                    className={`w-full bg-black/10 border border-variable rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-primary/50 text-variable-main transition-all placeholder:text-variable-muted/30 ${isCompanyFieldLocked('poblacion') ? lockedInputClass : ''}`}
                                                     placeholder="Localidad"
                                                 />
                                             </div>
@@ -1152,20 +1192,23 @@ export default function FundaePublicForm() {
                                                     <label className="text-[11px] font-bold text-variable-muted uppercase tracking-widest ml-1">C.P.</label>
                                                     <input
                                                         required
+                                                        readOnly={isCompanyFieldLocked('codigo_postal')}
                                                         value={formData.codigo_postal}
                                                         onChange={e => setFormData({ ...formData, codigo_postal: e.target.value })}
-                                                        className="w-full bg-black/10 border border-variable rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-primary/50 text-variable-main transition-all placeholder:text-variable-muted/30"
+                                                        className={`w-full bg-black/10 border border-variable rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-primary/50 text-variable-main transition-all placeholder:text-variable-muted/30 ${isCompanyFieldLocked('codigo_postal') ? lockedInputClass : ''}`}
                                                         placeholder="28001"
                                                     />
                                                 </div>
                                                 <div className="space-y-1.5">
                                                     <label className="text-[11px] font-bold text-variable-muted uppercase tracking-widest ml-1">Provincia</label>
-                                                    <CustomSelect
-                                                        value={formData.provincia}
-                                                        onChange={val => setFormData({ ...formData, provincia: val })}
-                                                        options={["Álava", "Albacete", "Alicante", "Almería", "Asturias", "Ávila", "Badajoz", "Baleares", "Barcelona", "Burgos", "Cáceres", "Cádiz", "Cantabria", "Castellón", "Ciudad Real", "Córdoba", "Cuenca", "Gerona", "Granada", "Guadalajara", "Guipúzcoa", "Huelva", "Huesca", "Jaén", "La Coruña", "La Rioja", "Las Palmas", "León", "Lérida", "Lugo", "Madrid", "Málaga", "Murcia", "Navarra", "Orense", "Palencia", "Pontevedra", "Salamanca", "Santa Cruz de Tenerife", "Segovia", "Sevilla", "Soria", "Tarragona", "Teruel", "Toledo", "Valencia", "Valladolid", "Vizcaya", "Zamora", "Zaragoza", "Ceuta", "Melilla"].map(p => ({ value: p, label: p }))}
-                                                        placeholder="Selecciona provincia"
-                                                    />
+                                                    <div className={isCompanyFieldLocked('provincia') ? 'pointer-events-none opacity-70' : ''}>
+                                                        <CustomSelect
+                                                            value={formData.provincia}
+                                                            onChange={val => setFormData({ ...formData, provincia: val })}
+                                                            options={["Álava", "Albacete", "Alicante", "Almería", "Asturias", "Ávila", "Badajoz", "Baleares", "Barcelona", "Burgos", "Cáceres", "Cádiz", "Cantabria", "Castellón", "Ciudad Real", "Córdoba", "Cuenca", "Gerona", "Granada", "Guadalajara", "Guipúzcoa", "Huelva", "Huesca", "Jaén", "La Coruña", "La Rioja", "Las Palmas", "León", "Lérida", "Lugo", "Madrid", "Málaga", "Murcia", "Navarra", "Orense", "Palencia", "Pontevedra", "Salamanca", "Santa Cruz de Tenerife", "Segovia", "Sevilla", "Soria", "Tarragona", "Teruel", "Toledo", "Valencia", "Valladolid", "Vizcaya", "Zamora", "Zaragoza", "Ceuta", "Melilla"].map(p => ({ value: p, label: p }))}
+                                                            placeholder="Selecciona provincia"
+                                                        />
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>
@@ -1185,9 +1228,10 @@ export default function FundaePublicForm() {
                                                     <label className="text-[11px] font-bold text-variable-muted uppercase tracking-widest ml-1">CNAE (Actividad)</label>
                                                     <input
                                                         required
+                                                        readOnly={isCompanyFieldLocked('cnae')}
                                                         value={formData.cnae}
                                                         onChange={e => setFormData({ ...formData, cnae: e.target.value })}
-                                                        className="w-full bg-black/10 border border-variable rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-primary/50 text-variable-main transition-all placeholder:text-variable-muted/30 font-mono"
+                                                        className={`w-full bg-black/10 border border-variable rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-primary/50 text-variable-main transition-all placeholder:text-variable-muted/30 font-mono ${isCompanyFieldLocked('cnae') ? lockedInputClass : ''}`}
                                                         placeholder="0000"
                                                     />
                                                 </div>
@@ -1196,9 +1240,10 @@ export default function FundaePublicForm() {
                                                     <input
                                                         type="number"
                                                         required
+                                                        readOnly={isCompanyFieldLocked('num_medio_empleados')}
                                                         value={formData.num_medio_empleados}
                                                         onChange={e => setFormData({ ...formData, num_medio_empleados: e.target.value })}
-                                                        className="w-full sm:w-32 bg-black/10 border border-variable rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-primary/50 text-variable-main transition-all placeholder:text-variable-muted/30"
+                                                        className={`w-full sm:w-32 bg-black/10 border border-variable rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-primary/50 text-variable-main transition-all placeholder:text-variable-muted/30 ${isCompanyFieldLocked('num_medio_empleados') ? lockedInputClass : ''}`}
                                                         placeholder="Ej. 15"
                                                     />
                                                 </div>
@@ -1208,9 +1253,10 @@ export default function FundaePublicForm() {
                                                 <label className="text-[11px] font-bold text-variable-muted uppercase tracking-widest ml-1">Convenio de Referencia</label>
                                                 <input
                                                     required
+                                                    readOnly={isCompanyFieldLocked('convenio_referencia')}
                                                     value={formData.convenio_referencia}
                                                     onChange={e => setFormData({ ...formData, convenio_referencia: e.target.value })}
-                                                    className="w-full bg-black/10 border border-variable rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-primary/50 text-variable-main transition-all placeholder:text-variable-muted/30"
+                                                    className={`w-full bg-black/10 border border-variable rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-primary/50 text-variable-main transition-all placeholder:text-variable-muted/30 ${isCompanyFieldLocked('convenio_referencia') ? lockedInputClass : ''}`}
                                                     placeholder="Ej. Convenio Oficinas y Despachos"
                                                 />
                                             </div>
@@ -1219,9 +1265,10 @@ export default function FundaePublicForm() {
                                                 <label className="text-[11px] font-bold text-variable-muted uppercase tracking-widest ml-1">Cód. Cuenta Cotización (CCC)</label>
                                                 <input
                                                     required
+                                                    readOnly={isCompanyFieldLocked('ccc')}
                                                     value={formData.ccc}
                                                     onChange={e => setFormData({ ...formData, ccc: e.target.value })}
-                                                    className="w-full bg-black/10 border border-variable rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-primary/50 text-variable-main transition-all placeholder:text-variable-muted/30 font-mono"
+                                                    className={`w-full bg-black/10 border border-variable rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-primary/50 text-variable-main transition-all placeholder:text-variable-muted/30 font-mono ${isCompanyFieldLocked('ccc') ? lockedInputClass : ''}`}
                                                     placeholder="00000000000"
                                                 />
                                             </div>
