@@ -357,8 +357,19 @@ export default function FundaePublicForm() {
         // Cargar logos como base64
         let logoAfcB64 = null;
         let logoFundaeB64 = null;
+        let firmaB64 = null;
         try { logoAfcB64 = await imageToBase64(logo); } catch (_) { }
         try { logoFundaeB64 = await imageToBase64(logo_fundae); } catch (_) { }
+
+        // Firma del emisor (configurable en /ajustes-emisor → bucket doc-assets/company/firma.png)
+        try {
+            const { data: firmaCfg } = await supabase.storage
+                .from('doc-assets')
+                .getPublicUrl('company/firma.png');
+            if (firmaCfg?.publicUrl) {
+                firmaB64 = await imageToBase64(`${firmaCfg.publicUrl}?t=${Date.now()}`);
+            }
+        } catch (_) { }
 
         // ── Función header (se llama en cada página) ─────────────────
         const addHeader = () => {
@@ -536,7 +547,15 @@ export default function FundaePublicForm() {
         doc.setFontSize(8);
         doc.text('(Sello y firma)', col1X, yPos);
         doc.text('(Sello y firma)', col2X, yPos);
-        yPos += 28;
+        yPos += 4;
+
+        // Firma del emisor (Por AFC Academia S.L.) — solo si hay imagen configurada
+        if (firmaB64) {
+            const firmaH = 22;
+            const firmaW = Math.min(colW, 50);
+            doc.addImage(firmaB64, 'PNG', col2X, yPos, firmaW, firmaH);
+        }
+        yPos += 24;
 
         // Líneas de firma
         doc.setDrawColor(100, 100, 100);
@@ -699,8 +718,13 @@ export default function FundaePublicForm() {
         const a = document.createElement('a');
         a.href = url;
         a.download = `Expediente_FUNDAE_${formData.empresa || 'empresa'}_${new Date().getFullYear()}.pdf`;
+        a.rel = 'noopener';
+        document.body.appendChild(a);
         a.click();
-        URL.revokeObjectURL(url);
+        setTimeout(() => {
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }, 0);
     };
 
     // ── RENDERIZADO OTP ───────────────────────────────────────────────────

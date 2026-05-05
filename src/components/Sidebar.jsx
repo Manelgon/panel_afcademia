@@ -7,13 +7,16 @@ import {
     LogOut,
     Target,
     BookOpen,
-    Briefcase
+    Briefcase,
+    Building2
 } from 'lucide-react';
 import logo from '../assets/logo.png';
 import { useAuth } from '../context/AuthContext';
+import { useUnsavedChanges } from '../context/UnsavedChangesContext';
 
 const SidebarItem = ({ icon: Icon, to = "#", label, activeOverride, onClick }) => {
     const location = useLocation();
+    const { requestNavigate } = useUnsavedChanges();
 
     let active = false;
     if (activeOverride !== undefined) {
@@ -38,6 +41,7 @@ const SidebarItem = ({ icon: Icon, to = "#", label, activeOverride, onClick }) =
         <Link
             to={to}
             title={label}
+            onClick={(e) => { e.preventDefault(); requestNavigate(to); }}
             className={`p-3 md:p-4 rounded-2xl transition-all duration-300 flex items-center justify-center flex-shrink-0 ${active ? 'bg-primary text-white shadow-lg shadow-primary/30' : 'text-variable-muted hover:text-primary hover:bg-white/5'}`}
         >
             <Icon size={24} />
@@ -48,12 +52,14 @@ const SidebarItem = ({ icon: Icon, to = "#", label, activeOverride, onClick }) =
 // Configuration submenu items
 const CONFIG_ITEMS = [
     { icon: Users, to: '/users', label: 'Gestión de Equipo' },
+    { icon: Building2, to: '/ajustes-emisor', label: 'Ajustes Emisor' },
 ];
 
 export default function Sidebar() {
     const { signOut } = useAuth();
     const navigate = useNavigate();
     const location = useLocation();
+    const { requestNavigate } = useUnsavedChanges();
     const [configOpen, setConfigOpen] = useState(false);
     const [mobileConfigOpen, setMobileConfigOpen] = useState(false);
     const configRef = useRef(null);
@@ -120,7 +126,7 @@ export default function Sidebar() {
                                 <Link
                                     key={item.to}
                                     to={item.to}
-                                    onClick={() => setConfigOpen(false)}
+                                    onClick={(e) => { e.preventDefault(); setConfigOpen(false); requestNavigate(item.to); }}
                                     className={`config-flyout-item ${location.pathname === item.to || location.pathname.startsWith(item.to + '/')
                                         ? 'config-flyout-item-active'
                                         : ''
@@ -175,7 +181,7 @@ export default function Sidebar() {
                                 <Link
                                     key={item.to}
                                     to={item.to}
-                                    onClick={() => setMobileConfigOpen(false)}
+                                    onClick={(e) => { e.preventDefault(); setMobileConfigOpen(false); requestNavigate(item.to); }}
                                     className={`config-popover-item ${location.pathname === item.to || location.pathname.startsWith(item.to + '/')
                                         ? 'config-flyout-item-active'
                                         : ''

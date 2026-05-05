@@ -4,6 +4,7 @@ import { ThemeProvider } from './context/ThemeContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { NotificationProvider } from './context/NotificationContext';
 import { LoadingProvider } from './context/LoadingContext';
+import { UnsavedChangesProvider } from './context/UnsavedChangesContext';
 
 // Lazy-load: cada pagina entra a su propio chunk.
 // Reduce el bundle inicial de ~1.1 MB a ~250 KB y mejora First Paint.
@@ -14,6 +15,7 @@ const Leads = lazy(() => import('./pages/Leads'));
 const Clientes = lazy(() => import('./pages/Clientes'));
 const ClienteDetail = lazy(() => import('./pages/ClienteDetail'));
 const Fundae = lazy(() => import('./pages/Fundae'));
+const AjustesEmisor = lazy(() => import('./pages/AjustesEmisor'));
 // NOTA: Projects, ProjectDetail, Tasks, Calendar existen como paginas pero
 // no estan registradas como rutas todavia (mantener paridad con original).
 const FundaePublicForm = lazy(() => import('./pages/FundaePublicForm'));
@@ -58,8 +60,9 @@ function App() {
                 <LoadingProvider>
                     <ThemeProvider>
                         <Router>
-                            <Suspense fallback={<RouteSpinner />}>
-                                <Routes>
+                            <UnsavedChangesProvider>
+                                <Suspense fallback={<RouteSpinner />}>
+                                    <Routes>
                                     <Route path="/login" element={<Login />} />
 
                                     <Route path="/" element={
@@ -98,12 +101,19 @@ function App() {
                                         </ProtectedRoute>
                                     } />
 
+                                    <Route path="/ajustes-emisor" element={
+                                        <ProtectedRoute>
+                                            <AjustesEmisor />
+                                        </ProtectedRoute>
+                                    } />
+
                                     <Route path="/fundae-form/:token" element={<FundaePublicForm />} />
 
                                     {/* Redirect a / si no encuentra ruta (luego ProtectedRoute mandara a /login si no hay sesion) */}
                                     <Route path="*" element={<Navigate to="/" />} />
                                 </Routes>
-                            </Suspense>
+                                </Suspense>
+                            </UnsavedChangesProvider>
                         </Router>
                     </ThemeProvider>
                 </LoadingProvider>
