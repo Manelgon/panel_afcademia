@@ -726,19 +726,24 @@ export default function FundaePublicForm() {
 
             // 3.5 Subir el PDF al bucket privado fundae-docs/{fundae_id}/expediente_pendiente.pdf
             //     y registrar la ruta + estado "pendiente_firma" en el expediente
+            console.log('[FUNDAE] 🔼 Iniciando subida del PDF al storage...');
             try {
                 const fundaeId = tokenData.fundae_id;
                 const pdfPath = `${fundaeId}/expediente_pendiente.pdf`;
-                const { error: uploadErr } = await supabase.storage
+                console.log('[FUNDAE] PDF path:', pdfPath, '| blob size:', blob?.size);
+
+                const { data: upData, error: uploadErr } = await supabase.storage
                     .from('fundae-docs')
                     .upload(pdfPath, blob, {
                         contentType: 'application/pdf',
                         upsert: true
                     });
+
                 if (uploadErr) {
-                    console.error('Error subiendo PDF al storage:', uploadErr);
+                    console.error('[FUNDAE] ❌ Error subiendo PDF al storage:', uploadErr);
                 } else {
-                    await supabase
+                    console.log('[FUNDAE] ✅ PDF subido correctamente:', upData);
+                    const { error: updErr } = await supabase
                         .from('fundae_seguimiento')
                         .update({
                             expediente_pdf_path: pdfPath,
@@ -746,9 +751,14 @@ export default function FundaePublicForm() {
                             expediente_pdf_generado_at: new Date().toISOString()
                         })
                         .eq('id', fundaeId);
+                    if (updErr) {
+                        console.error('[FUNDAE] ❌ Error actualizando fundae_seguimiento con la ruta del PDF:', updErr);
+                    } else {
+                        console.log('[FUNDAE] ✅ fundae_seguimiento actualizado con expediente_pdf_path');
+                    }
                 }
             } catch (uErr) {
-                console.error('Error guardando PDF expediente:', uErr);
+                console.error('[FUNDAE] ❌ Excepción guardando PDF expediente:', uErr);
             }
 
             // 4. Convertir PDF a base64 y enviar al webhook de n8n para email
