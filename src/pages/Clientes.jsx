@@ -128,37 +128,37 @@ export default function Clientes() {
                     ))}
                 </div>
 
-                {/* Filtros */}
-                <div className="flex flex-wrap items-center gap-4 mb-6">
-                    <div className="relative flex-1 min-w-[260px]">
-                        <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-variable-muted pointer-events-none" />
-                        <input
-                            type="text"
-                            value={search}
-                            onChange={(e) => setSearch(e.target.value)}
-                            className="w-full bg-white/5 border border-variable rounded-2xl pl-11 pr-5 py-3.5 focus:outline-none focus:border-primary/50 text-variable-main transition-all text-sm"
-                            placeholder="Buscar por nombre, empresa o email..."
-                        />
-                    </div>
-                    <div className="w-full sm:w-56">
-                        <CustomSelect
-                            value={filterFundae}
-                            onChange={setFilterFundae}
-                            options={[
-                                { value: 'todos', label: 'Todos los clientes' },
-                                { value: 'con', label: 'Con expediente FUNDAE' },
-                                { value: 'sin', label: 'Sin expediente FUNDAE' }
-                            ]}
-                        />
-                    </div>
-                </div>
-
                 <DataTable
                     tableId="clientes"
                     loading={loading}
                     data={filtered}
                     rowKey="id"
                     onRowClick={(c) => navigate(`/clientes/${c.id}`)}
+                    toolbarLeft={
+                        <div className="flex flex-wrap items-center gap-3 w-full">
+                            <div className="relative flex-1 min-w-[220px] max-w-md">
+                                <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-variable-muted pointer-events-none" />
+                                <input
+                                    type="text"
+                                    value={search}
+                                    onChange={(e) => setSearch(e.target.value)}
+                                    className="w-full bg-white/5 border border-variable rounded-2xl pl-11 pr-5 py-2.5 focus:outline-none focus:border-primary/50 text-variable-main transition-all text-sm"
+                                    placeholder="Buscar por nombre, empresa o email..."
+                                />
+                            </div>
+                            <div className="w-full sm:w-56">
+                                <CustomSelect
+                                    value={filterFundae}
+                                    onChange={setFilterFundae}
+                                    options={[
+                                        { value: 'todos', label: 'Todos los clientes' },
+                                        { value: 'con', label: 'Con expediente FUNDAE' },
+                                        { value: 'sin', label: 'Sin expediente FUNDAE' }
+                                    ]}
+                                />
+                            </div>
+                        </div>
+                    }
                     columns={[
                         {
                             key: 'cliente',

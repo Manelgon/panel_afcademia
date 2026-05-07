@@ -15,7 +15,8 @@ import {
     Coins,
     Download,
     Upload,
-    FileSignature
+    FileSignature,
+    Search
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../lib/supabase';
@@ -159,6 +160,7 @@ export default function Fundae() {
     const [editingRecord, setEditingRecord] = useState(null);
     const [formData, setFormData] = useState(INITIAL_FORM);
     const [filterEstado, setFilterEstado] = useState('todos');
+    const [search, setSearch] = useState('');
 
     // Comment modal state for quick actions (Incidencia / Cancelar)
     const [isCommentModalOpen, setIsCommentModalOpen] = useState(false);
@@ -483,9 +485,18 @@ export default function Fundae() {
         return () => supabase.removeChannel(channel);
     }, []);
 
-    const filteredRecords = filterEstado === 'todos'
+    const filteredByEstado = filterEstado === 'todos'
         ? records
         : records.filter(r => r.estado === filterEstado);
+
+    const filteredRecords = (() => {
+        const q = search.trim().toLowerCase();
+        if (!q) return filteredByEstado;
+        return filteredByEstado.filter(r => {
+            const haystack = `${r.empresa || ''} ${r.cif || ''} ${r.email || ''} ${r.telefono || ''}`.toLowerCase();
+            return haystack.includes(q);
+        });
+    })();
 
     const stats = {
         todos: records.length,
@@ -675,6 +686,18 @@ export default function Fundae() {
                     loading={loading}
                     data={filteredRecords}
                     rowKey="id"
+                    toolbarLeft={
+                        <div className="relative w-full max-w-md">
+                            <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-variable-muted pointer-events-none" />
+                            <input
+                                type="text"
+                                value={search}
+                                onChange={(e) => setSearch(e.target.value)}
+                                className="w-full bg-white/5 border border-variable rounded-2xl pl-11 pr-5 py-2.5 focus:outline-none focus:border-primary/50 text-variable-main transition-all text-sm"
+                                placeholder="Buscar por empresa, CIF o email..."
+                            />
+                        </div>
+                    }
                     columns={[
                         {
                             key: 'empresa',

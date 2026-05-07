@@ -185,6 +185,7 @@ export default function Leads() {
     const [loading, setLoading] = useState(false);
     const [leadsList, setLeadsList] = useState([]);
     const [activeTab, setActiveTab] = useState('todos');
+    const [search, setSearch] = useState('');
     const [fetchError, setFetchError] = useState(null);
     const [editingLead, setEditingLead] = useState(null);
     const [formData, setFormData] = useState(INITIAL_FORM_STATE);
@@ -234,9 +235,18 @@ export default function Leads() {
         perdido: activeLeads.filter(l => l.flujos_embudo?.[0]?.status_actual === 'perdido').length
     };
 
-    const filteredLeads = activeTab === 'todos'
+    const tabLeads = activeTab === 'todos'
         ? activeLeads
         : activeLeads.filter(l => (l.flujos_embudo?.[0]?.status_actual || 'nuevo') === activeTab);
+
+    const filteredLeads = (() => {
+        const q = search.trim().toLowerCase();
+        if (!q) return tabLeads;
+        return tabLeads.filter(l => {
+            const haystack = `${l.nombre || ''} ${l.empresa_nombre || ''} ${l.email || ''} ${l.whatsapp || ''} ${l.ciudad || ''}`.toLowerCase();
+            return haystack.includes(q);
+        });
+    })();
 
     const handleCreateLead = async (e) => {
         e.preventDefault();
@@ -662,29 +672,35 @@ export default function Leads() {
                     </div>
                 </header>
 
-                <div className="flex flex-wrap gap-2 mb-8 bg-white/5 p-1.5 rounded-[1.5rem] border border-variable w-fit">
-                    {tabs.map((tab) => (
-                        <button
-                            key={tab.id}
-                            onClick={() => setActiveTab(tab.id)}
-                            className={`px-6 py-2.5 rounded-2xl text-[10px] sm:text-xs font-black uppercase tracking-widest transition-all flex items-center gap-3 ${activeTab === tab.id
-                                ? 'bg-primary text-white shadow-lg shadow-primary/20'
-                                : 'text-variable-muted hover:text-variable-main'
-                                }`}
-                        >
-                            {tab.label}
-                            <span className="px-2 py-0.5 rounded-md bg-black/10 text-[9px]">
-                                {stats[tab.id]}
-                            </span>
-                        </button>
-                    ))}
-                </div>
-
                 <DataTable
                     tableId="leads"
                     loading={loading}
                     data={filteredLeads}
                     rowKey="id"
+                    toolbarLeft={
+                        <div className="flex flex-wrap items-center gap-3 w-full">
+                            <div className="relative flex-1 min-w-[220px] max-w-md">
+                                <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-variable-muted pointer-events-none" />
+                                <input
+                                    type="text"
+                                    value={search}
+                                    onChange={(e) => setSearch(e.target.value)}
+                                    className="w-full bg-white/5 border border-variable rounded-2xl pl-11 pr-5 py-2.5 focus:outline-none focus:border-primary/50 text-variable-main transition-all text-sm"
+                                    placeholder="Buscar por nombre, empresa o email..."
+                                />
+                            </div>
+                            <div className="w-full sm:w-56">
+                                <CustomSelect
+                                    value={activeTab}
+                                    onChange={setActiveTab}
+                                    options={tabs.map(t => ({
+                                        value: t.id,
+                                        label: `${t.label} (${stats[t.id] ?? 0})`
+                                    }))}
+                                />
+                            </div>
+                        </div>
+                    }
                     columns={[
                         {
                             key: 'nombre',

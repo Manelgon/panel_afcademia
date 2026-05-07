@@ -38,6 +38,7 @@ export default function DataTable({
     rowKey = 'id',
     defaultSort,
     onRowClick,
+    toolbarLeft = null,
 }) {
     // ================================================================
     // COLUMN VISIBILITY  (persisted in localStorage)
@@ -164,7 +165,7 @@ export default function DataTable({
             {/* ----- TOOLBAR (column selector) ----- */}
             <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
                 <div className="flex-1 min-w-0">
-                    {/* Optional: Add search or breadcrumbs here in the future */}
+                    {toolbarLeft}
                 </div>
 
                 <div ref={colMenuRef} className="relative">
