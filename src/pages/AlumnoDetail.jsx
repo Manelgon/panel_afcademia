@@ -19,7 +19,12 @@ import {
     Edit3,
     CalendarPlus,
     X,
-    Save
+    Save,
+    Download,
+    Archive,
+    Ban,
+    Eye,
+    Power
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../lib/supabase';
@@ -93,15 +98,18 @@ export default function AlumnoDetail() {
         return () => supabase.removeChannel(channel);
     }, [id]);
 
-    const handleAutologin = async () => {
+    // Si se pasa groupid el alumno entra directo al home del curso, no al dashboard general.
+    const handleAutologin = async (groupid = null) => {
         if (!alumno?.evolcampus_userid) {
             showNotification('Este alumno aún no tiene userid de evolCampus.', 'error');
             return;
         }
+        const params = { userid: alumno.evolcampus_userid };
+        if (groupid) params.groupid = groupid;
         await withLoading(async () => {
             try {
                 const { data, error } = await supabase.functions.invoke('evolcampus-proxy', {
-                    body: { action: 'getUrlAutologin', method: 'POST', params: { userid: alumno.evolcampus_userid } }
+                    body: { action: 'getUrlAutologin', method: 'POST', params }
                 });
                 if (error) throw error;
                 const url = data?.urlautologin;
@@ -110,7 +118,50 @@ export default function AlumnoDetail() {
             } catch (err) {
                 showNotification('Error generando autologin: ' + (err.message || ''), 'error');
             }
-        }, 'Generando acceso al campus...');
+        }, groupid ? 'Generando acceso al curso...' : 'Generando acceso al campus...');
+    };
+
+    // Cambia el estado de una matrícula en evolCampus (0=activa, 1=archivada, 2=baja, 3=solo lectura).
+    // Tras éxito, refresca matrículas para reflejar el nuevo enrollmentstatus.
+    const handleChangeMatriculaStatus = async (matricula, newStatus) => {
+        if (!matricula?.evolcampus_enrollmentid) {
+            showNotification('Esta matrícula no está vinculada a evolCampus.', 'error');
+            return;
+        }
+        await withLoading(async () => {
+            try {
+                const { data, error } = await supabase.functions.invoke('evolcampus-proxy', {
+                    body: {
+                        action: 'updateEnrollment',
+                        method: 'POST',
+                        params: { enrollmentid: matricula.evolcampus_enrollmentid, status: newStatus }
+                    }
+                });
+                if (error) throw error;
+                if (data?.result === 0) throw new Error(data?.error || data?.message || 'evolCampus rechazó el cambio.');
+
+                // Actualizar también espejo local para feedback inmediato
+                await supabase
+                    .from('matriculas')
+                    .update({ enrollmentstatus: newStatus })
+                    .eq('id', matricula.id);
+
+                const labels = { 0: 'activa', 1: 'archivada', 2: 'baja', 3: 'solo lectura' };
+                showNotification(`✅ Matrícula ${labels[newStatus] || ''}.`, 'success');
+                fetchMatriculas();
+            } catch (err) {
+                showNotification('Error cambiando estado: ' + (err.message || ''), 'error');
+            }
+        }, 'Cambiando estado en campus...');
+    };
+
+    // Abre el diploma (URL temporal de evolCampus) en nueva pestaña.
+    const handleDownloadDiploma = (matricula) => {
+        if (!matricula?.url_diploma) {
+            showNotification('Esta matrícula aún no tiene diploma disponible.', 'error');
+            return;
+        }
+        window.open(matricula.url_diploma, '_blank', 'noopener');
     };
 
     // Propaga cambios del alumno a evolCampus en TODAS sus matrículas
@@ -525,14 +576,42 @@ export default function AlumnoDetail() {
                                     align: 'right',
                                     render: (m) => {
                                         if (!m.evolcampus_enrollmentid) return null;
+                                        const isActive = m.enrollmentstatus === 0 || m.enrollmentstatus == null;
                                         return (
-                                            <button
-                                                onClick={(e) => { e.stopPropagation(); setExtendOpen(m); }}
-                                                title="Ampliar plazo de finalización (solo asíncronos)"
-                                                className="inline-flex items-center gap-1 px-2 py-1.5 glass rounded-xl text-amber-500 hover:bg-amber-500/10 transition-colors border border-transparent hover:border-amber-500/20 text-[10px] font-bold"
-                                            >
-                                                <CalendarPlus size={11} /> Ampliar
-                                            </button>
+                                            <div className="flex items-center justify-end gap-1 flex-wrap">
+                                                {/* Acceso directo al curso del alumno */}
+                                                {alumno.evolcampus_userid && m.evolcampus_groupid && (
+                                                    <button
+                                                        onClick={(e) => { e.stopPropagation(); handleAutologin(m.evolcampus_groupid); }}
+                                                        title="Acceso directo al curso del alumno"
+                                                        className="p-1.5 glass rounded-xl text-blue-500 hover:bg-blue-500/10 transition-colors border border-transparent hover:border-blue-500/20"
+                                                    >
+                                                        <ExternalLink size={11} />
+                                                    </button>
+                                                )}
+                                                {/* Diploma si está disponible */}
+                                                {m.url_diploma && (
+                                                    <button
+                                                        onClick={(e) => { e.stopPropagation(); handleDownloadDiploma(m); }}
+                                                        title="Descargar diploma"
+                                                        className="p-1.5 glass rounded-xl text-emerald-500 hover:bg-emerald-500/10 transition-colors border border-transparent hover:border-emerald-500/20"
+                                                    >
+                                                        <Download size={11} />
+                                                    </button>
+                                                )}
+                                                {/* Cambio de estado */}
+                                                <StatusMenu m={m} onChange={(s) => handleChangeMatriculaStatus(m, s)} />
+                                                {/* Ampliar plazo */}
+                                                {isActive && (
+                                                    <button
+                                                        onClick={(e) => { e.stopPropagation(); setExtendOpen(m); }}
+                                                        title="Ampliar plazo de finalización (solo asíncronos)"
+                                                        className="p-1.5 glass rounded-xl text-amber-500 hover:bg-amber-500/10 transition-colors border border-transparent hover:border-amber-500/20"
+                                                    >
+                                                        <CalendarPlus size={11} />
+                                                    </button>
+                                                )}
+                                            </div>
                                         );
                                     }
                                 }
@@ -668,6 +747,52 @@ function ResetPwdModal({ alumno, onClose, onSave }) {
                 </button>
             </div>
         </ModalShell>
+    );
+}
+
+// Menú compacto para cambiar enrollmentstatus de una matrícula.
+// 0=activa 1=archivada 2=baja 3=solo lectura
+function StatusMenu({ m, onChange }) {
+    const [open, setOpen] = useState(false);
+    const ref = React.useRef(null);
+    React.useEffect(() => {
+        if (!open) return;
+        const onClick = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+        document.addEventListener('mousedown', onClick);
+        return () => document.removeEventListener('mousedown', onClick);
+    }, [open]);
+
+    const current = m.enrollmentstatus ?? 0;
+    const options = [
+        { value: 0, label: 'Activar', icon: Power, color: 'text-emerald-500' },
+        { value: 1, label: 'Archivar', icon: Archive, color: 'text-gray-500' },
+        { value: 2, label: 'Dar de baja', icon: Ban, color: 'text-rose-500' },
+        { value: 3, label: 'Solo lectura', icon: Eye, color: 'text-blue-500' }
+    ];
+
+    return (
+        <div className="relative" ref={ref}>
+            <button
+                onClick={(e) => { e.stopPropagation(); setOpen(o => !o); }}
+                title="Cambiar estado en campus"
+                className="p-1.5 glass rounded-xl text-variable-muted hover:text-primary transition-colors border border-transparent hover:border-primary/20"
+            >
+                <Power size={11} />
+            </button>
+            {open && (
+                <div className="absolute right-0 top-full mt-1 z-30 glass rounded-2xl border border-variable shadow-xl overflow-hidden min-w-[160px]">
+                    {options.filter(o => o.value !== current).map(o => (
+                        <button
+                            key={o.value}
+                            onClick={(e) => { e.stopPropagation(); setOpen(false); onChange(o.value); }}
+                            className={`w-full px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-left flex items-center gap-2 hover:bg-white/10 transition-colors ${o.color}`}
+                        >
+                            <o.icon size={11} /> {o.label}
+                        </button>
+                    ))}
+                </div>
+            )}
+        </div>
     );
 }
 
