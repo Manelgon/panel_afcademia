@@ -12,13 +12,15 @@ import {
     ArrowUpRight,
     Filter,
     CheckCircle2,
-    Briefcase
+    Briefcase,
+    Edit3
 } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
 import { supabase } from '../lib/supabase';
 import Sidebar from '../components/Sidebar';
 import DataTable from '../components/DataTable';
 import CustomSelect from '../components/CustomSelect';
+import EditClienteModal from '../components/cliente/EditClienteModal';
 import { useNotifications } from '../context/NotificationContext';
 
 export default function Clientes() {
@@ -28,6 +30,7 @@ export default function Clientes() {
     const [clientes, setClientes] = useState([]);
     const [search, setSearch] = useState('');
     const [filterFundae, setFilterFundae] = useState('todos'); // todos | con | sin
+    const [editingCliente, setEditingCliente] = useState(null);
 
     const fetchClientes = async () => {
         setLoading(true);
@@ -275,17 +278,37 @@ export default function Clientes() {
                             label: '',
                             align: 'right',
                             render: (c) => (
-                                <Link
-                                    to={`/clientes/${c.id}`}
-                                    onClick={(e) => e.stopPropagation()}
-                                    className="inline-flex items-center gap-2 px-3 py-2 glass rounded-xl text-variable-muted hover:text-primary transition-all text-xs font-bold"
-                                >
-                                    Ver ficha <ArrowUpRight size={14} />
-                                </Link>
+                                <div className="flex items-center justify-end gap-1.5">
+                                    <button
+                                        onClick={(e) => { e.stopPropagation(); setEditingCliente(c); }}
+                                        title="Editar cliente"
+                                        className="p-2 glass rounded-xl text-variable-muted hover:text-primary transition-colors border border-transparent hover:border-primary/20"
+                                    >
+                                        <Edit3 size={14} />
+                                    </button>
+                                    <Link
+                                        to={`/clientes/${c.id}`}
+                                        onClick={(e) => e.stopPropagation()}
+                                        className="inline-flex items-center gap-2 px-3 py-2 glass rounded-xl text-variable-muted hover:text-primary transition-all text-xs font-bold"
+                                    >
+                                        Ver ficha <ArrowUpRight size={14} />
+                                    </Link>
+                                </div>
                             )
                         }
                     ]}
                 />
+
+                <AnimatePresence>
+                    {editingCliente && (
+                        <EditClienteModal
+                            cliente={editingCliente}
+                            onClose={() => setEditingCliente(null)}
+                            onSaved={fetchClientes}
+                            showNotification={showNotification}
+                        />
+                    )}
+                </AnimatePresence>
             </main>
         </div>
     );
