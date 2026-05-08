@@ -16,26 +16,36 @@ import {
     Download,
     Upload,
     FileSignature,
+    FileText,
     Search
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../lib/supabase';
 import Sidebar from '../components/Sidebar';
 import DataTable from '../components/DataTable';
+import FacturaModal from '../components/fundae/FacturaModal';
+import FichasFundaeList from '../components/fundae/FichasFundaeList';
 import { useNotifications } from '../context/NotificationContext';
 import { useGlobalLoading } from '../context/LoadingContext';
 
-// ── Flujo de 7 pasos del expediente FUNDAE ─────────────────────────────
+// ── Flujo del expediente FUNDAE ────────────────────────────────────────
 const FLOW_STEPS = [
     { key: 'formulario_pendiente_enviar', label: 'Formulario pendiente de enviar', short: 'Pend. Enviar' },
     { key: 'formulario_enviado', label: 'Formulario enviado', short: 'Form. Env.' },
     { key: 'formulario_cumplimentado', label: 'Formulario cumplimentado', short: 'Form. Cumpl.' },
     { key: 'formulario_recibido', label: 'Formulario recibido', short: 'Form. Rec.' },
     { key: 'creditos_verificados', label: 'Créditos verificados', short: 'Créditos' },
+    { key: 'factura_creada', label: 'Factura creada', short: 'Fact. Creada' },
     { key: 'factura_enviada', label: 'Factura enviada', short: 'Fact. Env.' },
     { key: 'factura_pagada', label: 'Factura pagada', short: 'Fact. Pag.' },
-    { key: 'ficha_alumno_enviada', label: 'Ficha de alumno enviada', short: 'Ficha' },
+    { key: 'enlace_fichas_enviado', label: 'Enlace de fichas enviado', short: 'Enlace fichas' },
+    { key: 'fichas_firmadas', label: 'Fichas de alumnos firmadas', short: 'Fichas firm.' },
+    { key: 'fichas_verificadas', label: 'Fichas verificadas', short: 'Fichas verif.' },
+    { key: 'alumnos_convertidos', label: 'Alumnos convertidos', short: 'Alumnos' },
 ];
+
+// Pasos derivados (no editables manualmente, los calcula un trigger SQL desde fundae_alumnos)
+const DERIVED_FICHAS_STEPS = new Set(['fichas_firmadas', 'fichas_verificadas', 'alumnos_convertidos']);
 
 const INITIAL_FORM = {
     empresa: '',
@@ -51,9 +61,13 @@ const INITIAL_FORM = {
     formulario_cumplimentado: false,
     formulario_recibido: false,
     creditos_verificados: false,
+    factura_creada: false,
     factura_enviada: false,
     factura_pagada: false,
-    ficha_alumno_enviada: false,
+    enlace_fichas_enviado: false,
+    fichas_firmadas: false,
+    fichas_verificadas: false,
+    alumnos_convertidos: false,
     estado: 'pendiente',
     comentarios: ''
 };
@@ -77,7 +91,7 @@ function FlowProgress({ record }) {
     const currentStep = FLOW_STEPS[lastTrueIndex];
 
     // Number to display (0-indexing)
-    const displayNum = isFullyDone ? 7 : lastTrueIndex;
+    const displayNum = isFullyDone ? FLOW_STEPS.length : lastTrueIndex;
     const pct = (displayNum / FLOW_STEPS.length) * 100;
 
     return (
@@ -174,16 +188,31 @@ export default function Fundae() {
     const [isCreditsModalOpen, setIsCreditsModalOpen] = useState(false);
     const [creditsInputData, setCreditsInputData] = useState({ record: null, amount: '' });
 
+    // Factura Modal State
+    const [facturaModalRecord, setFacturaModalRecord] = useState(null);
+
     // PDF firmado: input file oculto + record activo (sobre cuál se está subiendo)
     const fileInputRef = useRef(null);
     const [uploadingFor, setUploadingFor] = useState(null);
+
+    // Fichas de alumnos del expediente actualmente abierto
+    const [fichasExpediente, setFichasExpediente] = useState([]);
+    const fetchFichasExpediente = async (fundaeId) => {
+        if (!fundaeId) { setFichasExpediente([]); return; }
+        const { data } = await supabase.from('fundae_alumnos').select('*').eq('fundae_id', fundaeId).order('created_at');
+        setFichasExpediente(data || []);
+    };
+    useEffect(() => {
+        if (editingRecord?.id) fetchFichasExpediente(editingRecord.id);
+        else setFichasExpediente([]);
+    }, [editingRecord?.id]);
 
     const fetchRecords = async () => {
         setLoading(true);
         try {
             const { data, error } = await supabase
                 .from('fundae_seguimiento')
-                .select('*, leads(nombre, empresa_nombre, email, whatsapp)')
+                .select('*, leads(nombre, empresa_nombre, email, whatsapp, lead_billing(factura_pdf_path, numero_factura))')
                 .order('fecha_inicio', { ascending: false });
             if (error) throw error;
             setRecords(data || []);
@@ -194,6 +223,29 @@ export default function Fundae() {
         }
     };
 
+    // ── Descargar el PDF de la factura ──
+    const handleDownloadFactura = async (record) => {
+        const billing = Array.isArray(record.leads?.lead_billing)
+            ? record.leads.lead_billing[0]
+            : record.leads?.lead_billing;
+        const path = billing?.factura_pdf_path;
+        if (!path) {
+            showNotification('Esta factura todavía no se ha generado.', 'error');
+            return;
+        }
+        await withLoading(async () => {
+            try {
+                const { data, error } = await supabase.storage
+                    .from('facturas')
+                    .createSignedUrl(path, 60);
+                if (error) throw error;
+                window.open(data.signedUrl, '_blank', 'noopener');
+            } catch (err) {
+                showNotification(`No se pudo descargar la factura: ${err.message}`, 'error');
+            }
+        }, 'Generando enlace a la factura...');
+    };
+
     // ── Descargar el PDF del expediente (firmado si existe, si no el pendiente) ──
     const handleDownloadExpediente = async (record) => {
         const path = record.expediente_firmado_path || record.expediente_pdf_path;
@@ -201,15 +253,17 @@ export default function Fundae() {
             showNotification('Este expediente todavía no tiene PDF generado.', 'error');
             return;
         }
-        try {
-            const { data, error } = await supabase.storage
-                .from('fundae-docs')
-                .createSignedUrl(path, 60); // 60 segundos
-            if (error) throw error;
-            window.open(data.signedUrl, '_blank', 'noopener');
-        } catch (err) {
-            showNotification(`No se pudo descargar el PDF: ${err.message}`, 'error');
-        }
+        await withLoading(async () => {
+            try {
+                const { data, error } = await supabase.storage
+                    .from('fundae-docs')
+                    .createSignedUrl(path, 60);
+                if (error) throw error;
+                window.open(data.signedUrl, '_blank', 'noopener');
+            } catch (err) {
+                showNotification(`No se pudo descargar el PDF: ${err.message}`, 'error');
+            }
+        }, 'Generando enlace al expediente...');
     };
 
     // ── Click en botón de subir PDF firmado: abre el input file ──
@@ -429,6 +483,109 @@ export default function Fundae() {
             }
         }
 
+        // Factura Creada: no se avanza con un toggle simple — abre el modal de creación.
+        // El modal genera el PDF, lo sube a Storage, persiste en lead_billing y marca factura_creada=true (vía trigger).
+        if (currentStep.key === 'factura_creada') {
+            setFacturaModalRecord(record);
+            return;
+        }
+
+        // Factura Enviada: actualiza lead_billing.estado_factura='enviada' (el trigger sincroniza el espejo).
+        if (currentStep.key === 'factura_enviada') {
+            const confirmed = await confirm({
+                title: 'Marcar factura como enviada',
+                message: `¿Confirmar que la factura ${record.empresa ? `de ${record.empresa}` : ''} ha sido enviada al cliente?`,
+                confirmText: 'Sí, enviada',
+                cancelText: 'Cancelar'
+            });
+            if (!confirmed) return;
+            await withLoading(async () => {
+                try {
+                    const { error } = await supabase
+                        .from('lead_billing')
+                        .update({ estado_factura: 'enviada', fecha_factura_enviada: new Date().toISOString() })
+                        .eq('lead_id', record.lead_id);
+                    if (error) throw error;
+                    showNotification('Factura marcada como enviada.', 'success');
+                    fetchRecords();
+                } catch (err) {
+                    showNotification(`Error: ${err.message}`, 'error');
+                }
+            }, 'Marcando factura como enviada...');
+            return;
+        }
+
+        // Enviar enlace de fichas al cliente (acción manual del admin).
+        if (currentStep.key === 'enlace_fichas_enviado') {
+            const confirmed = await confirm({
+                title: 'Enviar enlace de fichas al cliente',
+                message: `Se enviará un email a ${record.email || record.leads?.email || 'la dirección del cliente'} con el enlace para rellenar las fichas de inscripción de los alumnos. ¿Continuar?`,
+                confirmText: 'Sí, enviar',
+                cancelText: 'Cancelar'
+            });
+            if (!confirmed) return;
+            await withLoading(async () => {
+                try {
+                    // 1. Generar token + activar flag enviar_alumnos_pendiente.
+                    //    El listener realtime existente en este mismo componente
+                    //    invoca la edge function send-fundae-alumnos-link al detectar el flag.
+                    const { error: rpcErr } = await supabase.rpc('send_fundae_alumnos_link', { p_fundae_id: record.id });
+                    if (rpcErr) throw rpcErr;
+
+                    // 2. Marcar el paso del flujo.
+                    const { error: upErr } = await supabase
+                        .from('fundae_seguimiento')
+                        .update({ enlace_fichas_enviado: true })
+                        .eq('id', record.id);
+                    if (upErr) throw upErr;
+
+                    showNotification('✅ Enlace de fichas enviado al cliente.');
+                    fetchRecords();
+                } catch (err) {
+                    showNotification(`Error: ${err.message}`, 'error');
+                }
+            }, 'Enviando enlace de fichas al cliente...');
+            return;
+        }
+
+        // Pasos derivados de fichas de alumnos: abren el modal de edición del expediente,
+        // donde está la sección "Fichas de alumnos" con los botones Verificar / Convertir.
+        if (DERIVED_FICHAS_STEPS.has(currentStep.key)) {
+            const messages = {
+                fichas_firmadas: 'Pendiente de que el cliente firme todas las fichas. Recibió el enlace al marcar la factura como pagada.',
+                fichas_verificadas: 'Hay fichas firmadas pendientes de verificar. Abre el expediente y verifica cada una.',
+                alumnos_convertidos: 'Hay fichas verificadas pendientes de convertir a alumno.'
+            };
+            showNotification(messages[currentStep.key] || '', 'info');
+            openEditModal(record);
+            return;
+        }
+
+        // Factura Pagada: actualiza lead_billing.estado_factura='pagada' (el trigger sincroniza espejo y dispara fichas).
+        if (currentStep.key === 'factura_pagada') {
+            const confirmed = await confirm({
+                title: 'Marcar factura como pagada',
+                message: 'Esto disparará automáticamente el envío del enlace de fichas de alumnos al cliente. ¿Continuar?',
+                confirmText: 'Sí, pagada',
+                cancelText: 'Cancelar'
+            });
+            if (!confirmed) return;
+            await withLoading(async () => {
+                try {
+                    const { error } = await supabase
+                        .from('lead_billing')
+                        .update({ estado_factura: 'pagada', fecha_factura_pagada: new Date().toISOString() })
+                        .eq('lead_id', record.lead_id);
+                    if (error) throw error;
+                    showNotification('Factura pagada. Se enviarán las fichas de alumnos al cliente.', 'success');
+                    fetchRecords();
+                } catch (err) {
+                    showNotification(`Error: ${err.message}`, 'error');
+                }
+            }, 'Marcando factura como pagada...');
+            return;
+        }
+
         await withLoading(async () => {
             try {
                 const { error } = await supabase
@@ -485,6 +642,41 @@ export default function Fundae() {
         return () => supabase.removeChannel(channel);
     }, []);
 
+    // Auto-envío del enlace de fichas de alumnos cuando el trigger marca enviar_alumnos_pendiente=true.
+    // Idempotente: solo envía si alumnos_link_enviado_at es nulo.
+    useEffect(() => {
+        const pendientes = records.filter(r => r.enviar_alumnos_pendiente && !r.alumnos_link_enviado_at);
+        if (pendientes.length === 0) return;
+        let cancelled = false;
+        (async () => {
+            for (const rec of pendientes) {
+                try {
+                    const { data: tok } = await supabase.rpc('issue_fundae_alumnos_token', { p_fundae_id: rec.id });
+                    if (!tok || cancelled) continue;
+                    const publicUrl = `${window.location.origin}/fundae-alumnos/${tok.token}`;
+
+                    const { error: invokeErr } = await supabase.functions.invoke('send-fundae-alumnos-link', {
+                        body: {
+                            email: tok.email,
+                            empresa: tok.empresa,
+                            public_url: publicUrl,
+                            num_alumnos: rec.num_asistentes || 0
+                        }
+                    });
+                    if (invokeErr) { console.error('[ALUMNOS-LINK] invoke error:', invokeErr); continue; }
+
+                    await supabase
+                        .from('fundae_seguimiento')
+                        .update({ alumnos_link_enviado_at: new Date().toISOString() })
+                        .eq('id', rec.id);
+                } catch (err) {
+                    console.error('[ALUMNOS-LINK] error procesando expediente', rec.id, err);
+                }
+            }
+        })();
+        return () => { cancelled = true; };
+    }, [records]);
+
     const filteredByEstado = filterEstado === 'todos'
         ? records
         : records.filter(r => r.estado === filterEstado);
@@ -529,9 +721,13 @@ export default function Fundae() {
             formulario_cumplimentado: record.formulario_cumplimentado || false,
             formulario_recibido: record.formulario_recibido || false,
             creditos_verificados: record.creditos_verificados || false,
+            factura_creada: record.factura_creada || false,
             factura_enviada: record.factura_enviada || false,
             factura_pagada: record.factura_pagada || false,
-            ficha_alumno_enviada: record.ficha_alumno_enviada || false,
+            enlace_fichas_enviado: record.enlace_fichas_enviado || false,
+            fichas_firmadas: record.fichas_firmadas || false,
+            fichas_verificadas: record.fichas_verificadas || false,
+            alumnos_convertidos: record.alumnos_convertidos || false,
             estado: record.estado || 'pendiente',
             comentarios: record.comentarios || ''
         });
@@ -563,9 +759,10 @@ export default function Fundae() {
                     formulario_cumplimentado: formData.formulario_cumplimentado,
                     formulario_recibido: formData.formulario_recibido,
                     creditos_verificados: formData.creditos_verificados,
-                    factura_enviada: formData.factura_enviada,
-                    factura_pagada: formData.factura_pagada,
-                    ficha_alumno_enviada: formData.ficha_alumno_enviada,
+                    // factura_creada / factura_enviada / factura_pagada NO se incluyen:
+                    // son espejos de lead_billing y se sincronizan por trigger.
+                    // fichas_firmadas / fichas_verificadas / alumnos_convertidos NO se incluyen:
+                    // son derivados de fundae_alumnos y se sincronizan por trigger.
                     estado: formData.estado,
                     comentarios: formData.comentarios || null
                 };
@@ -855,6 +1052,21 @@ export default function Fundae() {
                                                 <Upload size={15} />
                                             </button>
                                         )}
+
+                                        {/* Descargar factura (si existe PDF de factura) */}
+                                        {r.factura_creada && (() => {
+                                            const billing = Array.isArray(r.leads?.lead_billing) ? r.leads.lead_billing[0] : r.leads?.lead_billing;
+                                            if (!billing?.factura_pdf_path) return null;
+                                            return (
+                                                <button
+                                                    onClick={() => handleDownloadFactura(r)}
+                                                    title={`Descargar factura ${billing.numero_factura || ''}`}
+                                                    className="p-2 glass rounded-xl text-blue-500 hover:bg-blue-500/10 transition-colors border border-transparent hover:border-blue-500/20"
+                                                >
+                                                    <FileText size={15} />
+                                                </button>
+                                            );
+                                        })()}
                                         <button onClick={() => openEditModal(r)} className="p-2 glass rounded-xl text-variable-muted hover:text-primary transition-colors text-xs font-bold px-3">
                                             Editar
                                         </button>
@@ -950,25 +1162,21 @@ export default function Fundae() {
                                 <div className="space-y-2">
                                     {FLOW_STEPS.map((step, i) => {
                                         const prevDone = i === 0 || formData[FLOW_STEPS[i - 1].key];
-                                        const isCurrent = !formData[step.key] && prevDone;
+                                        const isDone = !!formData[step.key];
+                                        // Solo es el paso actual el primer pendiente cuyo paso anterior está hecho.
+                                        const isCurrent = !isDone && prevDone;
                                         return (
                                             <ToggleStep
                                                 key={step.key}
                                                 step={step}
                                                 index={i}
-                                                checked={formData[step.key]}
+                                                checked={isDone}
                                                 onChange={v => {
-                                                    // Validation: Cannot set creditos_verificados to true if amount is 0
-                                                    if (step.key === 'creditos_verificados' && v) {
-                                                        const creditValue = parseFloat(formData.creditos_fundae) || 0;
-                                                        if (creditValue <= 0) {
-                                                            showNotification('Introduce el importe de créditos antes de marcar este paso como verificado.', 'error');
-                                                            return;
-                                                        }
-                                                    }
-                                                    setField(step.key, v);
+                                                    // Solo se puede tocar el paso actual; el resto bloqueado.
+                                                    if (!isCurrent) return;
+                                                    if (v && editingRecord) handleAdvanceStep(editingRecord);
                                                 }}
-                                                disabled={!prevDone && !formData[step.key]}
+                                                disabled={!isCurrent}
                                                 isCurrent={isCurrent}
                                             />
                                         );
@@ -993,6 +1201,19 @@ export default function Fundae() {
                                         <textarea value={formData.comentarios} onChange={e => setField('comentarios', e.target.value)} rows={3} className="w-full bg-white/5 border border-variable rounded-2xl px-5 py-4 focus:outline-none focus:border-primary/50 text-variable-main transition-all resize-none" placeholder="Anotaciones, incidencias..." />
                                     </div>
                                 </div>
+
+                                {editingRecord && (
+                                    <>
+                                        <p className="text-[10px] font-black text-primary uppercase tracking-[0.2em] border-b border-primary/20 pb-2 pt-2">
+                                            Fichas de alumnos ({fichasExpediente.length})
+                                        </p>
+                                        <FichasFundaeList
+                                            fichas={fichasExpediente}
+                                            onRefresh={() => fetchFichasExpediente(editingRecord.id)}
+                                            showNotification={showNotification}
+                                        />
+                                    </>
+                                )}
 
                                 <button type="submit" className="w-full py-5 bg-primary text-white rounded-2xl font-bold hover:brightness-110 active:scale-[0.98] transition-all shadow-xl shadow-primary/30 mt-4 flex items-center justify-center gap-2">
                                     <ShieldCheck size={20} /> {editingRecord ? 'Actualizar Expediente' : 'Crear Expediente'}
@@ -1114,6 +1335,25 @@ export default function Fundae() {
                             </div>
                         </motion.div>
                     </div>
+                )}
+            </AnimatePresence>
+
+            {/* Factura Modal */}
+            <AnimatePresence>
+                {facturaModalRecord && (
+                    <FacturaModal
+                        record={facturaModalRecord}
+                        onClose={() => setFacturaModalRecord(null)}
+                        onCreated={() => {
+                            // El modal ya marca factura_creada=true en BD y ha subido el PDF.
+                            // Si el modal de edición está abierto sobre el mismo expediente, reflejamos el cambio en formData.
+                            if (editingRecord && editingRecord.id === facturaModalRecord?.id) {
+                                setField('factura_creada', true);
+                            }
+                            fetchRecords();
+                        }}
+                        showNotification={showNotification}
+                    />
                 )}
             </AnimatePresence>
         </div>

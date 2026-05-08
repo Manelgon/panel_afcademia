@@ -741,15 +741,19 @@ export default function FundaePublicForm() {
                 if (leadsSyncError) console.error('Error sincronizando con leads:', leadsSyncError);
             }
 
-            // 2. Marcar el token como usado y guardar valores calculados
-            await supabase
+            // 2. Marcar el token como usado
+            const { data: tokenUpdRows, error: tokenUpdErr } = await supabase
                 .from('fundae_form_tokens')
-                .update({ 
-                    used: true,
-                    representante_empresa: representanteCalculado,
-                    domicilio: domicilioCalculado
-                })
-                .eq('token', token);
+                .update({ used: true })
+                .eq('token', token)
+                .select();
+            if (tokenUpdErr) {
+                console.error('[FUNDAE] ❌ Error marcando token como usado:', tokenUpdErr);
+            } else if (!tokenUpdRows || tokenUpdRows.length === 0) {
+                console.error('[FUNDAE] ❌ El token no se actualizó (0 filas). token=', token);
+            } else {
+                console.log('[FUNDAE] ✅ Token marcado como usado:', tokenUpdRows[0].token);
+            }
 
             // 3. Generar el PDF
             const blob = await generatePDF(formData);

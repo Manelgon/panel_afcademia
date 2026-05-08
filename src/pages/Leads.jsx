@@ -554,8 +554,7 @@ export default function Leads() {
                             formulario_recibido: false,
                             creditos_verificados: false,
                             factura_enviada: false,
-                            factura_pagada: false,
-                            ficha_alumno_enviada: false
+                            factura_pagada: false
                         }]);
 
                     if (fundaeError) console.error('Error creando expediente FUNDAE:', fundaeError);

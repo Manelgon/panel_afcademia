@@ -23,11 +23,15 @@ import {
     Loader2,
     Ban,
     X,
-    ShieldCheck
+    ShieldCheck,
+    GraduationCap,
+    Download
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../lib/supabase';
 import Sidebar from '../components/Sidebar';
+import EditClienteModal from '../components/cliente/EditClienteModal';
+import FichasFundaeList from '../components/fundae/FichasFundaeList';
 import { useNotifications } from '../context/NotificationContext';
 import { useGlobalLoading } from '../context/LoadingContext';
 
@@ -35,6 +39,7 @@ const TABS = [
     { id: 'resumen', label: 'Resumen', icon: User },
     { id: 'facturacion', label: 'Facturación', icon: Euro },
     { id: 'fundae', label: 'FUNDAE', icon: BookOpen },
+    { id: 'alumnos', label: 'Alumnos', icon: GraduationCap },
     { id: 'actividad', label: 'Actividad', icon: Activity }
 ];
 
@@ -62,6 +67,7 @@ export default function ClienteDetail() {
     const [loading, setLoading] = useState(true);
     const [cliente, setCliente] = useState(null);
     const [activeTab, setActiveTab] = useState('resumen');
+    const [editOpen, setEditOpen] = useState(false);
 
     const fetchCliente = async () => {
         setLoading(true);
@@ -73,7 +79,10 @@ export default function ClienteDetail() {
                     flujos_embudo(status_actual, actividad, tags_proceso, keyword_recibida),
                     segmentacion_despacho(num_comunidades, interes_fundae, software_actual, objetivo_automatizacion),
                     lead_billing(*),
-                    fundae_seguimiento(*)
+                    fundae_seguimiento(
+                        *,
+                        fundae_alumnos(*)
+                    )
                 `)
                 .eq('id', id)
                 .single();
@@ -95,6 +104,7 @@ export default function ClienteDetail() {
             .on('postgres_changes', { event: '*', schema: 'public', table: 'leads', filter: `id=eq.${id}` }, fetchCliente)
             .on('postgres_changes', { event: '*', schema: 'public', table: 'fundae_seguimiento', filter: `lead_id=eq.${id}` }, fetchCliente)
             .on('postgres_changes', { event: '*', schema: 'public', table: 'lead_billing', filter: `lead_id=eq.${id}` }, fetchCliente)
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'fundae_alumnos' }, fetchCliente)
             .subscribe();
         return () => supabase.removeChannel(channel);
     }, [id]);
@@ -123,8 +133,7 @@ export default function ClienteDetail() {
                     formulario_recibido: false,
                     creditos_verificados: false,
                     factura_enviada: false,
-                    factura_pagada: false,
-                    ficha_alumno_enviada: false
+                    factura_pagada: false
                 }]);
                 if (error) throw error;
                 showNotification('Expediente FUNDAE creado');
@@ -263,6 +272,13 @@ export default function ClienteDetail() {
 
                         <div className="flex items-center gap-3 flex-shrink-0">
                             <button
+                                onClick={() => setEditOpen(true)}
+                                className="px-4 py-3 glass rounded-2xl text-xs font-bold text-variable-muted hover:text-primary transition-all flex items-center gap-2"
+                                title="Editar datos del cliente"
+                            >
+                                <Edit3 size={14} /> Editar cliente
+                            </button>
+                            <button
                                 onClick={handleRevertirCliente}
                                 className="px-4 py-3 glass rounded-2xl text-xs font-bold text-variable-muted hover:text-rose-500 transition-all"
                                 title="Volver a marcar como lead en proceso"
@@ -311,22 +327,35 @@ export default function ClienteDetail() {
                 <AnimatePresence mode="wait">
                     {activeTab === 'resumen' && (
                         <motion.div key="resumen" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                            {/* Datos de empresa */}
-                            <div className="glass rounded-[1.5rem] p-6">
-                                <h3 className="text-sm font-black uppercase tracking-widest text-primary mb-5 flex items-center gap-2">
-                                    <Building2 size={16} /> Datos de Empresa
-                                </h3>
-                                <dl className="space-y-3">
-                                    <Field label="Razón Social" value={cliente.empresa_nombre} />
-                                    <Field label="CIF / NIF" value={cliente.cif_nif} mono />
-                                    <Field label="Dirección" value={cliente.direccion} />
-                                    <div className="grid grid-cols-2 gap-3">
-                                        <Field label="Ciudad" value={cliente.ciudad} />
-                                        <Field label="Provincia" value={cliente.provincia} />
+                            {/* Datos del cliente — lead_billing manda, lead como fallback */}
+                            {(() => {
+                                const lb = (Array.isArray(cliente.lead_billing) ? cliente.lead_billing[0] : cliente.lead_billing) || {};
+                                const datos = {
+                                    razon_social: lb.razon_social || cliente.razon_social || cliente.empresa_nombre,
+                                    cif: lb.cif || cliente.cif || cliente.cif_nif,
+                                    direccion: lb.direccion_facturacion || cliente.direccion,
+                                    ciudad: lb.poblacion || cliente.ciudad,
+                                    provincia: lb.provincia || cliente.provincia,
+                                    codigo_postal: lb.codigo_postal || cliente.codigo_postal
+                                };
+                                return (
+                                    <div className="glass rounded-[1.5rem] p-6">
+                                        <h3 className="text-sm font-black uppercase tracking-widest text-primary mb-5 flex items-center gap-2">
+                                            <Building2 size={16} /> Datos del Cliente
+                                        </h3>
+                                        <dl className="space-y-3">
+                                            <Field label="Razón Social" value={datos.razon_social} />
+                                            <Field label="CIF / NIF" value={datos.cif} mono />
+                                            <Field label="Dirección" value={datos.direccion} />
+                                            <div className="grid grid-cols-2 gap-3">
+                                                <Field label="Ciudad" value={datos.ciudad} />
+                                                <Field label="Provincia" value={datos.provincia} />
+                                            </div>
+                                            <Field label="Código Postal" value={datos.codigo_postal} mono />
+                                        </dl>
                                     </div>
-                                    <Field label="Código Postal" value={cliente.codigo_postal} mono />
-                                </dl>
-                            </div>
+                                );
+                            })()}
 
                             {/* Segmentación */}
                             <div className="glass rounded-[1.5rem] p-6">
@@ -368,25 +397,26 @@ export default function ClienteDetail() {
 
                     {activeTab === 'facturacion' && (
                         <motion.div key="facturacion" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="space-y-6">
-                            {/* Datos de facturación */}
+                            {/* Datos exclusivos de facturación (los datos generales están en Resumen) */}
                             <div className="glass rounded-[1.5rem] p-6">
                                 <h3 className="text-sm font-black uppercase tracking-widest text-primary mb-5 flex items-center gap-2">
-                                    <CreditCard size={16} /> Datos de Facturación
+                                    <CreditCard size={16} /> Datos de Cobro
                                 </h3>
-                                {billing.length === 0 ? (
-                                    <p className="text-variable-muted text-sm">No hay datos de facturación registrados.</p>
-                                ) : (
-                                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-                                        <Field label="Razón Social" value={billing[0].razon_social} />
-                                        <Field label="CIF" value={billing[0].cif} mono />
-                                        <Field label="Email facturación" value={billing[0].email_facturacion} />
-                                        <Field label="Método de pago" value={billing[0].metodo_pago} />
-                                        <Field label="Dirección" value={billing[0].direccion_facturacion} />
-                                        <Field label="Población / Provincia" value={[billing[0].poblacion, billing[0].provincia].filter(Boolean).join(', ')} />
-                                        <Field label="Código Postal" value={billing[0].codigo_postal} mono />
-                                        <Field label="IBAN" value={billing[0].iban} mono />
-                                    </div>
-                                )}
+                                {(() => {
+                                    const lb = billing[0] || {};
+                                    const datos = {
+                                        email_facturacion: lb.email_facturacion || cliente.email,
+                                        metodo_pago: lb.metodo_pago,
+                                        iban: lb.iban
+                                    };
+                                    return (
+                                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+                                            <Field label="Email facturación" value={datos.email_facturacion} />
+                                            <Field label="Método de pago" value={datos.metodo_pago} />
+                                            <Field label="IBAN" value={datos.iban} mono />
+                                        </div>
+                                    );
+                                })()}
                             </div>
 
                             {/* Histórico de facturas */}
@@ -494,6 +524,30 @@ export default function ClienteDetail() {
                         </motion.div>
                     )}
 
+                    {activeTab === 'alumnos' && (
+                        <motion.div key="alumnos" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="space-y-6">
+                            {(() => {
+                                const fichas = (cliente.fundae_seguimiento || []).flatMap(fs =>
+                                    (fs.fundae_alumnos || []).map(fa => ({ ...fa, expediente: fs }))
+                                );
+                                return (
+                                    <div className="glass rounded-[1.5rem] p-6">
+                                        <div className="flex items-center justify-between mb-5">
+                                            <h3 className="text-sm font-black uppercase tracking-widest text-primary flex items-center gap-2">
+                                                <GraduationCap size={16} /> Fichas de alumnos ({fichas.length})
+                                            </h3>
+                                        </div>
+                                        <FichasFundaeList
+                                            fichas={fichas}
+                                            onRefresh={fetchCliente}
+                                            showNotification={showNotification}
+                                        />
+                                    </div>
+                                );
+                            })()}
+                        </motion.div>
+                    )}
+
                     {activeTab === 'actividad' && (
                         <motion.div key="actividad" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="glass rounded-[1.5rem] p-6">
                             <h3 className="text-sm font-black uppercase tracking-widest text-primary mb-5 flex items-center gap-2">
@@ -524,6 +578,17 @@ export default function ClienteDetail() {
                                 </div>
                             </div>
                         </motion.div>
+                    )}
+                </AnimatePresence>
+
+                <AnimatePresence>
+                    {editOpen && cliente && (
+                        <EditClienteModal
+                            cliente={cliente}
+                            onClose={() => setEditOpen(false)}
+                            onSaved={fetchCliente}
+                            showNotification={showNotification}
+                        />
                     )}
                 </AnimatePresence>
             </main>
