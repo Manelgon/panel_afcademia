@@ -46,3 +46,7 @@ project_detailed_raw.html
 # OS / OneDrive
 Thumbs.db
 desktop.ini
+
+# Plantillas / documentos sueltos en raíz
+/Ficha_de_inscripci*.docx
+/Ficha_de_inscripci*.pdf
