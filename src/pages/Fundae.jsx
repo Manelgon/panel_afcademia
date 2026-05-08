@@ -9,6 +9,7 @@ import {
     AlertCircle,
     Loader2,
     Send,
+    RotateCw,
     AlertTriangle,
     Ban,
     Trash2,
@@ -25,6 +26,7 @@ import Sidebar from '../components/Sidebar';
 import DataTable from '../components/DataTable';
 import FacturaModal from '../components/fundae/FacturaModal';
 import FichasFundaeList from '../components/fundae/FichasFundaeList';
+import EncuestasFundaeSection from '../components/fundae/EncuestasFundaeSection';
 import { useNotifications } from '../context/NotificationContext';
 import { useGlobalLoading } from '../context/LoadingContext';
 
@@ -69,7 +71,8 @@ const INITIAL_FORM = {
     fichas_verificadas: false,
     alumnos_convertidos: false,
     estado: 'pendiente',
-    comentarios: ''
+    comentarios: '',
+    numero_expediente_fundae: ''
 };
 
 const ESTADO_CONFIG = {
@@ -335,6 +338,14 @@ export default function Fundae() {
             return;
         }
 
+        // Si ya hay un PDF firmado por el cliente, reenviar lo invalidaría al sobrescribir
+        // expediente_estado='pendiente_firma'. Bloqueamos para no perder la firma.
+        if (record.expediente_estado === 'firmado') {
+            showNotification('Este expediente ya está firmado. No se puede reenviar el formulario sin perder la firma actual.', 'error');
+            return;
+        }
+
+        const isResend = !!record.formulario_enviado;
         await withLoading(async () => {
             try {
                 const { error } = await supabase.rpc('send_fundae_form', {
@@ -343,12 +354,14 @@ export default function Fundae() {
 
                 if (error) throw error;
 
-                showNotification(`✅ Formulario enviado a ${record.empresa}`);
+                showNotification(isResend
+                    ? `✅ Formulario reenviado a ${record.empresa} (enlace anterior invalidado).`
+                    : `✅ Formulario enviado a ${record.empresa}`);
                 fetchRecords();
             } catch (err) {
                 showNotification(`Error al enviar formulario: ${err.message}`, 'error');
             }
-        }, `Enviando formulario a ${record.empresa}...`);
+        }, isResend ? `Reenviando formulario a ${record.empresa}...` : `Enviando formulario a ${record.empresa}...`);
     };
 
     // ── Avanzar paso secuencialmente ────────────────────────────────────────
@@ -577,6 +590,16 @@ export default function Fundae() {
                         .update({ estado_factura: 'pagada', fecha_factura_pagada: new Date().toISOString() })
                         .eq('lead_id', record.lead_id);
                     if (error) throw error;
+
+                    // Reflejar el importe pagado en fundae_seguimiento (espejo para la columna "Facturado / Pagado")
+                    const importePagado = parseFloat(record.facturado) || 0;
+                    if (importePagado > 0) {
+                        await supabase
+                            .from('fundae_seguimiento')
+                            .update({ pagado: importePagado })
+                            .eq('id', record.id);
+                    }
+
                     showNotification('Factura pagada. Se enviarán las fichas de alumnos al cliente.', 'success');
                     fetchRecords();
                 } catch (err) {
@@ -729,7 +752,8 @@ export default function Fundae() {
             fichas_verificadas: record.fichas_verificadas || false,
             alumnos_convertidos: record.alumnos_convertidos || false,
             estado: record.estado || 'pendiente',
-            comentarios: record.comentarios || ''
+            comentarios: record.comentarios || '',
+            numero_expediente_fundae: record.numero_expediente_fundae || ''
         });
         setIsModalOpen(true);
     };
@@ -764,7 +788,8 @@ export default function Fundae() {
                     // fichas_firmadas / fichas_verificadas / alumnos_convertidos NO se incluyen:
                     // son derivados de fundae_alumnos y se sincronizan por trigger.
                     estado: formData.estado,
-                    comentarios: formData.comentarios || null
+                    comentarios: formData.comentarios || null,
+                    numero_expediente_fundae: formData.numero_expediente_fundae?.trim() || null
                 };
 
                 // Removed auto-completion logic for the first step and overall completion.
@@ -897,6 +922,20 @@ export default function Fundae() {
                     }
                     columns={[
                         {
+                            key: 'numero_expediente',
+                            label: 'Nº Exp.',
+                            render: (r) => (
+                                <div className="text-xs">
+                                    <p className="font-mono font-bold text-variable-main">{r.numero_expediente || '—'}</p>
+                                    {r.numero_expediente_fundae && (
+                                        <p className="font-mono text-[10px] text-variable-muted mt-0.5" title="Nº FUNDAE">
+                                            FUNDAE: {r.numero_expediente_fundae}
+                                        </p>
+                                    )}
+                                </div>
+                            )
+                        },
+                        {
                             key: 'empresa',
                             label: 'Empresa',
                             render: (r) => (
@@ -1020,14 +1059,25 @@ export default function Fundae() {
                                             </button>
                                         )}
 
-                                        {/* Enviar formulario */}
+                                        {/* Enviar formulario (primer envío) */}
                                         {!r.formulario_enviado && (
                                             <button
                                                 onClick={() => handleSendFormulario(r)}
-                                                title="Enviar formulario FUNDAE al lead"
+                                                title="Enviar formulario FUNDAE al cliente"
                                                 className="p-2 glass rounded-xl text-variable-muted hover:text-primary transition-colors border border-transparent hover:border-primary/20"
                                             >
                                                 <Send size={15} />
+                                            </button>
+                                        )}
+
+                                        {/* Reenviar formulario (ya enviado pero aún no recibido y sin firma). Genera nuevo token e invalida los anteriores. */}
+                                        {r.formulario_enviado && !r.formulario_recibido && r.expediente_estado !== 'firmado' && (
+                                            <button
+                                                onClick={() => handleSendFormulario(r)}
+                                                title="Reenviar formulario (genera un nuevo enlace e invalida el anterior)"
+                                                className="p-2 glass rounded-xl text-amber-500 hover:bg-amber-500/10 transition-colors border border-transparent hover:border-amber-500/20"
+                                            >
+                                                <RotateCw size={15} />
                                             </button>
                                         )}
 
@@ -1095,7 +1145,9 @@ export default function Fundae() {
                         >
                             <button onClick={closeModal} className="absolute top-8 right-8 text-variable-muted hover:text-primary transition-colors"><X size={24} /></button>
                             <h2 className="text-3xl font-bold font-display mb-8 text-variable-main">
-                                {editingRecord ? 'Editar Expediente' : 'Nuevo Expediente FUNDAE'}
+                                {editingRecord
+                                    ? <>Editar Expediente {editingRecord.numero_expediente && <span className="text-primary font-mono text-2xl">{editingRecord.numero_expediente}</span>}</>
+                                    : 'Nuevo Expediente FUNDAE'}
                             </h2>
 
                             <form onSubmit={handleSubmit} className="space-y-6">
@@ -1120,6 +1172,32 @@ export default function Fundae() {
                                         <input value={formData.telefono} onChange={e => setField('telefono', e.target.value)} className="w-full bg-white/5 border border-variable rounded-2xl px-5 py-4 focus:outline-none focus:border-primary/50 text-variable-main transition-all" placeholder="+34 600 000 000" />
                                     </div>
                                 </div>
+
+                                {/* Identificación del expediente */}
+                                {editingRecord && (
+                                    <>
+                                        <p className="text-[10px] font-black text-primary uppercase tracking-[0.2em] border-b border-primary/20 pb-2 pt-2">Identificación</p>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                                            <div className="space-y-2">
+                                                <label className="text-xs font-bold text-variable-muted uppercase tracking-widest ml-1">Nº Expediente (interno)</label>
+                                                <input
+                                                    value={editingRecord.numero_expediente || ''}
+                                                    readOnly
+                                                    className="w-full bg-white/5 border border-variable rounded-2xl px-5 py-4 text-variable-main font-mono cursor-not-allowed opacity-70"
+                                                />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <label className="text-xs font-bold text-variable-muted uppercase tracking-widest ml-1">Nº Expediente FUNDAE</label>
+                                                <input
+                                                    value={formData.numero_expediente_fundae}
+                                                    onChange={e => setField('numero_expediente_fundae', e.target.value)}
+                                                    className="w-full bg-white/5 border border-variable rounded-2xl px-5 py-4 focus:outline-none focus:border-primary/50 text-variable-main transition-all font-mono"
+                                                    placeholder="Asignado por FUNDAE"
+                                                />
+                                            </div>
+                                        </div>
+                                    </>
+                                )}
 
                                 {/* Financiero */}
                                 <p className="text-[10px] font-black text-primary uppercase tracking-[0.2em] border-b border-primary/20 pb-2 pt-2">Datos Financieros</p>
@@ -1210,8 +1288,35 @@ export default function Fundae() {
                                         <FichasFundaeList
                                             fichas={fichasExpediente}
                                             onRefresh={() => fetchFichasExpediente(editingRecord.id)}
+                                            onAllVerified={async () => {
+                                                if (!editingRecord) return;
+                                                if (editingRecord.fichas_verificadas) {
+                                                    closeModal();
+                                                    return;
+                                                }
+                                                const { error } = await supabase
+                                                    .from('fundae_seguimiento')
+                                                    .update({ fichas_verificadas: true })
+                                                    .eq('id', editingRecord.id);
+                                                if (error) {
+                                                    showNotification('Error marcando paso: ' + error.message, 'error');
+                                                    return;
+                                                }
+                                                showNotification('✅ Todas las fichas verificadas. Avanzando al siguiente paso.');
+                                                fetchRecords();
+                                                closeModal();
+                                            }}
                                             showNotification={showNotification}
                                         />
+
+                                        {(() => {
+                                            // Tomamos el groupid de la primera ficha que lo tenga (todas comparten grupo).
+                                            const groupid = fichasExpediente.find(f => f.evolcampus_groupid)?.evolcampus_groupid;
+                                            if (!groupid) return null;
+                                            return (
+                                                <EncuestasFundaeSection groupid={groupid} />
+                                            );
+                                        })()}
                                     </>
                                 )}
 
