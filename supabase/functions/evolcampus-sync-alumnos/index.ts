@@ -163,18 +163,6 @@ Deno.serve(async (req: Request) => {
     let dniMissingFromEvol = 0;
     const errorList: Array<{ enrollmentid: any; detail: string }> = [];
 
-    // Log de muestra de las primeras matrículas para diagnosticar qué campos llegan
-    if (allEnrollments.length > 0) {
-        const sample = allEnrollments.slice(0, 3).map(e => ({
-            enrollmentid: e?.person?.enrollmentid,
-            userid: e?.person?.userid,
-            email: e?.person?.email,
-            identification: e?.person?.identification,
-            personKeys: e?.person ? Object.keys(e.person) : [],
-        }));
-        console.log("[sync] muestra de getEnrollments:", JSON.stringify(sample));
-    }
-
     for (const e of allEnrollments) {
         const person = e?.person || {};
         const enroll = e?.enroll || {};
@@ -264,8 +252,43 @@ Deno.serve(async (req: Request) => {
             if (fichaCandidata) {
                 await sb.from("fundae_alumnos").update(enrollUpdate).eq("id", fichaCandidata.id);
             }
-            // Nota: si no hay ficha asociada, la matrícula queda solo en evolCampus.
-            // El alumno ya está en BD con el userid para que el sync futuro siga funcionando.
+
+            // Upsert en matriculas (fuente paralela). Si hay ficha local, tipo='fundae'; si no, 'manual'.
+            // cliente_id se hereda del expediente FUNDAE de la ficha si existe.
+            let clienteIdMat: number | null = null;
+            if (fichaCandidata?.id) {
+                const { data: fsRow } = await sb
+                    .from("fundae_alumnos")
+                    .select("fundae_seguimiento(cliente_id)")
+                    .eq("id", fichaCandidata.id)
+                    .maybeSingle();
+                clienteIdMat = (fsRow as any)?.fundae_seguimiento?.cliente_id ?? null;
+            }
+            const matriculaPayload: Record<string, unknown> = {
+                alumno_id: alumno.id,
+                cliente_id: clienteIdMat,
+                fundae_alumno_id: fichaCandidata?.id || null,
+                tipo: fichaCandidata ? "fundae" : "manual",
+                curso_nombre: clean(enroll.study),
+                grupo_nombre: clean(enroll.group),
+                evolcampus_userid: userid,
+                evolcampus_enrollmentid: enrollmentid,
+                evolcampus_groupid: groupid,
+                completedpercent: num(enroll.completedpercent),
+                evaluations_percent: num(enroll.evaluationscompletedpercent),
+                grade: num(enroll.grade),
+                passed: enroll.passrequierements === 1 || enroll.passrequierements === "1",
+                enrollmentstatus: int(enroll.enrollmentstatus),
+                lastconnect: parseDate(enroll.lastconnect),
+                timeconnected: int(enroll.timeconnected),
+                connections: int(enroll.connections),
+                url_diploma: enroll.urldiploma || null,
+                evolcampus_synced_at: new Date().toISOString(),
+            };
+            const { error: matErr } = await sb
+                .from("matriculas")
+                .upsert(matriculaPayload, { onConflict: "evolcampus_enrollmentid" });
+            if (matErr) console.warn("[matriculas upsert]", enrollmentid, matErr.message);
 
             synced++;
         } catch (err) {
