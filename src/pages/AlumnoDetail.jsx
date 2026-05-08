@@ -67,6 +67,8 @@ export default function AlumnoDetail() {
                 .from('matriculas')
                 .select(`
                     *,
+                    fecha_inicio_curso,
+                    fecha_fin_curso,
                     clientes(id, razon_social),
                     fundae_alumnos(id, fundae_id, fundae_seguimiento(numero_expediente, empresa))
                 `)
@@ -468,6 +470,43 @@ export default function AlumnoDetail() {
                                             <span className="text-variable-muted text-xs flex items-center gap-1">
                                                 <Calendar size={11} /> {new Date(m.lastconnect).toLocaleDateString('es-ES')}
                                             </span>
+                                        );
+                                    }
+                                },
+                                {
+                                    key: 'fin_dias',
+                                    label: 'Finaliza',
+                                    render: (m) => {
+                                        if (!m.fecha_fin_curso) return <span className="text-variable-muted text-[10px]">—</span>;
+                                        // Días restantes calendario (sin horas) en zona local
+                                        const fin = new Date(m.fecha_fin_curso + 'T00:00:00');
+                                        const hoy = new Date();
+                                        hoy.setHours(0, 0, 0, 0);
+                                        const dias = Math.ceil((fin - hoy) / (1000 * 60 * 60 * 24));
+                                        const finalizada = m.passed || m.enrollmentstatus === 1 || m.enrollmentstatus === 2;
+                                        const colorBadge = finalizada
+                                            ? 'bg-gray-500/10 text-gray-500 border-gray-500/20'
+                                            : dias < 0
+                                                ? 'bg-rose-500/10 text-rose-500 border-rose-500/20'
+                                                : dias <= 7
+                                                    ? 'bg-amber-500/10 text-amber-500 border-amber-500/20'
+                                                    : 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20';
+                                        const labelDias = finalizada
+                                            ? 'Finalizada'
+                                            : dias < 0
+                                                ? `${Math.abs(dias)} d. vencida`
+                                                : dias === 0
+                                                    ? 'Hoy'
+                                                    : `${dias} d. restantes`;
+                                        return (
+                                            <div className="text-xs">
+                                                <span className="text-variable-muted flex items-center gap-1">
+                                                    <Calendar size={11} /> {fin.toLocaleDateString('es-ES')}
+                                                </span>
+                                                <span className={`inline-block mt-1 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider border ${colorBadge}`}>
+                                                    {labelDias}
+                                                </span>
+                                            </div>
                                         );
                                     }
                                 },

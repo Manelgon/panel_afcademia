@@ -101,6 +101,15 @@ function parseDate(s: any): string | null {
     const d = new Date(t.replace(" ", "T"));
     return isNaN(d.getTime()) ? null : d.toISOString();
 }
+// Fecha "calendario" (sin hora) para columnas DATE
+function parseDateOnly(s: any): string | null {
+    if (!s || typeof s !== "string") return null;
+    const t = s.trim();
+    if (!t) return null;
+    // Formatos comunes en la API: "Y-m-d" o "Y-m-d H:i:s"
+    const m = t.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    return m ? `${m[1]}-${m[2]}-${m[3]}` : null;
+}
 function num(v: any): number | null {
     if (v === null || v === undefined || v === "") return null;
     const n = Number(v);
@@ -340,6 +349,8 @@ Deno.serve(async (req: Request) => {
                 evolcampus_userid: userid,
                 evolcampus_enrollmentid: enrollmentid,
                 evolcampus_groupid: groupid,
+                fecha_inicio_curso: parseDateOnly(enroll.begin),
+                fecha_fin_curso: parseDateOnly(enroll.end),
                 completedpercent: num(enroll.completedpercent),
                 evaluations_percent: num(enroll.evaluationscompletedpercent),
                 grade: num(enroll.grade),
