@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
     GraduationCap,
     Search,
@@ -22,6 +23,7 @@ import { useNotifications } from '../context/NotificationContext';
 import { useGlobalLoading } from '../context/LoadingContext';
 
 export default function Alumnos() {
+    const navigate = useNavigate();
     const { showNotification } = useNotifications();
     const { withLoading } = useGlobalLoading();
     const [loading, setLoading] = useState(false);
@@ -30,32 +32,36 @@ export default function Alumnos() {
     const [search, setSearch] = useState('');
     const [filterCampus, setFilterCampus] = useState('todos'); // todos | matriculados | sin_matricular
     const [syncing, setSyncing] = useState(false);
-    const [activeTab, setActiveTab] = useState('alumnos'); // alumnos | pendientes
+    const [activeTab, setActiveTab] = useState('alumnos'); // alumnos | pendientes | no_vinculados
+
+    // Estado de la pestaña "No vinculados"
+    const [evolEnrollments, setEvolEnrollments] = useState(null); // null = aún no cargado; [] = vacío
+    const [evolLoading, setEvolLoading] = useState(false);
+    const [evolError, setEvolError] = useState(null);
+    const [importingEnrollment, setImportingEnrollment] = useState(null); // enrollmentid en curso
 
     const fetchAlumnos = async () => {
         setLoading(true);
         try {
-            // Cargar alumnos + sus inscripciones FUNDAE para mostrar empresa, fichas y estado evolCampus
+            // Cargar alumnos + sus matrículas (fuente nueva) + clientes vía matriculas o vía fichas FUNDAE.
             const { data, error } = await supabase
                 .from('alumnos')
                 .select(`
                     *,
+                    matriculas(
+                        id, tipo, curso_nombre, grupo_nombre,
+                        evolcampus_enrollmentid, evolcampus_groupid,
+                        passed, enrollmentstatus, completedpercent,
+                        cliente_id,
+                        clientes(id, razon_social)
+                    ),
                     fundae_alumnos(
                         id,
-                        empresa,
-                        ficha_estado,
-                        firmada_at,
-                        evolcampus_enrollmentid,
-                        evolcampus_groupid,
-                        matriculado_at,
-                        evolcampus_completed_percent,
-                        evolcampus_grade,
-                        evolcampus_passed,
-                        evolcampus_status,
-                        evolcampus_lastconnect,
-                        evolcampus_url_diploma,
-                        evolcampus_synced_at,
-                        fundae_id
+                        fundae_seguimiento(
+                            id,
+                            cliente_id,
+                            clientes(id, razon_social)
+                        )
                     )
                 `)
                 .order('updated_at', { ascending: false });
@@ -103,6 +109,14 @@ export default function Alumnos() {
             .subscribe();
         return () => supabase.removeChannel(channel);
     }, []);
+
+    // Cargar matrículas de evolCampus la primera vez que se abre la pestaña "no_vinculados".
+    useEffect(() => {
+        if (activeTab === 'no_vinculados' && evolEnrollments === null && !evolLoading) {
+            fetchEvolEnrollments();
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [activeTab]);
 
     const handleSyncEvolCampus = async () => {
         setSyncing(true);
@@ -159,24 +173,130 @@ export default function Alumnos() {
         }, 'Generando acceso al campus...');
     };
 
+    // Trae todas las matrículas de evolCampus paginadas. Cada matrícula incluye person.userid;
+    // las cruzamos contra la BD para detectar las que no tienen alumno local.
+    const fetchEvolEnrollments = async () => {
+        setEvolLoading(true);
+        setEvolError(null);
+        try {
+            const all = [];
+            let page = 1;
+            let totalPages = 1;
+            do {
+                const { data, error } = await supabase.functions.invoke('evolcampus-proxy', {
+                    body: { action: 'getEnrollments', method: 'POST', params: { page, regs_per_page: 200 } }
+                });
+                if (error) throw error;
+                if (data?.error) throw new Error(data.detail || data.error);
+                const items = Array.isArray(data?.data) ? data.data : [];
+                all.push(...items);
+                totalPages = Number(data?.pages || 1);
+                page++;
+            } while (page <= totalPages);
+            setEvolEnrollments(all);
+        } catch (err) {
+            console.error('[evol-no-vinc] error:', err);
+            setEvolError(err.message || String(err));
+        } finally {
+            setEvolLoading(false);
+        }
+    };
+
+    // Crea el alumno en BD a partir de una matrícula de evolCampus.
+    // No matricula nada nuevo: solo registra al alumno como existente.
+    const handleImportFromEvol = async (enrollment) => {
+        const person = enrollment?.person || {};
+        const userid = person.userid ? Number(person.userid) : null;
+        const enrollmentid = person.enrollmentid ? Number(person.enrollmentid) : null;
+        const dni = (person.identification || '').trim() || `EVOL-${userid || enrollmentid}`;
+        const nombre = (person.name || '').trim() || '—';
+        const apellidos = (person.lastname || '').trim() || '';
+        const email = (person.email || '').trim() || null;
+        const telefono = (person.phone || '').trim() || null;
+
+        setImportingEnrollment(enrollmentid);
+        try {
+            const { error } = await supabase
+                .from('alumnos')
+                .insert({ dni, nombre, apellidos, email, telefono, evolcampus_userid: userid });
+            if (error) throw error;
+            showNotification(`✅ Alumno ${nombre} ${apellidos} importado.`, 'success');
+            await fetchAlumnos();
+        } catch (err) {
+            showNotification(`Error importando: ${err.message}`, 'error');
+        } finally {
+            setImportingEnrollment(null);
+        }
+    };
+
+    // Devuelve los clientes únicos a los que está vinculado el alumno
+    // (vía sus matrículas o, en su defecto, vía sus fichas FUNDAE).
+    const getClientes = (a) => {
+        const map = new Map();
+        for (const m of a.matriculas || []) {
+            const c = m.clientes;
+            if (c?.id) map.set(c.id, c);
+        }
+        for (const f of a.fundae_alumnos || []) {
+            const c = f.fundae_seguimiento?.clientes;
+            if (c?.id) map.set(c.id, c);
+        }
+        return Array.from(map.values());
+    };
+
     const filtered = alumnos.filter(a => {
         const q = search.trim().toLowerCase();
         if (q) {
-            const haystack = `${a.nombre || ''} ${a.apellidos || ''} ${a.dni || ''} ${a.email || ''}`.toLowerCase();
+            const clienteNames = getClientes(a).map(c => c.razon_social || '').join(' ');
+            const haystack = `${a.nombre || ''} ${a.apellidos || ''} ${a.dni || ''} ${a.email || ''} ${clienteNames}`.toLowerCase();
             if (!haystack.includes(q)) return false;
         }
-        const isMatriculado = !!a.evolcampus_userid || (a.fundae_alumnos || []).some(f => f.evolcampus_enrollmentid);
+        const isMatriculado = !!a.evolcampus_userid || (a.matriculas || []).length > 0;
         if (filterCampus === 'matriculados' && !isMatriculado) return false;
         if (filterCampus === 'sin_matricular' && isMatriculado) return false;
+        if (filterCampus === 'pendientes' && getClientes(a).length > 0) return false;
         return true;
     });
 
     const stats = {
         total: alumnos.length,
-        matriculados: alumnos.filter(a => !!a.evolcampus_userid || (a.fundae_alumnos || []).some(f => f.evolcampus_enrollmentid)).length,
-        sinMatricular: alumnos.filter(a => !a.evolcampus_userid && !(a.fundae_alumnos || []).some(f => f.evolcampus_enrollmentid)).length,
-        totalFichas: alumnos.reduce((s, a) => s + ((a.fundae_alumnos || []).length), 0)
+        matriculados: alumnos.filter(a => !!a.evolcampus_userid || (a.matriculas || []).length > 0).length,
+        sinMatricular: alumnos.filter(a => !a.evolcampus_userid && (a.matriculas || []).length === 0).length,
+        pendientes: alumnos.filter(a => getClientes(a).length === 0).length
     };
+
+    // Derivados para la pestaña "No vinculados".
+    // BD sin evolCampus: alumnos en BD sin evolcampus_userid Y sin ninguna matricula con enrollment.
+    const alumnosBdSinEvol = alumnos.filter(a => {
+        if (a.evolcampus_userid) return false;
+        const matriculasConEnroll = (a.matriculas || []).filter(m => m.evolcampus_enrollmentid);
+        return matriculasConEnroll.length === 0;
+    });
+    // EvolCampus sin BD: cada matrícula de evol cuyo userid no esté en alumnos.evolcampus_userid.
+    // Una persona puede tener varias matrículas; agrupamos por userid para no listarla varias veces.
+    const evolSinBd = (() => {
+        if (!Array.isArray(evolEnrollments)) return [];
+        const useridsEnBd = new Set(
+            alumnos.map(a => a.evolcampus_userid).filter(Boolean).map(Number)
+        );
+        const huerfanos = evolEnrollments.filter(e => {
+            const uid = e?.person?.userid ? Number(e.person.userid) : null;
+            if (!uid) return true;
+            return !useridsEnBd.has(uid);
+        });
+        // Agrupar por userid (o por enrollmentid si no hay userid) para mostrar 1 fila por persona.
+        const map = new Map();
+        for (const e of huerfanos) {
+            const uid = e?.person?.userid ? Number(e.person.userid) : null;
+            const key = uid ? `u-${uid}` : `e-${e?.person?.enrollmentid}`;
+            if (!map.has(key)) {
+                map.set(key, { ...e, _matriculas: [e] });
+            } else {
+                map.get(key)._matriculas.push(e);
+            }
+        }
+        return Array.from(map.values());
+    })();
 
     return (
         <div className="flex min-h-screen transition-colors duration-300 overflow-hidden">
@@ -189,15 +309,6 @@ export default function Alumnos() {
                         <p className="text-variable-muted">Trabajadores inscritos a través de expedientes FUNDAE</p>
                     </div>
                     <div className="flex items-center gap-3 w-full sm:w-auto">
-                        <button
-                            onClick={handleSyncEvolCampus}
-                            disabled={syncing}
-                            className="px-4 py-3 glass rounded-2xl text-xs font-bold text-variable-muted hover:text-primary transition-all flex items-center gap-2 disabled:opacity-60"
-                            title="Sincronizar progreso desde evolCampus"
-                        >
-                            {syncing ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}
-                            <span className="hidden sm:inline">Sincronizar campus</span>
-                        </button>
                         <button onClick={fetchAlumnos} className="p-3 glass rounded-2xl text-variable-muted hover:text-primary transition-all" title="Refrescar lista">
                             <Clock size={20} />
                         </button>
@@ -209,7 +320,7 @@ export default function Alumnos() {
                         { key: 'total', label: 'Alumnos', value: stats.total, icon: UsersIcon, color: 'text-primary' },
                         { key: 'matr', label: 'Matriculados', value: stats.matriculados, icon: CheckCircle2, color: 'text-emerald-500' },
                         { key: 'sin', label: 'Sin matricular', value: stats.sinMatricular, icon: AlertCircle, color: 'text-amber-500' },
-                        { key: 'fichas', label: 'Fichas FUNDAE', value: stats.totalFichas, icon: BookOpen, color: 'text-blue-500' }
+                        { key: 'pend', label: 'Pendientes', value: stats.pendientes, icon: AlertCircle, color: 'text-amber-500' }
                     ].map(({ key, label, value, icon: Icon, color }) => (
                         <div key={key} className="glass rounded-2xl p-4 flex items-center gap-3">
                             <Icon size={20} className={color} />
@@ -225,7 +336,8 @@ export default function Alumnos() {
                 <div className="flex flex-wrap gap-2 mb-6 bg-white/5 p-1.5 rounded-[1.5rem] border border-variable w-fit">
                     {[
                         { id: 'alumnos', label: `Alumnos consolidados (${alumnos.length})`, icon: GraduationCap },
-                        { id: 'pendientes', label: `Fichas pendientes (${fichasPendientes.length})`, icon: AlertCircle }
+                        { id: 'pendientes', label: `Fichas pendientes (${fichasPendientes.length})`, icon: AlertCircle },
+                        { id: 'no_vinculados', label: 'No vinculados', icon: AlertCircle }
                     ].map(tab => (
                         <button
                             key={tab.id}
@@ -251,12 +363,133 @@ export default function Alumnos() {
                     </div>
                 )}
 
+                {activeTab === 'no_vinculados' && (
+                    <div className="space-y-6">
+                        {/* Sección 1: alumnos en BD sin matrícula evolCampus */}
+                        <div className="glass rounded-[1.5rem] p-6">
+                            <div className="flex items-center justify-between mb-4">
+                                <h3 className="text-sm font-black uppercase tracking-widest text-variable-main flex items-center gap-2">
+                                    <AlertCircle size={16} className="text-amber-500" />
+                                    En BD sin matrícula en evolCampus ({alumnosBdSinEvol.length})
+                                </h3>
+                            </div>
+                            {alumnosBdSinEvol.length === 0 ? (
+                                <p className="text-xs text-variable-muted">Todos los alumnos de la BD tienen su matrícula correspondiente en evolCampus.</p>
+                            ) : (
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-sm">
+                                        <thead>
+                                            <tr className="text-[10px] font-black uppercase tracking-widest text-variable-muted border-b border-variable">
+                                                <th className="text-left py-2 px-3">Alumno</th>
+                                                <th className="text-left py-2 px-3">DNI</th>
+                                                <th className="text-left py-2 px-3">Email</th>
+                                                <th className="text-left py-2 px-3">Cliente</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {alumnosBdSinEvol.map(a => {
+                                                const cls = getClientes(a);
+                                                return (
+                                                    <tr
+                                                        key={a.id}
+                                                        onClick={() => navigate(`/alumnos/${a.id}`)}
+                                                        className="border-b border-variable/40 hover:bg-white/5 cursor-pointer transition-colors"
+                                                    >
+                                                        <td className="py-3 px-3 font-bold text-variable-main">{a.nombre} {a.apellidos}</td>
+                                                        <td className="py-3 px-3 text-variable-muted">{a.dni || '—'}</td>
+                                                        <td className="py-3 px-3 text-variable-muted">{a.email || '—'}</td>
+                                                        <td className="py-3 px-3 text-variable-muted">
+                                                            {cls.length > 0 ? (cls[0].razon_social || '—') : (
+                                                                <span className="text-amber-500 text-[10px] font-bold uppercase">Sin cliente</span>
+                                                            )}
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Sección 2: matrículas en evolCampus sin alumno en BD */}
+                        <div className="glass rounded-[1.5rem] p-6">
+                            <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
+                                <h3 className="text-sm font-black uppercase tracking-widest text-variable-main flex items-center gap-2">
+                                    <AlertCircle size={16} className="text-amber-500" />
+                                    En evolCampus sin alumno en BD ({Array.isArray(evolEnrollments) ? evolSinBd.length : '—'})
+                                </h3>
+                                <button
+                                    onClick={fetchEvolEnrollments}
+                                    disabled={evolLoading}
+                                    className="px-3 py-2 glass rounded-xl text-variable-muted hover:text-primary transition-all text-[10px] font-bold uppercase tracking-widest flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    {evolLoading ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
+                                    {evolLoading ? 'Cargando…' : 'Refrescar'}
+                                </button>
+                            </div>
+                            {evolError && (
+                                <p className="text-xs text-rose-500 mb-3">Error: {evolError}</p>
+                            )}
+                            {evolLoading && evolEnrollments === null ? (
+                                <p className="text-xs text-variable-muted">Consultando evolCampus…</p>
+                            ) : Array.isArray(evolEnrollments) && evolSinBd.length === 0 ? (
+                                <p className="text-xs text-variable-muted">Todas las matrículas de evolCampus tienen su alumno en BD.</p>
+                            ) : Array.isArray(evolEnrollments) ? (
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-sm">
+                                        <thead>
+                                            <tr className="text-[10px] font-black uppercase tracking-widest text-variable-muted border-b border-variable">
+                                                <th className="text-left py-2 px-3">Alumno</th>
+                                                <th className="text-left py-2 px-3">DNI</th>
+                                                <th className="text-left py-2 px-3">Email</th>
+                                                <th className="text-left py-2 px-3">Matrículas</th>
+                                                <th className="text-right py-2 px-3"></th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {evolSinBd.map(e => {
+                                                const p = e.person || {};
+                                                const enrollmentid = p.enrollmentid ? Number(p.enrollmentid) : null;
+                                                const importing = importingEnrollment === enrollmentid;
+                                                return (
+                                                    <tr key={`${p.userid || ''}-${enrollmentid}`} className="border-b border-variable/40">
+                                                        <td className="py-3 px-3 font-bold text-variable-main">{p.name} {p.lastname}</td>
+                                                        <td className="py-3 px-3 text-variable-muted">{p.identification || '—'}</td>
+                                                        <td className="py-3 px-3 text-variable-muted">{p.email || '—'}</td>
+                                                        <td className="py-3 px-3">
+                                                            <span className="px-2 py-1 rounded bg-blue-500/10 text-blue-500 text-[10px] font-bold border border-blue-500/20">
+                                                                {(e._matriculas || [e]).length}
+                                                            </span>
+                                                        </td>
+                                                        <td className="py-3 px-3 text-right">
+                                                            <button
+                                                                onClick={() => handleImportFromEvol(e)}
+                                                                disabled={importing}
+                                                                className="px-3 py-1.5 bg-primary text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:brightness-110 transition-all disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1.5"
+                                                            >
+                                                                {importing ? <Loader2 size={11} className="animate-spin" /> : null}
+                                                                {importing ? 'Importando…' : 'Importar a BD'}
+                                                            </button>
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            ) : null}
+                        </div>
+                    </div>
+                )}
+
                 {activeTab === 'alumnos' && (
                 <DataTable
                     tableId="alumnos"
                     loading={loading}
                     data={filtered}
                     rowKey="id"
+                    onRowClick={(a) => navigate(`/alumnos/${a.id}`)}
                     toolbarLeft={
                         <div className="flex flex-wrap items-center gap-3 w-full">
                             <div className="relative flex-1 min-w-[220px] max-w-md">
@@ -276,7 +509,8 @@ export default function Alumnos() {
                                     options={[
                                         { value: 'todos', label: 'Todos los alumnos' },
                                         { value: 'matriculados', label: 'Matriculados en campus' },
-                                        { value: 'sin_matricular', label: 'Sin matricular' }
+                                        { value: 'sin_matricular', label: 'Sin matricular' },
+                                        { value: 'pendientes', label: 'Pendientes de vincular a cliente' }
                                     ]}
                                 />
                             </div>
@@ -317,95 +551,69 @@ export default function Alumnos() {
                             )
                         },
                         {
-                            key: 'empresa',
-                            label: 'Empresa',
+                            key: 'cliente',
+                            label: 'Cliente',
                             render: (a) => {
-                                const empresas = Array.from(new Set((a.fundae_alumnos || []).map(f => f.empresa).filter(Boolean)));
-                                if (empresas.length === 0) return <span className="text-variable-muted text-[10px]">—</span>;
-                                return (
-                                    <div className="text-xs text-variable-main">
-                                        {empresas[0]}
-                                        {empresas.length > 1 && (
-                                            <span className="ml-1 text-[9px] text-variable-muted">+{empresas.length - 1}</span>
-                                        )}
-                                    </div>
-                                );
-                            }
-                        },
-                        {
-                            key: 'categoria',
-                            label: 'Categoría',
-                            render: (a) => (
-                                <span className="text-xs text-variable-muted">{a.categoria_profesional || '—'}</span>
-                            )
-                        },
-                        {
-                            key: 'fichas',
-                            label: 'Fichas FUNDAE',
-                            render: (a) => {
-                                const fichas = a.fundae_alumnos || [];
-                                if (fichas.length === 0) return <span className="text-variable-muted text-[10px]">—</span>;
-                                const firmadas = fichas.filter(f => f.ficha_estado === 'firmada').length;
-                                return (
-                                    <div className="flex items-center gap-2">
-                                        <span className="px-2 py-1 rounded bg-blue-500/10 text-blue-500 text-[10px] font-bold border border-blue-500/20">
-                                            {fichas.length} {fichas.length === 1 ? 'ficha' : 'fichas'}
-                                        </span>
-                                        {firmadas > 0 && (
-                                            <span className="text-[9px] text-emerald-500 font-black">✓ {firmadas}</span>
-                                        )}
-                                    </div>
-                                );
-                            }
-                        },
-                        {
-                            key: 'progreso',
-                            label: 'Progreso',
-                            render: (a) => {
-                                const matriculas = (a.fundae_alumnos || []).filter(f => f.evolcampus_enrollmentid);
-                                if (matriculas.length === 0) {
+                                const cls = getClientes(a);
+                                if (cls.length === 0) {
                                     return (
                                         <span className="px-2 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-wider border bg-amber-500/10 text-amber-500 border-amber-500/20">
-                                            Sin matricular
+                                            Pendiente
                                         </span>
                                     );
                                 }
-                                const m = matriculas[0]; // primera matrícula
-                                const pct = m.evolcampus_completed_percent;
-                                const grade = m.evolcampus_grade;
-                                const passed = m.evolcampus_passed;
-                                if (pct === null || pct === undefined) {
-                                    return <span className="text-variable-muted text-[10px]">Sin sincronizar</span>;
-                                }
-                                const pctNum = Number(pct);
-                                const color = passed ? 'bg-emerald-500' : pctNum >= 50 ? 'bg-blue-500' : 'bg-amber-500';
                                 return (
-                                    <div className="min-w-[140px]">
-                                        <div className="flex items-center justify-between mb-1">
-                                            <span className="text-[10px] font-black text-variable-main">{Math.round(pctNum)}%</span>
-                                            {grade !== null && grade !== undefined && (
-                                                <span className={`text-[9px] font-bold ${passed ? 'text-emerald-500' : 'text-variable-muted'}`}>
-                                                    {Number(grade).toFixed(1)}
-                                                </span>
-                                            )}
-                                        </div>
-                                        <div className="w-full bg-white/5 rounded-full h-1.5 overflow-hidden">
-                                            <div className={`${color} h-full rounded-full transition-all`} style={{ width: `${Math.min(pctNum, 100)}%` }} />
-                                        </div>
-                                        {matriculas.length > 1 && (
-                                            <span className="text-[9px] text-variable-muted mt-0.5 block">+{matriculas.length - 1} matrícula{matriculas.length === 2 ? '' : 's'} más</span>
+                                    <div className="text-xs text-variable-main">
+                                        {cls[0].razon_social || '—'}
+                                        {cls.length > 1 && (
+                                            <span className="ml-1 text-[9px] text-variable-muted">+{cls.length - 1}</span>
                                         )}
                                     </div>
                                 );
                             }
                         },
                         {
-                            key: 'lastconnect',
-                            label: 'Última conexión',
+                            key: 'matriculas',
+                            label: 'Matrículas',
                             render: (a) => {
-                                const lc = (a.fundae_alumnos || []).map(f => f.evolcampus_lastconnect).filter(Boolean).sort().pop();
-                                if (!lc) return <span className="text-variable-muted text-[10px]">—</span>;
-                                return <span className="text-variable-muted text-xs">{new Date(lc).toLocaleDateString('es-ES')}</span>;
+                                const ms = a.matriculas || [];
+                                if (ms.length === 0) {
+                                    return <span className="text-variable-muted text-[10px]">—</span>;
+                                }
+                                const completadas = ms.filter(m => m.passed).length;
+                                return (
+                                    <div className="flex items-center gap-2">
+                                        <span className="px-2 py-1 rounded bg-blue-500/10 text-blue-500 text-[10px] font-bold border border-blue-500/20">
+                                            {ms.length} {ms.length === 1 ? 'matrícula' : 'matrículas'}
+                                        </span>
+                                        {completadas > 0 && (
+                                            <span className="text-[9px] text-emerald-500 font-black">✓ {completadas}</span>
+                                        )}
+                                    </div>
+                                );
+                            }
+                        },
+                        {
+                            key: 'estado_campus',
+                            label: 'Campus',
+                            align: 'center',
+                            render: (a) => {
+                                if (a.evolcampus_userid) {
+                                    return (
+                                        <div className="flex justify-center">
+                                            <span className="px-2 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-wider bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
+                                                Matriculado
+                                            </span>
+                                        </div>
+                                    );
+                                }
+                                return (
+                                    <div className="flex justify-center">
+                                        <span className="px-2 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-wider bg-amber-500/10 text-amber-500 border border-amber-500/20">
+                                            Sin matricular
+                                        </span>
+                                    </div>
+                                );
                             }
                         },
                         {
@@ -416,7 +624,7 @@ export default function Alumnos() {
                                 if (!a.evolcampus_userid) return <span className="text-variable-muted text-[10px]">—</span>;
                                 return (
                                     <button
-                                        onClick={() => handleAutologin(a.evolcampus_userid)}
+                                        onClick={(e) => { e.stopPropagation(); handleAutologin(a.evolcampus_userid); }}
                                         title="Acceso directo al campus"
                                         className="inline-flex items-center gap-1 px-2 py-1.5 glass rounded-xl text-blue-500 hover:bg-blue-500/10 transition-colors border border-transparent hover:border-blue-500/20 text-[10px] font-bold"
                                     >
