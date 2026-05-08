@@ -740,30 +740,6 @@ export default function FundaePublicForm() {
             }
             console.log('✅ Datos guardados correctamente:', updatedRows[0]);
 
-            // 1.5 Sincronizar con la tabla leads si existe lead_id
-            if (tokenData.fundae_seguimiento?.lead_id) {
-                const { error: leadsSyncError } = await supabase
-                    .from('leads')
-                    .update({
-                        empresa_nombre: formData.empresa,
-                        razon_social: formData.razon_social,
-                        cif: formData.cif,
-                        telefono_empresa: formData.telefono,
-                        domicilio: domicilioCalculado,
-                        ciudad: formData.poblacion,
-                        codigo_postal: formData.codigo_postal,
-                        provincia: formData.provincia,
-                        convenio_referencia: formData.convenio_referencia,
-                        cnae: formData.cnae,
-                        ccc: formData.ccc,
-                        num_medio_empleados: formData.num_medio_empleados,
-                        representante_empresa: representanteCalculado,
-                        nif_nie_representante: formData.nif_nie_representante
-                    })
-                    .eq('id', tokenData.fundae_seguimiento.lead_id);
-                if (leadsSyncError) console.error('Error sincronizando con leads:', leadsSyncError);
-            }
-
             // 2. Marcar el token como usado
             const { data: tokenUpdRows, error: tokenUpdErr } = await supabase
                 .from('fundae_form_tokens')
