@@ -31,6 +31,9 @@ export default function FundaePublicForm() {
     const [error, setError] = useState(null);
     const [tokenData, setTokenData] = useState(null);
     const [fundaeRecord, setFundaeRecord] = useState(null);
+    // Datos consolidados del cliente (fundae > lead_billing > leads) devueltos por get_fundae_form_prefill.
+    // Es la fuente de verdad para el bloqueo de los campos de empresa.
+    const [prefillData, setPrefillData] = useState(null);
 
     // Estados de navegación interna
     // 0: Solicitar Código, 1: Verificar Código, 2: Formulario, 3: Éxito
@@ -105,33 +108,50 @@ export default function FundaePublicForm() {
                 setTokenData(tData);
                 const fundae = tData.fundae_seguimiento || {};
                 setFundaeRecord(fundae);
+
+                // Prefill consolidado desde el RPC (fundae > lead_billing > leads).
+                // Si el RPC falla por algún motivo, caemos al expediente como antes.
+                let prefill = {};
+                try {
+                    const { data: rpcData, error: rpcErr } = await supabase.rpc('get_fundae_form_prefill', {
+                        p_token: rawToken
+                    });
+                    if (!rpcErr && rpcData?.success && rpcData.data) {
+                        prefill = rpcData.data;
+                    }
+                } catch (e) {
+                    // Silencioso: en último caso el form arranca con los valores del expediente
+                    console.warn('[FUNDAE] prefill RPC falló, uso fundae_seguimiento como fallback', e);
+                }
+                const v = (k) => (prefill?.[k] !== undefined && prefill[k] !== null) ? prefill[k] : (fundae?.[k] ?? '');
+                setPrefillData(prefill);
                 setFormData({
-                    empresa: fundae.empresa || '',
-                    razon_social: fundae.razon_social || '',
-                    cif: fundae.cif || '',
-                    telefono: fundae.telefono || '',
-                    email: fundae.email || tData.email || '',
-                    domicilio: fundae.domicilio || '',
-                    tipo_via: fundae.tipo_via || '',
-                    nombre_via: fundae.nombre_via || '',
-                    numero_via: fundae.numero_via || '',
+                    empresa: v('empresa') || '',
+                    razon_social: v('razon_social') || '',
+                    cif: v('cif') || '',
+                    telefono: v('telefono') || '',
+                    email: v('email') || tData.email || '',
+                    domicilio: v('domicilio') || '',
+                    tipo_via: v('tipo_via') || '',
+                    nombre_via: v('nombre_via') || '',
+                    numero_via: v('numero_via') || '',
                     bloque: fundae.bloque || '',
-                    piso: fundae.piso || '',
-                    puerta: fundae.puerta || '',
-                    poblacion: fundae.poblacion || '',
-                    codigo_postal: fundae.codigo_postal || '',
-                    provincia: fundae.provincia || '',
-                    convenio_referencia: fundae.convenio_referencia || '',
-                    cnae: fundae.cnae || '',
-                    ccc: fundae.ccc || '',
-                    num_medio_empleados: fundae.num_medio_empleados || '',
-                    num_asistentes: fundae.num_asistentes || '',
-                    prefijo_telefono: fundae.prefijo_telefono || '+34',
-                    representante_empresa: fundae.representante_empresa || '',
-                    representante_nombre: fundae.representante_nombre || '',
-                    representante_apellido1: fundae.representante_apellido1 || '',
-                    representante_apellido2: fundae.representante_apellido2 || '',
-                    nif_nie_representante: fundae.nif_nie_representante || ''
+                    piso: v('piso') || '',
+                    puerta: v('puerta') || '',
+                    poblacion: v('poblacion') || '',
+                    codigo_postal: v('codigo_postal') || '',
+                    provincia: v('provincia') || '',
+                    convenio_referencia: v('convenio_referencia') || '',
+                    cnae: v('cnae') || '',
+                    ccc: v('ccc') || '',
+                    num_medio_empleados: v('num_medio_empleados') || '',
+                    num_asistentes: v('num_asistentes') || '',
+                    prefijo_telefono: v('prefijo_telefono') || '+34',
+                    representante_empresa: v('representante_empresa') || '',
+                    representante_nombre: v('representante_nombre') || '',
+                    representante_apellido1: v('representante_apellido1') || '',
+                    representante_apellido2: v('representante_apellido2') || '',
+                    nif_nie_representante: v('nif_nie_representante') || ''
                 });
 
                 // Determinar el paso inicial
@@ -180,6 +200,9 @@ export default function FundaePublicForm() {
 
     // Campos de "empresa": si llegan ya con valor desde BD se bloquean para no sobrescribir
     // datos previamente acordados. El representante / contacto siempre es editable.
+    // El bloqueo se decide sobre los datos consolidados (prefillData), que combinan
+    // fundae_seguimiento > lead_billing > leads. Así una razón social guardada en el lead
+    // ya bloquea el campo aunque el expediente FUNDAE aún no la tenga.
     const COMPANY_FIELDS = new Set([
         'empresa', 'razon_social', 'cif',
         'tipo_via', 'nombre_via', 'numero_via', 'bloque', 'piso', 'puerta',
@@ -188,7 +211,7 @@ export default function FundaePublicForm() {
     ]);
     const isCompanyFieldLocked = (field) => {
         if (!COMPANY_FIELDS.has(field)) return false;
-        const val = fundaeRecord?.[field];
+        const val = prefillData?.[field] ?? fundaeRecord?.[field];
         return val !== null && val !== undefined && String(val).trim() !== '';
     };
     const lockedInputClass = 'opacity-70 cursor-not-allowed';
