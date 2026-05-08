@@ -202,8 +202,9 @@ export default function Alumnos() {
         }
     };
 
-    // Crea el alumno en BD a partir de una matrícula de evolCampus.
-    // No matricula nada nuevo: solo registra al alumno como existente.
+    // Crea el alumno en BD + todas sus matrículas a partir de los datos de evolCampus.
+    // El parámetro `enrollment` es la fila agrupada por persona, con `_matriculas` con
+    // todas las matrículas que evolCampus tiene para ese userid.
     const handleImportFromEvol = async (enrollment) => {
         const person = enrollment?.person || {};
         const userid = person.userid ? Number(person.userid) : null;
@@ -214,13 +215,73 @@ export default function Alumnos() {
         const email = (person.email || '').trim() || null;
         const telefono = (person.phone || '').trim() || null;
 
+        const parseDate = (s) => {
+            if (!s || typeof s !== 'string') return null;
+            const t = s.trim();
+            if (!t) return null;
+            const d = new Date(t.replace(' ', 'T'));
+            return isNaN(d.getTime()) ? null : d.toISOString();
+        };
+        const numOrNull = (v) => {
+            if (v === null || v === undefined || v === '') return null;
+            const n = Number(v);
+            return isNaN(n) ? null : n;
+        };
+        const intOrNull = (v) => {
+            const n = numOrNull(v);
+            return n === null ? null : Math.trunc(n);
+        };
+
         setImportingEnrollment(enrollmentid);
         try {
-            const { error } = await supabase
+            // 1. Crear alumno (o reutilizar si ya existe por DNI: import idempotente).
+            const { data: alumno, error: aErr } = await supabase
                 .from('alumnos')
-                .insert({ dni, nombre, apellidos, email, telefono, evolcampus_userid: userid });
-            if (error) throw error;
-            showNotification(`✅ Alumno ${nombre} ${apellidos} importado.`, 'success');
+                .upsert(
+                    { dni, nombre, apellidos, email, telefono, evolcampus_userid: userid },
+                    { onConflict: 'dni' }
+                )
+                .select('id')
+                .single();
+            if (aErr) throw aErr;
+
+            // 2. Insertar todas las matrículas que evolCampus tiene para esta persona.
+            const enrollmentsToImport = enrollment._matriculas || [enrollment];
+            const matriculasPayload = enrollmentsToImport.map(e => {
+                const en = e.enroll || {};
+                return {
+                    alumno_id: alumno.id,
+                    tipo: 'manual',
+                    curso_nombre: en.study || null,
+                    grupo_nombre: en.group || null,
+                    evolcampus_userid: userid,
+                    evolcampus_enrollmentid: intOrNull(e.person?.enrollmentid),
+                    evolcampus_groupid: intOrNull(en.groupid),
+                    completedpercent: numOrNull(en.completedpercent),
+                    evaluations_percent: numOrNull(en.evaluationscompletedpercent),
+                    grade: numOrNull(en.grade),
+                    passed: en.passrequierements === 1 || en.passrequierements === '1',
+                    enrollmentstatus: intOrNull(en.enrollmentstatus),
+                    lastconnect: parseDate(en.lastconnect),
+                    timeconnected: intOrNull(en.timeconnected),
+                    connections: intOrNull(en.connections),
+                    url_diploma: en.urldiploma || null,
+                    evolcampus_synced_at: new Date().toISOString()
+                };
+            }).filter(m => m.evolcampus_enrollmentid); // sin enrollmentid no podemos identificar la matrícula
+
+            if (matriculasPayload.length > 0) {
+                const { error: mErr } = await supabase
+                    .from('matriculas')
+                    .upsert(matriculasPayload, { onConflict: 'evolcampus_enrollmentid' });
+                if (mErr) throw mErr;
+            }
+
+            const n = matriculasPayload.length;
+            showNotification(
+                `✅ Alumno ${nombre} ${apellidos} importado con ${n} ${n === 1 ? 'matrícula' : 'matrículas'}.`,
+                'success'
+            );
             await fetchAlumnos();
         } catch (err) {
             showNotification(`Error importando: ${err.message}`, 'error');
