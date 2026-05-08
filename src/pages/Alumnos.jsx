@@ -206,20 +206,24 @@ export default function Alumnos() {
     // Crea el alumno en BD + todas sus matrículas a partir de los datos de evolCampus.
     // El parámetro `enrollment` es la fila agrupada por persona, con `_matriculas` con
     // todas las matrículas que evolCampus tiene para ese userid.
-    // Vacíos en evolCampus → null en BD (no se inventan placeholders).
-    // Excepción: el DNI es UNIQUE NOT NULL en alumnos. Sin DNI real no se puede importar.
+    // Vacíos en evolCampus → null en BD (excepto el DNI: la columna es UNIQUE NOT NULL,
+    // así que si evolCampus no devuelve DNI usamos el placeholder EVOL-{userid}, mismo
+    // patrón que el sync. Si más tarde evolCampus rellena el DNI real, el sync lo
+    // sobrescribe automáticamente —ver dniRecovered en evolcampus-sync-alumnos).
     const handleImportFromEvol = async (enrollment) => {
         const person = enrollment?.person || {};
         const userid = person.userid ? Number(person.userid) : null;
         const enrollmentid = person.enrollmentid ? Number(person.enrollmentid) : null;
-        const dni = (person.identification || '').trim() || null;
+        const dniReal = (person.identification || '').trim() || null;
+        const dni = dniReal || (userid ? `EVOL-${userid}` : (enrollmentid ? `EVOL-${enrollmentid}` : null));
         const nombre = (person.name || '').trim() || null;
         const apellidos = (person.lastname || '').trim() || null;
         const email = (person.email || '').trim() || null;
         const telefono = (person.phone || '').trim() || null;
 
         if (!dni) {
-            showNotification('No se puede importar: la matrícula de evolCampus no tiene DNI.', 'error');
+            // Sin userid ni enrollmentid no podemos generar siquiera un placeholder único.
+            showNotification('No se puede importar: la matrícula no tiene userid ni enrollmentid en evolCampus.', 'error');
             return;
         }
 
@@ -529,12 +533,14 @@ export default function Alumnos() {
                                                 const enrollmentid = p.enrollmentid ? Number(p.enrollmentid) : null;
                                                 const importing = importingEnrollment === enrollmentid;
                                                 const dniReal = (p.identification || '').trim();
-                                                const canImport = !!dniReal;
                                                 const fullName = [p.name, p.lastname].filter(Boolean).join(' ').trim();
+                                                const tooltip = dniReal
+                                                    ? 'Importar este alumno y sus matrículas'
+                                                    : 'Importar (sin DNI: se usará un placeholder hasta que evolCampus rellene el DNI real)';
                                                 return (
                                                     <tr key={`${p.userid || ''}-${enrollmentid}`} className="border-b border-variable/40">
                                                         <td className="py-3 px-3 font-bold text-variable-main">{fullName || '—'}</td>
-                                                        <td className="py-3 px-3 text-variable-muted">{dniReal || <span className="text-rose-500">— sin DNI</span>}</td>
+                                                        <td className="py-3 px-3 text-variable-muted">{dniReal || '—'}</td>
                                                         <td className="py-3 px-3 text-variable-muted">{p.email || '—'}</td>
                                                         <td className="py-3 px-3">
                                                             <span className="px-2 py-1 rounded bg-blue-500/10 text-blue-500 text-[10px] font-bold border border-blue-500/20">
@@ -544,8 +550,8 @@ export default function Alumnos() {
                                                         <td className="py-3 px-3 text-right">
                                                             <button
                                                                 onClick={() => handleImportFromEvol(e)}
-                                                                disabled={importing || !canImport}
-                                                                title={canImport ? 'Importar este alumno y sus matrículas' : 'No se puede importar: la matrícula no tiene DNI en evolCampus'}
+                                                                disabled={importing}
+                                                                title={tooltip}
                                                                 className="px-3 py-1.5 bg-primary text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:brightness-110 transition-all disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1.5"
                                                             >
                                                                 {importing ? <Loader2 size={11} className="animate-spin" /> : null}
