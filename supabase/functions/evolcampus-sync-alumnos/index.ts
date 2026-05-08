@@ -75,6 +75,25 @@ async function getEnrollmentsPage(token: string, page: number) {
     return JSON.parse(text);
 }
 
+// getEnrollment singular: trae datos extra que el listado no devuelve (fecha_nacimiento,
+// nivel_estudios, categoria_profesional, NASS, posición, etc.)
+async function getEnrollmentDetail(token: string, enrollmentid: number) {
+    const form = new URLSearchParams();
+    form.set("enrollmentid", String(enrollmentid));
+    const res = await fetch(`${EVOL_BASE}/getEnrollment`, {
+        method: "POST",
+        headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/x-www-form-urlencoded",
+            Accept: "application/json",
+        },
+        body: form.toString(),
+    });
+    const text = await res.text();
+    if (!res.ok) throw new Error(`getEnrollment ${enrollmentid}: ${res.status} ${text}`);
+    return JSON.parse(text);
+}
+
 function parseDate(s: any): string | null {
     if (!s || typeof s !== "string") return null;
     const t = s.trim();
@@ -127,10 +146,11 @@ Deno.serve(async (req: Request) => {
         return json(200, { synced: 0, created: 0, errors: 0, total: 0, message: "evolCampus no devolvió matrículas." });
     }
 
-    // 2. Cargar alumnos existentes en BD (DNI + email indexados)
+    // 2. Cargar alumnos existentes en BD (DNI + email indexados).
+    //    Cargo también los campos enriquecidos para decidir si necesitamos llamar a getEnrollment.
     const { data: existingAlumnos, error: aErr } = await sb
         .from("alumnos")
-        .select("id, dni, email, evolcampus_userid");
+        .select("id, dni, email, evolcampus_userid, fecha_nacimiento, nivel_estudios, categoria_profesional, nass");
     if (aErr) return json(500, { error: "db_alumnos_failed", detail: aErr.message });
 
     const byDni = new Map<string, any>();
@@ -140,6 +160,22 @@ Deno.serve(async (req: Request) => {
         if (a.dni) byDni.set(String(a.dni).toUpperCase().trim(), a);
         if (a.email) byEmail.set(String(a.email).toLowerCase().trim(), a);
         if (a.evolcampus_userid) byUserid.set(Number(a.evolcampus_userid), a);
+    }
+
+    // Cache de detalles getEnrollment por enrollmentid: si dos matrículas distintas son del
+    // mismo curso pero el caller pasa el mismo enrollmentid no se duplica la llamada.
+    const detailCache = new Map<number, any>();
+    async function getDetail(enrollmentid: number): Promise<any | null> {
+        if (detailCache.has(enrollmentid)) return detailCache.get(enrollmentid);
+        try {
+            const detail = await getEnrollmentDetail(token, enrollmentid);
+            detailCache.set(enrollmentid, detail);
+            return detail;
+        } catch (err) {
+            console.warn(`[enrich] getEnrollment ${enrollmentid} failed:`, String(err));
+            detailCache.set(enrollmentid, null);
+            return null;
+        }
     }
 
     // 3. Cargar fichas fundae_alumnos para enlazar enrollment cuando coincida
@@ -161,6 +197,7 @@ Deno.serve(async (req: Request) => {
     let errors = 0;
     let dniRecovered = 0;
     let dniMissingFromEvol = 0;
+    let enriched = 0;
     const errorList: Array<{ enrollmentid: any; detail: string }> = [];
 
     for (const e of allEnrollments) {
@@ -184,7 +221,7 @@ Deno.serve(async (req: Request) => {
             if (!alumno && dni && byDni.has(dni.toUpperCase())) alumno = byDni.get(dni.toUpperCase());
             if (!alumno && email && byEmail.has(email.toLowerCase())) alumno = byEmail.get(email.toLowerCase());
 
-            const alumnoPayload = {
+            const alumnoPayload: Record<string, unknown> = {
                 nombre: nombre || (alumno?.nombre ?? "—"),
                 apellidos: apellidos || (alumno?.apellidos ?? ""),
                 email: email,
@@ -192,13 +229,37 @@ Deno.serve(async (req: Request) => {
                 evolcampus_userid: userid,
             };
 
+            // Decidir si necesitamos enriquecer con getEnrollment singular (1 llamada extra).
+            // Sí cuando: alumno nuevo, o alumno existente al que le falta algún campo extra.
+            const needsEnrichment = !alumno
+                || !alumno.fecha_nacimiento
+                || !alumno.nivel_estudios
+                || !alumno.categoria_profesional
+                || !alumno.nass;
+
+            if (needsEnrichment) {
+                const detail = await getDetail(enrollmentid);
+                const personDetail = detail?.person || {};
+                const fechaNac = clean(personDetail.birthdate) || clean(personDetail.fecha_nacimiento);
+                const nivel = clean(personDetail.studieslevel) || clean(personDetail.nivel_estudios);
+                const categoria = clean(personDetail.position) || clean(personDetail.categoria_profesional);
+                const nass = clean(personDetail.nass) || clean(personDetail.naf) || clean(personDetail.ssn);
+                if (fechaNac && (!alumno || !alumno.fecha_nacimiento)) alumnoPayload.fecha_nacimiento = fechaNac;
+                if (nivel && (!alumno || !alumno.nivel_estudios)) alumnoPayload.nivel_estudios = nivel;
+                if (categoria && (!alumno || !alumno.categoria_profesional)) alumnoPayload.categoria_profesional = categoria;
+                if (nass && (!alumno || !alumno.nass)) alumnoPayload.nass = nass;
+                if (alumnoPayload.fecha_nacimiento || alumnoPayload.nivel_estudios || alumnoPayload.categoria_profesional || alumnoPayload.nass) {
+                    enriched++;
+                }
+            }
+
             if (!alumno) {
                 // Crear alumno nuevo. dni es obligatorio en BD (UNIQUE) — si no viene de evolCampus, usamos un placeholder único.
                 const dniValue = dni || `EVOL-${userid || enrollmentid}`;
                 const { data: ins, error: insErr } = await sb
                     .from("alumnos")
                     .insert({ ...alumnoPayload, dni: dniValue })
-                    .select("id, dni, email, evolcampus_userid")
+                    .select("id, dni, email, evolcampus_userid, fecha_nacimiento, nivel_estudios, categoria_profesional, nass")
                     .single();
                 if (insErr) throw new Error(`insert alumno: ${insErr.message}`);
                 alumno = ins;
@@ -222,6 +283,11 @@ Deno.serve(async (req: Request) => {
                     if (alumno.dni) byDni.delete(String(alumno.dni).toUpperCase().trim());
                     byDni.set(dni.toUpperCase().trim(), { ...alumno, dni });
                 }
+                // Aplicar campos enriquecidos solo si están vacíos en BD (no pisamos lo manual).
+                if (alumnoPayload.fecha_nacimiento && !alumno.fecha_nacimiento) updPayload.fecha_nacimiento = alumnoPayload.fecha_nacimiento;
+                if (alumnoPayload.nivel_estudios && !alumno.nivel_estudios) updPayload.nivel_estudios = alumnoPayload.nivel_estudios;
+                if (alumnoPayload.categoria_profesional && !alumno.categoria_profesional) updPayload.categoria_profesional = alumnoPayload.categoria_profesional;
+                if (alumnoPayload.nass && !alumno.nass) updPayload.nass = alumnoPayload.nass;
                 if (Object.keys(updPayload).length > 0) {
                     await sb.from("alumnos").update(updPayload).eq("id", alumno.id);
                 }
@@ -304,6 +370,7 @@ Deno.serve(async (req: Request) => {
         total: allEnrollments.length,
         dniRecovered,
         dniMissingFromEvol,
+        enriched,
         errorList: errorList.slice(0, 20),
     });
 });
