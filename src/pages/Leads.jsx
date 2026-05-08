@@ -24,6 +24,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTheme } from '../context/ThemeContext';
 import { supabase } from '../lib/supabase';
+import { buildFundaeSeguimientoPayload } from '../lib/fundae';
 import Sidebar from '../components/Sidebar';
 import Portal from '../components/Portal';
 import CustomSelect from '../components/CustomSelect';
@@ -540,22 +541,10 @@ export default function Leads() {
 
                 // 2. Si el usuario eligió "Sí" en el modal FUNDAE: crear expediente
                 if (createFundae) {
+                    const payload = await buildFundaeSeguimientoPayload(lead.id);
                     const { error: fundaeError } = await supabase
                         .from('fundae_seguimiento')
-                        .insert([{
-                            lead_id: lead.id,
-                            empresa: lead.empresa_nombre || lead.nombre,
-                            email: lead.email,
-                            telefono: lead.whatsapp || null,
-                            // Flujo iniciado: paso 0 pendiente (pendiente de enviar)
-                            estado: 'pendiente',
-                            formulario_pendiente_enviar: true,
-                            formulario_enviado: false,
-                            formulario_recibido: false,
-                            creditos_verificados: false,
-                            factura_enviada: false,
-                            factura_pagada: false
-                        }]);
+                        .insert([payload]);
 
                     if (fundaeError) console.error('Error creando expediente FUNDAE:', fundaeError);
                     else showNotification(`✅ ${lead.nombre} convertido. Expediente FUNDAE iniciado automáticamente.`);

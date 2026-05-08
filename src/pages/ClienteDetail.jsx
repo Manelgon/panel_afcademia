@@ -29,6 +29,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../lib/supabase';
+import { buildFundaeSeguimientoPayload } from '../lib/fundae';
 import Sidebar from '../components/Sidebar';
 import EditClienteModal from '../components/cliente/EditClienteModal';
 import FichasFundaeList from '../components/fundae/FichasFundaeList';
@@ -121,20 +122,8 @@ export default function ClienteDetail() {
 
         await withLoading(async () => {
             try {
-                const { error } = await supabase.from('fundae_seguimiento').insert([{
-                    lead_id: cliente.id,
-                    empresa: cliente.empresa_nombre || cliente.nombre,
-                    cif: cliente.cif_nif || null,
-                    email: cliente.email,
-                    telefono: cliente.whatsapp || null,
-                    estado: 'pendiente',
-                    formulario_pendiente_enviar: true,
-                    formulario_enviado: false,
-                    formulario_recibido: false,
-                    creditos_verificados: false,
-                    factura_enviada: false,
-                    factura_pagada: false
-                }]);
+                const payload = await buildFundaeSeguimientoPayload(cliente.id);
+                const { error } = await supabase.from('fundae_seguimiento').insert([payload]);
                 if (error) throw error;
                 showNotification('Expediente FUNDAE creado');
                 fetchCliente();
