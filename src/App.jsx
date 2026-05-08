@@ -19,6 +19,9 @@ const AjustesEmisor = lazy(() => import('./pages/AjustesEmisor'));
 // NOTA: Projects, ProjectDetail, Tasks, Calendar existen como paginas pero
 // no estan registradas como rutas todavia (mantener paridad con original).
 const FundaePublicForm = lazy(() => import('./pages/FundaePublicForm'));
+const FundaeAlumnosPublic = lazy(() => import('./pages/FundaeAlumnosPublic'));
+const Alumnos = lazy(() => import('./pages/Alumnos'));
+const Facturacion = lazy(() => import('./pages/Facturacion'));
 
 const RouteSpinner = () => (
     <div className="min-h-screen flex items-center justify-center bg-variable-main">
@@ -108,6 +111,19 @@ function App() {
                                     } />
 
                                     <Route path="/fundae-form/:token" element={<FundaePublicForm />} />
+                                    <Route path="/fundae-alumnos/:token" element={<FundaeAlumnosPublic />} />
+
+                                    <Route path="/alumnos" element={
+                                        <ProtectedRoute>
+                                            <Alumnos />
+                                        </ProtectedRoute>
+                                    } />
+
+                                    <Route path="/facturacion" element={
+                                        <ProtectedRoute>
+                                            <Facturacion />
+                                        </ProtectedRoute>
+                                    } />
 
                                     {/* Redirect a / si no encuentra ruta (luego ProtectedRoute mandara a /login si no hay sesion) */}
                                     <Route path="*" element={<Navigate to="/" />} />

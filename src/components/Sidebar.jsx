@@ -8,7 +8,9 @@ import {
     Target,
     BookOpen,
     Briefcase,
-    Building2
+    Building2,
+    GraduationCap,
+    Receipt
 } from 'lucide-react';
 import logo from '../assets/logo.png';
 import { useAuth } from '../context/AuthContext';
@@ -113,6 +115,8 @@ export default function Sidebar() {
                     <SidebarItem icon={Target} to="/leads" label="Leads" />
                     <SidebarItem icon={Briefcase} to="/clientes" label="Clientes" />
                     <SidebarItem icon={BookOpen} to="/fundae" label="Seguimiento FUNDAE" />
+                    <SidebarItem icon={Receipt} to="/facturacion" label="Facturación" />
+                    <SidebarItem icon={GraduationCap} to="/alumnos" label="Alumnos" />
                 </div>
 
                 <div className="mt-auto flex flex-col gap-4 items-center w-full px-4">
@@ -171,6 +175,8 @@ export default function Sidebar() {
                     <SidebarItem icon={Target} to="/leads" label="Leads" />
                     <SidebarItem icon={Briefcase} to="/clientes" label="Clientes" />
                     <SidebarItem icon={BookOpen} to="/fundae" label="Seguimiento FUNDAE" />
+                    <SidebarItem icon={Receipt} to="/facturacion" label="Facturación" />
+                    <SidebarItem icon={GraduationCap} to="/alumnos" label="Alumnos" />
 
                     {/* Mobile config with popover */}
                     <div className="relative" ref={mobileConfigRef}>
