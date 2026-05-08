@@ -178,42 +178,50 @@ export default function Alumnos() {
     const fetchEvolEnrollments = async () => {
         setEvolLoading(true);
         setEvolError(null);
-        try {
-            const all = [];
-            let page = 1;
-            let totalPages = 1;
-            do {
-                const { data, error } = await supabase.functions.invoke('evolcampus-proxy', {
-                    body: { action: 'getEnrollments', method: 'POST', params: { page, regs_per_page: 200 } }
-                });
-                if (error) throw error;
-                if (data?.error) throw new Error(data.detail || data.error);
-                const items = Array.isArray(data?.data) ? data.data : [];
-                all.push(...items);
-                totalPages = Number(data?.pages || 1);
-                page++;
-            } while (page <= totalPages);
-            setEvolEnrollments(all);
-        } catch (err) {
-            console.error('[evol-no-vinc] error:', err);
-            setEvolError(err.message || String(err));
-        } finally {
-            setEvolLoading(false);
-        }
+        await withLoading(async () => {
+            try {
+                const all = [];
+                let page = 1;
+                let totalPages = 1;
+                do {
+                    const { data, error } = await supabase.functions.invoke('evolcampus-proxy', {
+                        body: { action: 'getEnrollments', method: 'POST', params: { page, regs_per_page: 200 } }
+                    });
+                    if (error) throw error;
+                    if (data?.error) throw new Error(data.detail || data.error);
+                    const items = Array.isArray(data?.data) ? data.data : [];
+                    all.push(...items);
+                    totalPages = Number(data?.pages || 1);
+                    page++;
+                } while (page <= totalPages);
+                setEvolEnrollments(all);
+            } catch (err) {
+                console.error('[evol-no-vinc] error:', err);
+                setEvolError(err.message || String(err));
+            }
+        }, 'Consultando evolCampus...');
+        setEvolLoading(false);
     };
 
     // Crea el alumno en BD + todas sus matrículas a partir de los datos de evolCampus.
     // El parámetro `enrollment` es la fila agrupada por persona, con `_matriculas` con
     // todas las matrículas que evolCampus tiene para ese userid.
+    // Vacíos en evolCampus → null en BD (no se inventan placeholders).
+    // Excepción: el DNI es UNIQUE NOT NULL en alumnos. Sin DNI real no se puede importar.
     const handleImportFromEvol = async (enrollment) => {
         const person = enrollment?.person || {};
         const userid = person.userid ? Number(person.userid) : null;
         const enrollmentid = person.enrollmentid ? Number(person.enrollmentid) : null;
-        const dni = (person.identification || '').trim() || `EVOL-${userid || enrollmentid}`;
-        const nombre = (person.name || '').trim() || '—';
-        const apellidos = (person.lastname || '').trim() || '';
+        const dni = (person.identification || '').trim() || null;
+        const nombre = (person.name || '').trim() || null;
+        const apellidos = (person.lastname || '').trim() || null;
         const email = (person.email || '').trim() || null;
         const telefono = (person.phone || '').trim() || null;
+
+        if (!dni) {
+            showNotification('No se puede importar: la matrícula de evolCampus no tiene DNI.', 'error');
+            return;
+        }
 
         const parseDate = (s) => {
             if (!s || typeof s !== 'string') return null;
@@ -231,63 +239,70 @@ export default function Alumnos() {
             const n = numOrNull(v);
             return n === null ? null : Math.trunc(n);
         };
+        const cleanOrNull = (s) => {
+            if (s === null || s === undefined) return null;
+            const t = String(s).trim();
+            return t === '' ? null : t;
+        };
 
         setImportingEnrollment(enrollmentid);
-        try {
-            // 1. Crear alumno (o reutilizar si ya existe por DNI: import idempotente).
-            const { data: alumno, error: aErr } = await supabase
-                .from('alumnos')
-                .upsert(
-                    { dni, nombre, apellidos, email, telefono, evolcampus_userid: userid },
-                    { onConflict: 'dni' }
-                )
-                .select('id')
-                .single();
-            if (aErr) throw aErr;
+        await withLoading(async () => {
+            try {
+                // 1. Crear alumno (o reutilizar si ya existe por DNI: import idempotente).
+                const { data: alumno, error: aErr } = await supabase
+                    .from('alumnos')
+                    .upsert(
+                        { dni, nombre, apellidos, email, telefono, evolcampus_userid: userid },
+                        { onConflict: 'dni' }
+                    )
+                    .select('id')
+                    .single();
+                if (aErr) throw aErr;
 
-            // 2. Insertar todas las matrículas que evolCampus tiene para esta persona.
-            const enrollmentsToImport = enrollment._matriculas || [enrollment];
-            const matriculasPayload = enrollmentsToImport.map(e => {
-                const en = e.enroll || {};
-                return {
-                    alumno_id: alumno.id,
-                    tipo: 'manual',
-                    curso_nombre: en.study || null,
-                    grupo_nombre: en.group || null,
-                    evolcampus_userid: userid,
-                    evolcampus_enrollmentid: intOrNull(e.person?.enrollmentid),
-                    evolcampus_groupid: intOrNull(en.groupid),
-                    completedpercent: numOrNull(en.completedpercent),
-                    evaluations_percent: numOrNull(en.evaluationscompletedpercent),
-                    grade: numOrNull(en.grade),
-                    passed: en.passrequierements === 1 || en.passrequierements === '1',
-                    enrollmentstatus: intOrNull(en.enrollmentstatus),
-                    lastconnect: parseDate(en.lastconnect),
-                    timeconnected: intOrNull(en.timeconnected),
-                    connections: intOrNull(en.connections),
-                    url_diploma: en.urldiploma || null,
-                    evolcampus_synced_at: new Date().toISOString()
-                };
-            }).filter(m => m.evolcampus_enrollmentid); // sin enrollmentid no podemos identificar la matrícula
+                // 2. Insertar todas las matrículas que evolCampus tiene para esta persona.
+                const enrollmentsToImport = enrollment._matriculas || [enrollment];
+                const matriculasPayload = enrollmentsToImport.map(e => {
+                    const en = e.enroll || {};
+                    return {
+                        alumno_id: alumno.id,
+                        tipo: 'manual',
+                        curso_nombre: cleanOrNull(en.study),
+                        grupo_nombre: cleanOrNull(en.group),
+                        evolcampus_userid: userid,
+                        evolcampus_enrollmentid: intOrNull(e.person?.enrollmentid),
+                        evolcampus_groupid: intOrNull(en.groupid),
+                        completedpercent: numOrNull(en.completedpercent),
+                        evaluations_percent: numOrNull(en.evaluationscompletedpercent),
+                        grade: numOrNull(en.grade),
+                        passed: en.passrequierements === 1 || en.passrequierements === '1',
+                        enrollmentstatus: intOrNull(en.enrollmentstatus),
+                        lastconnect: parseDate(en.lastconnect),
+                        timeconnected: intOrNull(en.timeconnected),
+                        connections: intOrNull(en.connections),
+                        url_diploma: cleanOrNull(en.urldiploma),
+                        evolcampus_synced_at: new Date().toISOString()
+                    };
+                }).filter(m => m.evolcampus_enrollmentid); // sin enrollmentid no podemos identificar la matrícula
 
-            if (matriculasPayload.length > 0) {
-                const { error: mErr } = await supabase
-                    .from('matriculas')
-                    .upsert(matriculasPayload, { onConflict: 'evolcampus_enrollmentid' });
-                if (mErr) throw mErr;
+                if (matriculasPayload.length > 0) {
+                    const { error: mErr } = await supabase
+                        .from('matriculas')
+                        .upsert(matriculasPayload, { onConflict: 'evolcampus_enrollmentid' });
+                    if (mErr) throw mErr;
+                }
+
+                const n = matriculasPayload.length;
+                const displayName = [nombre, apellidos].filter(Boolean).join(' ') || dni;
+                showNotification(
+                    `✅ Alumno ${displayName} importado con ${n} ${n === 1 ? 'matrícula' : 'matrículas'}.`,
+                    'success'
+                );
+                await fetchAlumnos();
+            } catch (err) {
+                showNotification(`Error importando: ${err.message}`, 'error');
             }
-
-            const n = matriculasPayload.length;
-            showNotification(
-                `✅ Alumno ${nombre} ${apellidos} importado con ${n} ${n === 1 ? 'matrícula' : 'matrículas'}.`,
-                'success'
-            );
-            await fetchAlumnos();
-        } catch (err) {
-            showNotification(`Error importando: ${err.message}`, 'error');
-        } finally {
-            setImportingEnrollment(null);
-        }
+        }, 'Importando alumno y matrículas...');
+        setImportingEnrollment(null);
     };
 
     // Devuelve los clientes únicos a los que está vinculado el alumno
@@ -513,10 +528,13 @@ export default function Alumnos() {
                                                 const p = e.person || {};
                                                 const enrollmentid = p.enrollmentid ? Number(p.enrollmentid) : null;
                                                 const importing = importingEnrollment === enrollmentid;
+                                                const dniReal = (p.identification || '').trim();
+                                                const canImport = !!dniReal;
+                                                const fullName = [p.name, p.lastname].filter(Boolean).join(' ').trim();
                                                 return (
                                                     <tr key={`${p.userid || ''}-${enrollmentid}`} className="border-b border-variable/40">
-                                                        <td className="py-3 px-3 font-bold text-variable-main">{p.name} {p.lastname}</td>
-                                                        <td className="py-3 px-3 text-variable-muted">{p.identification || '—'}</td>
+                                                        <td className="py-3 px-3 font-bold text-variable-main">{fullName || '—'}</td>
+                                                        <td className="py-3 px-3 text-variable-muted">{dniReal || <span className="text-rose-500">— sin DNI</span>}</td>
                                                         <td className="py-3 px-3 text-variable-muted">{p.email || '—'}</td>
                                                         <td className="py-3 px-3">
                                                             <span className="px-2 py-1 rounded bg-blue-500/10 text-blue-500 text-[10px] font-bold border border-blue-500/20">
@@ -526,7 +544,8 @@ export default function Alumnos() {
                                                         <td className="py-3 px-3 text-right">
                                                             <button
                                                                 onClick={() => handleImportFromEvol(e)}
-                                                                disabled={importing}
+                                                                disabled={importing || !canImport}
+                                                                title={canImport ? 'Importar este alumno y sus matrículas' : 'No se puede importar: la matrícula no tiene DNI en evolCampus'}
                                                                 className="px-3 py-1.5 bg-primary text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:brightness-110 transition-all disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1.5"
                                                             >
                                                                 {importing ? <Loader2 size={11} className="animate-spin" /> : null}
