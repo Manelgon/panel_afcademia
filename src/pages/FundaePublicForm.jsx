@@ -740,6 +740,31 @@ export default function FundaePublicForm() {
             }
             console.log('✅ Datos guardados correctamente:', updatedRows[0]);
 
+            // 1.5 Sincronizar datos fiscales/comerciales con la tabla clientes (fuente de verdad).
+            const clienteId = tokenData.fundae_seguimiento?.cliente_id;
+            if (clienteId) {
+                const { error: cliErr } = await supabase
+                    .from('clientes')
+                    .update({
+                        razon_social: formData.razon_social || null,
+                        cif: formData.cif || null,
+                        domicilio: domicilioCalculado || null,
+                        codigo_postal: formData.codigo_postal || null,
+                        poblacion: formData.poblacion || null,
+                        provincia: formData.provincia || null,
+                        telefono_empresa: formData.telefono || null,
+                        ccc: formData.ccc || null,
+                        cnae: formData.cnae || null,
+                        convenio_referencia: formData.convenio_referencia || null,
+                        num_medio_empleados: formData.num_medio_empleados || null,
+                        representante_empresa: representanteCalculado || null,
+                        nif_nie_representante: formData.nif_nie_representante || null,
+                    })
+                    .eq('id', clienteId);
+                if (cliErr) console.error('[FUNDAE] ⚠️ Error sincronizando con clientes:', cliErr);
+                else console.log('[FUNDAE] ✅ Cliente actualizado con datos del formulario');
+            }
+
             // 2. Marcar el token como usado
             const { data: tokenUpdRows, error: tokenUpdErr } = await supabase
                 .from('fundae_form_tokens')

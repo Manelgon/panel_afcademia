@@ -71,7 +71,7 @@ export default function VerificarFichaModal({ ficha, onClose, onSaved, showNotif
                 const nivelLabel = valueToLabel(NIVELES_ESTUDIOS, form.nivel_estudios) || null;
                 const categoriaLabel = valueToLabel(CATEGORIAS_PROFESIONALES, form.categoria_profesional) || null;
 
-                const { error } = await supabase
+                const { data: updRows, error } = await supabase
                     .from('fundae_alumnos')
                     .update({
                         nombre: form.nombre.trim(),
@@ -91,8 +91,13 @@ export default function VerificarFichaModal({ ficha, onClose, onSaved, showNotif
                         verificada_at: new Date().toISOString(),
                         verificada_por: user?.id ?? null
                     })
-                    .eq('id', ficha.id);
+                    .eq('id', ficha.id)
+                    .select();
                 if (error) throw error;
+                if (!updRows || updRows.length === 0) {
+                    throw new Error('No se actualizó ninguna fila. Posible problema de permisos (RLS) o la ficha no existe. Recarga la página y vuelve a intentarlo.');
+                }
+                console.log('[VerificarFicha] ✅ Filas actualizadas:', updRows.length, updRows[0]);
                 showNotification('✅ Ficha verificada.');
                 updatedFicha = {
                     ...ficha,

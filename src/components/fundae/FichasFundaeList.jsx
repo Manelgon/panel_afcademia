@@ -7,7 +7,6 @@ import CustomSelect from '../CustomSelect';
 import VerificarFichaModal from './VerificarFichaModal';
 import ConvertirAlumnoModal from './ConvertirAlumnoModal';
 import DetallesFichaModal from './DetallesFichaModal';
-import { useNotifications } from '../../context/NotificationContext';
 import { useGlobalLoading } from '../../context/LoadingContext';
 
 const ESTADOS = {
@@ -17,8 +16,7 @@ const ESTADOS = {
     convertida: { label: 'Convertida en alumno', color: 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20', icon: UserPlus }
 };
 
-export default function FichasFundaeList({ fichas, onRefresh, showNotification, tableId = 'fichas-fundae' }) {
-    const { confirm } = useNotifications();
+export default function FichasFundaeList({ fichas, onRefresh, onAllVerified, showNotification, tableId = 'fichas-fundae' }) {
     const { withLoading } = useGlobalLoading();
     const [verificarFicha, setVerificarFicha] = useState(null);
     const [convertirFicha, setConvertirFicha] = useState(null);
@@ -28,13 +26,20 @@ export default function FichasFundaeList({ fichas, onRefresh, showNotification, 
 
     const handleVerificada = async (updatedFicha) => {
         await onRefresh?.();
-        const ok = await confirm({
-            title: 'Ficha verificada',
-            message: '¿Quieres convertir ahora la ficha en alumno? Si hay coincidencias por DNI o email, podrás resolverlas.',
-            confirmText: 'Sí, convertir',
-            cancelText: 'Más tarde'
-        });
-        if (ok) setConvertirFicha(updatedFicha);
+        // Comprobar contra BD directamente para evitar leer la prop vieja del closure.
+        // Si tras esta verificación ya no quedan fichas en estado 'firmada' en el mismo
+        // expediente, notificamos al padre para que cierre/avance.
+        if (!updatedFicha?.fundae_id || !onAllVerified) return;
+        const { data, error } = await supabase
+            .from('fundae_alumnos')
+            .select('id, ficha_estado')
+            .eq('fundae_id', updatedFicha.fundae_id)
+            .eq('ficha_estado', 'firmada')
+            .limit(1);
+        if (error) return;
+        if (!data || data.length === 0) {
+            onAllVerified();
+        }
     };
 
     const handleDownload = async (path) => {
@@ -145,6 +150,7 @@ export default function FichasFundaeList({ fichas, onRefresh, showNotification, 
                         render: (f) => (
                             <div className="flex items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
                                 <button
+                                    type="button"
                                     onClick={() => setDetallesFicha(f)}
                                     title="Ver detalles"
                                     className="p-2 glass rounded-xl text-variable-muted hover:text-primary transition-colors border border-transparent hover:border-primary/20"
@@ -153,6 +159,7 @@ export default function FichasFundaeList({ fichas, onRefresh, showNotification, 
                                 </button>
                                 {f.ficha_pdf_path && (
                                     <button
+                                        type="button"
                                         onClick={() => handleDownload(f.ficha_pdf_path)}
                                         title="Descargar PDF firmado"
                                         className="p-2 glass rounded-xl text-blue-500 hover:bg-blue-500/10 transition-colors border border-transparent hover:border-blue-500/20"
@@ -161,13 +168,13 @@ export default function FichasFundaeList({ fichas, onRefresh, showNotification, 
                                     </button>
                                 )}
                                 {f.ficha_estado === 'firmada' && (
-                                    <button onClick={() => setVerificarFicha(f)}
+                                    <button type="button" onClick={() => setVerificarFicha(f)}
                                         className="px-3 py-1.5 glass rounded-xl text-amber-500 hover:bg-amber-500/10 transition-colors border border-amber-500/30 text-[10px] font-bold flex items-center gap-1">
                                         <CheckCircle2 size={12} /> Verificar
                                     </button>
                                 )}
                                 {f.ficha_estado === 'verificada' && (
-                                    <button onClick={() => setConvertirFicha(f)}
+                                    <button type="button" onClick={() => setConvertirFicha(f)}
                                         className="px-3 py-1.5 glass rounded-xl text-blue-500 hover:bg-blue-500/10 transition-colors border border-blue-500/30 text-[10px] font-bold flex items-center gap-1">
                                         <UserPlus size={12} /> Convertir
                                     </button>

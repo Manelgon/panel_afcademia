@@ -284,10 +284,10 @@ export default function FacturaModal({ record, onClose, onCreated, showNotificat
                 if (insErr) throw insErr;
             }
 
-            // Marcar paso del flujo
+            // Marcar paso del flujo y reflejar el importe facturado
             await supabase
                 .from('fundae_seguimiento')
-                .update({ factura_creada: true })
+                .update({ factura_creada: true, facturado: total })
                 .eq('id', record.id);
 
             showNotification('✅ Factura creada y guardada.');
