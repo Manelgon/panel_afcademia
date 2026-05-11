@@ -10,6 +10,7 @@ import {
     Briefcase,
     Building2,
     GraduationCap,
+    Layers,
     Receipt
 } from 'lucide-react';
 import logo from '../assets/logo.png';
@@ -117,6 +118,7 @@ export default function Sidebar() {
                     <SidebarItem icon={BookOpen} to="/fundae" label="Seguimiento FUNDAE" />
                     <SidebarItem icon={Receipt} to="/facturacion" label="Facturación" />
                     <SidebarItem icon={GraduationCap} to="/alumnos" label="Alumnos" />
+                    <SidebarItem icon={Layers} to="/cursos" label="Cursos" />
                 </div>
 
                 <div className="mt-auto flex flex-col gap-4 items-center w-full px-4">
@@ -177,6 +179,7 @@ export default function Sidebar() {
                     <SidebarItem icon={BookOpen} to="/fundae" label="Seguimiento FUNDAE" />
                     <SidebarItem icon={Receipt} to="/facturacion" label="Facturación" />
                     <SidebarItem icon={GraduationCap} to="/alumnos" label="Alumnos" />
+                    <SidebarItem icon={Layers} to="/cursos" label="Cursos" />
 
                     {/* Mobile config with popover */}
                     <div className="relative" ref={mobileConfigRef}>

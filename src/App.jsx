@@ -21,6 +21,9 @@ const AjustesEmisor = lazy(() => import('./pages/AjustesEmisor'));
 const FundaePublicForm = lazy(() => import('./pages/FundaePublicForm'));
 const FundaeAlumnosPublic = lazy(() => import('./pages/FundaeAlumnosPublic'));
 const Alumnos = lazy(() => import('./pages/Alumnos'));
+const AlumnoDetail = lazy(() => import('./pages/AlumnoDetail'));
+const Cursos = lazy(() => import('./pages/Cursos'));
+const CursoDetail = lazy(() => import('./pages/CursoDetail'));
 const Facturacion = lazy(() => import('./pages/Facturacion'));
 
 const RouteSpinner = () => (
@@ -116,6 +119,24 @@ function App() {
                                     <Route path="/alumnos" element={
                                         <ProtectedRoute>
                                             <Alumnos />
+                                        </ProtectedRoute>
+                                    } />
+
+                                    <Route path="/alumnos/:id" element={
+                                        <ProtectedRoute>
+                                            <AlumnoDetail />
+                                        </ProtectedRoute>
+                                    } />
+
+                                    <Route path="/cursos" element={
+                                        <ProtectedRoute>
+                                            <Cursos />
+                                        </ProtectedRoute>
+                                    } />
+
+                                    <Route path="/cursos/:courseid" element={
+                                        <ProtectedRoute>
+                                            <CursoDetail />
                                         </ProtectedRoute>
                                     } />
 
