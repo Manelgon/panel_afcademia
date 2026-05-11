@@ -60,6 +60,7 @@ const ESTADO_FACTURA = {
 };
 
 export default function ClienteDetail() {
+    // :id es el cliente_id (ya no el lead_id)
     const { id } = useParams();
     const navigate = useNavigate();
     const { showNotification, confirm } = useNotifications();
@@ -74,12 +75,15 @@ export default function ClienteDetail() {
         setLoading(true);
         try {
             const { data, error } = await supabase
-                .from('leads')
+                .from('clientes')
                 .select(`
                     *,
-                    flujos_embudo(status_actual, actividad, tags_proceso, keyword_recibida),
-                    segmentacion_despacho(num_comunidades, interes_fundae, software_actual, objetivo_automatizacion),
-                    lead_billing(*),
+                    leads(
+                        *,
+                        flujos_embudo(status_actual, actividad, tags_proceso, keyword_recibida),
+                        segmentacion_despacho(num_comunidades, interes_fundae, software_actual, objetivo_automatizacion),
+                        lead_billing(*)
+                    ),
                     fundae_seguimiento(
                         *,
                         fundae_alumnos(*)
@@ -102,9 +106,10 @@ export default function ClienteDetail() {
         fetchCliente();
         const channel = supabase
             .channel(`cliente-${id}`)
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'leads', filter: `id=eq.${id}` }, fetchCliente)
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'fundae_seguimiento', filter: `lead_id=eq.${id}` }, fetchCliente)
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'lead_billing', filter: `lead_id=eq.${id}` }, fetchCliente)
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'clientes', filter: `id=eq.${id}` }, fetchCliente)
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'leads' }, fetchCliente)
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'fundae_seguimiento', filter: `cliente_id=eq.${id}` }, fetchCliente)
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'lead_billing' }, fetchCliente)
             .on('postgres_changes', { event: '*', schema: 'public', table: 'fundae_alumnos' }, fetchCliente)
             .subscribe();
         return () => supabase.removeChannel(channel);
@@ -112,9 +117,10 @@ export default function ClienteDetail() {
 
     // Crear nuevo expediente FUNDAE para este cliente
     const handleCrearExpediente = async () => {
+        const empresa = cliente?.empresa_nombre || cliente?.leads?.empresa_nombre || cliente?.razon_social || cliente?.leads?.nombre;
         const confirmed = await confirm({
             title: '¿Crear expediente FUNDAE?',
-            message: `Se creará un nuevo expediente FUNDAE para ${cliente.empresa_nombre || cliente.nombre}.`,
+            message: `Se creará un nuevo expediente FUNDAE para ${empresa}.`,
             confirmText: 'Crear expediente',
             cancelText: 'Cancelar'
         });
@@ -122,7 +128,7 @@ export default function ClienteDetail() {
 
         await withLoading(async () => {
             try {
-                const payload = await buildFundaeSeguimientoPayload(cliente.id);
+                const payload = await buildFundaeSeguimientoPayload({ cliente_id: cliente.id });
                 const { error } = await supabase.from('fundae_seguimiento').insert([payload]);
                 if (error) throw error;
                 showNotification('Expediente FUNDAE creado');
@@ -131,31 +137,6 @@ export default function ClienteDetail() {
                 showNotification(`Error: ${err.message}`, 'error');
             }
         }, 'Creando expediente...');
-    };
-
-    // Volver a poner el cliente como lead "en proceso"
-    const handleRevertirCliente = async () => {
-        const confirmed = await confirm({
-            title: '¿Devolver a Leads?',
-            message: `${cliente.empresa_nombre || cliente.nombre} dejará de aparecer en Clientes y volverá al pipeline de leads como "En Proceso". Los datos se mantienen intactos.`,
-            confirmText: 'Devolver a Leads',
-            cancelText: 'Cancelar'
-        });
-        if (!confirmed) return;
-
-        await withLoading(async () => {
-            try {
-                const { error } = await supabase
-                    .from('flujos_embudo')
-                    .update({ status_actual: 'en_proceso' })
-                    .eq('lead_id', cliente.id);
-                if (error) throw error;
-                showNotification('Cliente devuelto a Leads');
-                navigate('/clientes');
-            } catch (err) {
-                showNotification(`Error: ${err.message}`, 'error');
-            }
-        }, 'Revirtiendo...');
     };
 
     if (loading || !cliente) {
@@ -169,16 +150,19 @@ export default function ClienteDetail() {
         );
     }
 
-    // Verificar que es realmente un cliente (status convertido)
-    const status = cliente.flujos_embudo?.[0]?.status_actual;
-    if (status !== 'convertido') {
+    const lead = cliente.leads || {};
+    const empresa = cliente.empresa_nombre || lead.empresa_nombre || cliente.razon_social || lead.nombre;
+
+    // Verificar que el lead vinculado sigue marcado como convertido
+    const status = lead.flujos_embudo?.[0]?.status_actual;
+    if (status && status !== 'convertido') {
         return (
             <div className="flex min-h-screen">
                 <Sidebar />
                 <main className="flex-1 p-10 flex items-center justify-center">
                     <div className="text-center max-w-md">
-                        <h2 className="text-2xl font-bold text-variable-main mb-3">Este lead no es cliente</h2>
-                        <p className="text-variable-muted mb-6">El lead {cliente.nombre} no está marcado como convertido. Conviértelo desde la sección de Leads para verlo aquí.</p>
+                        <h2 className="text-2xl font-bold text-variable-main mb-3">Este lead ya no es cliente</h2>
+                        <p className="text-variable-muted mb-6">El lead asociado a {empresa} no está marcado como convertido.</p>
                         <Link to="/leads" className="inline-flex items-center gap-2 px-6 py-3 bg-primary text-white rounded-2xl font-bold">
                             <ArrowLeft size={18} /> Ir a Leads
                         </Link>
@@ -188,10 +172,10 @@ export default function ClienteDetail() {
         );
     }
 
-    const seg = Array.isArray(cliente.segmentacion_despacho) ? cliente.segmentacion_despacho[0] : cliente.segmentacion_despacho;
-    const billing = Array.isArray(cliente.lead_billing) ? cliente.lead_billing : (cliente.lead_billing ? [cliente.lead_billing] : []);
+    const seg = Array.isArray(lead.segmentacion_despacho) ? lead.segmentacion_despacho[0] : lead.segmentacion_despacho;
+    const billing = Array.isArray(lead.lead_billing) ? lead.lead_billing : (lead.lead_billing ? [lead.lead_billing] : []);
     const expedientes = cliente.fundae_seguimiento || [];
-    const flujo = cliente.flujos_embudo?.[0] || {};
+    const flujo = lead.flujos_embudo?.[0] || {};
 
     const totalFacturado = billing.reduce((s, b) => s + (parseFloat(b.importe_factura) || 0), 0);
     const totalPagadas = billing.filter(b => b.estado_factura === 'pagada').reduce((s, b) => s + (parseFloat(b.importe_factura) || 0), 0);
@@ -215,12 +199,12 @@ export default function ClienteDetail() {
                     <div className="flex flex-col lg:flex-row gap-6 lg:items-center lg:justify-between">
                         <div className="flex items-start gap-5 min-w-0 flex-1">
                             <div className="size-16 sm:size-20 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary font-black text-xl sm:text-2xl flex-shrink-0">
-                                {(cliente.empresa_nombre || cliente.nombre || '?').slice(0, 2).toUpperCase()}
+                                {(empresa || '?').slice(0, 2).toUpperCase()}
                             </div>
                             <div className="min-w-0 flex-1">
                                 <div className="flex flex-wrap items-center gap-3 mb-2">
                                     <h1 className="text-2xl sm:text-3xl font-bold font-display tracking-tight text-variable-main truncate">
-                                        {cliente.empresa_nombre || cliente.nombre}
+                                        {empresa}
                                     </h1>
                                     <span className="px-2 py-1 rounded-md bg-emerald-500/10 text-emerald-500 text-[10px] font-black uppercase tracking-widest border border-emerald-500/20">
                                         Cliente
@@ -237,22 +221,22 @@ export default function ClienteDetail() {
                                     )}
                                 </div>
                                 <p className="text-variable-muted text-sm">
-                                    Contacto: <span className="text-variable-main font-bold">{cliente.nombre}</span>
+                                    Contacto: <span className="text-variable-main font-bold">{lead.nombre}</span>
                                 </p>
                                 <div className="flex flex-wrap gap-4 mt-3 text-xs text-variable-muted">
-                                    {cliente.email && (
-                                        <a href={`mailto:${cliente.email}`} className="flex items-center gap-1.5 hover:text-primary transition-colors">
-                                            <Mail size={12} /> {cliente.email}
+                                    {lead.email && (
+                                        <a href={`mailto:${lead.email}`} className="flex items-center gap-1.5 hover:text-primary transition-colors">
+                                            <Mail size={12} /> {lead.email}
                                         </a>
                                     )}
-                                    {cliente.whatsapp && (
-                                        <a href={`tel:${cliente.whatsapp}`} className="flex items-center gap-1.5 hover:text-primary transition-colors">
-                                            <Phone size={12} /> {cliente.whatsapp}
+                                    {lead.whatsapp && (
+                                        <a href={`tel:${lead.whatsapp}`} className="flex items-center gap-1.5 hover:text-primary transition-colors">
+                                            <Phone size={12} /> {lead.whatsapp}
                                         </a>
                                     )}
-                                    {cliente.ciudad && (
+                                    {(cliente.poblacion || lead.ciudad) && (
                                         <span className="flex items-center gap-1.5">
-                                            <MapPin size={12} /> {cliente.ciudad}
+                                            <MapPin size={12} /> {cliente.poblacion || lead.ciudad}
                                         </span>
                                     )}
                                 </div>
@@ -266,13 +250,6 @@ export default function ClienteDetail() {
                                 title="Editar datos del cliente"
                             >
                                 <Edit3 size={14} /> Editar cliente
-                            </button>
-                            <button
-                                onClick={handleRevertirCliente}
-                                className="px-4 py-3 glass rounded-2xl text-xs font-bold text-variable-muted hover:text-rose-500 transition-all"
-                                title="Volver a marcar como lead en proceso"
-                            >
-                                Devolver a Leads
                             </button>
                         </div>
                     </div>
@@ -316,16 +293,17 @@ export default function ClienteDetail() {
                 <AnimatePresence mode="wait">
                     {activeTab === 'resumen' && (
                         <motion.div key="resumen" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                            {/* Datos del cliente — lead_billing manda, lead como fallback */}
+                            {/* Datos del cliente — clientes manda, lead_billing y leads como fallback */}
                             {(() => {
-                                const lb = (Array.isArray(cliente.lead_billing) ? cliente.lead_billing[0] : cliente.lead_billing) || {};
+                                const lb = billing[0] || {};
                                 const datos = {
-                                    razon_social: lb.razon_social || cliente.razon_social || cliente.empresa_nombre,
-                                    cif: lb.cif || cliente.cif || cliente.cif_nif,
-                                    direccion: lb.direccion_facturacion || cliente.direccion,
-                                    ciudad: lb.poblacion || cliente.ciudad,
-                                    provincia: lb.provincia || cliente.provincia,
-                                    codigo_postal: lb.codigo_postal || cliente.codigo_postal
+                                    empresa_nombre: cliente.empresa_nombre || lead.empresa_nombre,
+                                    razon_social: cliente.razon_social || lb.razon_social,
+                                    cif: cliente.cif || lb.cif,
+                                    direccion: cliente.domicilio || lb.direccion_facturacion,
+                                    ciudad: cliente.poblacion || lb.poblacion || lead.ciudad,
+                                    provincia: cliente.provincia || lb.provincia,
+                                    codigo_postal: cliente.codigo_postal || lb.codigo_postal
                                 };
                                 return (
                                     <div className="glass rounded-[1.5rem] p-6">
@@ -333,7 +311,8 @@ export default function ClienteDetail() {
                                             <Building2 size={16} /> Datos del Cliente
                                         </h3>
                                         <dl className="space-y-3">
-                                            <Field label="Razón Social" value={datos.razon_social} />
+                                            <Field label="Nombre del despacho" value={datos.empresa_nombre} />
+                                            <Field label="Razón Social (fiscal)" value={datos.razon_social} />
                                             <Field label="CIF / NIF" value={datos.cif} mono />
                                             <Field label="Dirección" value={datos.direccion} />
                                             <div className="grid grid-cols-2 gap-3">
@@ -376,8 +355,8 @@ export default function ClienteDetail() {
                                     <Calendar size={16} /> Origen y Captación
                                 </h3>
                                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
-                                    <Field label="Fuente" value={cliente.source || 'Landing Page'} />
-                                    <Field label="Fecha de Captación" value={new Date(cliente.fecha_creacion).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })} />
+                                    <Field label="Fuente" value={lead.source || 'Landing Page'} />
+                                    <Field label="Fecha de Captación" value={lead.fecha_creacion ? new Date(lead.fecha_creacion).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' }) : '—'} />
                                     <Field label="Keyword Recibida" value={flujo.keyword_recibida} />
                                 </div>
                             </div>
@@ -394,7 +373,7 @@ export default function ClienteDetail() {
                                 {(() => {
                                     const lb = billing[0] || {};
                                     const datos = {
-                                        email_facturacion: lb.email_facturacion || cliente.email,
+                                        email_facturacion: lb.email_facturacion || lead.email,
                                         metodo_pago: lb.metodo_pago,
                                         iban: lb.iban
                                     };

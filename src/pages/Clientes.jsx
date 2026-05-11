@@ -29,27 +29,33 @@ export default function Clientes() {
     const [loading, setLoading] = useState(false);
     const [clientes, setClientes] = useState([]);
     const [search, setSearch] = useState('');
-    const [filterFundae, setFilterFundae] = useState('todos'); // todos | con | sin
+    const [filterFundae, setFilterFundae] = useState('todos');
     const [editingCliente, setEditingCliente] = useState(null);
 
     const fetchClientes = async () => {
         setLoading(true);
         try {
-            // Un cliente = un lead con flujos_embudo.status_actual = 'convertido'
+            // Fuente de verdad: tabla clientes. Trae datos de contacto vía join a leads.
             const { data, error } = await supabase
-                .from('leads')
+                .from('clientes')
                 .select(`
                     *,
-                    flujos_embudo!inner(status_actual, actividad, tags_proceso),
-                    segmentacion_despacho(num_comunidades, interes_fundae, software_actual),
-                    lead_billing(razon_social, importe_factura, estado_factura),
+                    leads(
+                        id, nombre, email, whatsapp, empresa_nombre, ciudad, source, fecha_creacion,
+                        flujos_embudo(status_actual, actividad, tags_proceso),
+                        segmentacion_despacho(num_comunidades, interes_fundae, software_actual),
+                        lead_billing(razon_social, importe_factura, estado_factura)
+                    ),
                     fundae_seguimiento(id, estado, creditos_fundae, facturado, pagado)
                 `)
-                .eq('flujos_embudo.status_actual', 'convertido')
-                .order('fecha_creacion', { ascending: false });
+                .order('fecha_conversion', { ascending: false });
 
             if (error) throw error;
-            setClientes(data || []);
+            // Filtrar solo los que siguen marcados como convertidos en flujos_embudo
+            const filtered = (data || []).filter(c =>
+                c.leads?.flujos_embudo?.[0]?.status_actual === 'convertido'
+            );
+            setClientes(filtered);
         } catch (err) {
             console.error('Error fetching clientes:', err);
             showNotification(`Error al cargar clientes: ${err.message}`, 'error');
@@ -62,21 +68,25 @@ export default function Clientes() {
         fetchClientes();
         const channel = supabase
             .channel('clientes-changes')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'clientes' }, fetchClientes)
             .on('postgres_changes', { event: '*', schema: 'public', table: 'leads' }, fetchClientes)
             .on('postgres_changes', { event: '*', schema: 'public', table: 'flujos_embudo' }, fetchClientes)
             .subscribe();
         return () => supabase.removeChannel(channel);
     }, []);
 
+    // Helpers para acceder a datos del lead vinculado
+    const getLead = (c) => c.leads || {};
+    const getBilling = (c) => getLead(c).lead_billing || [];
+
     // Filtrado por búsqueda y FUNDAE
     const filtered = clientes.filter(c => {
-        // Búsqueda por nombre, empresa o email
+        const lead = getLead(c);
         const q = search.trim().toLowerCase();
         if (q) {
-            const haystack = `${c.nombre || ''} ${c.empresa_nombre || ''} ${c.email || ''}`.toLowerCase();
+            const haystack = `${lead.nombre || ''} ${c.empresa_nombre || ''} ${lead.empresa_nombre || ''} ${c.razon_social || ''} ${lead.email || ''}`.toLowerCase();
             if (!haystack.includes(q)) return false;
         }
-        // Filtro FUNDAE
         const hasFundae = (c.fundae_seguimiento?.length || 0) > 0;
         if (filterFundae === 'con' && !hasFundae) return false;
         if (filterFundae === 'sin' && hasFundae) return false;
@@ -88,12 +98,12 @@ export default function Clientes() {
         total: clientes.length,
         conFundae: clientes.filter(c => (c.fundae_seguimiento?.length || 0) > 0).length,
         importeTotal: clientes.reduce((sum, c) => {
-            const facturas = c.lead_billing || [];
+            const facturas = getBilling(c);
             const total = (Array.isArray(facturas) ? facturas : [facturas])
                 .reduce((s, f) => s + (parseFloat(f?.importe_factura) || 0), 0);
             return sum + total;
         }, 0),
-        activos: clientes.filter(c => c.flujos_embudo?.[0]?.actividad === 'lead_activo').length
+        activos: clientes.filter(c => getLead(c).flujos_embudo?.[0]?.actividad === 'lead_activo').length
     };
 
     return (
@@ -166,41 +176,57 @@ export default function Clientes() {
                         {
                             key: 'cliente',
                             label: 'Cliente',
+                            render: (c) => {
+                                const lead = getLead(c);
+                                const empresa = c.empresa_nombre || lead.empresa_nombre || c.razon_social || lead.nombre;
+                                return (
+                                    <div className="flex items-center gap-3">
+                                        <div className="size-10 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary font-black text-sm flex-shrink-0">
+                                            {(empresa || '?').slice(0, 2).toUpperCase()}
+                                        </div>
+                                        <div>
+                                            <p className="font-bold text-variable-main">{empresa}</p>
+                                            <p className="text-[10px] text-variable-muted uppercase font-black tracking-widest">{lead.nombre}</p>
+                                        </div>
+                                    </div>
+                                );
+                            }
+                        },
+                        {
+                            key: 'razon_social',
+                            label: 'Razón Social',
                             render: (c) => (
-                                <div className="flex items-center gap-3">
-                                    <div className="size-10 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary font-black text-sm flex-shrink-0">
-                                        {(c.empresa_nombre || c.nombre || '?').slice(0, 2).toUpperCase()}
-                                    </div>
-                                    <div>
-                                        <p className="font-bold text-variable-main">{c.empresa_nombre || c.nombre}</p>
-                                        <p className="text-[10px] text-variable-muted uppercase font-black tracking-widest">{c.nombre}</p>
-                                    </div>
-                                </div>
+                                c.razon_social
+                                    ? <span className="text-xs text-variable-main">{c.razon_social}</span>
+                                    : <span className="text-variable-muted text-[10px]">—</span>
                             )
                         },
                         {
                             key: 'contacto',
                             label: 'Contacto',
-                            render: (c) => (
-                                <div className="text-sm">
-                                    <div className="flex items-center gap-2 text-variable-muted">
-                                        <Mail size={12} className="opacity-60" />
-                                        <span className="truncate max-w-[200px]">{c.email || '—'}</span>
-                                    </div>
-                                    {c.whatsapp && (
-                                        <div className="flex items-center gap-2 text-variable-muted mt-1">
-                                            <Phone size={12} className="opacity-60" />
-                                            <span>{c.whatsapp}</span>
+                            render: (c) => {
+                                const lead = getLead(c);
+                                return (
+                                    <div className="text-sm">
+                                        <div className="flex items-center gap-2 text-variable-muted">
+                                            <Mail size={12} className="opacity-60" />
+                                            <span className="truncate max-w-[200px]">{lead.email || '—'}</span>
                                         </div>
-                                    )}
-                                </div>
-                            )
+                                        {lead.whatsapp && (
+                                            <div className="flex items-center gap-2 text-variable-muted mt-1">
+                                                <Phone size={12} className="opacity-60" />
+                                                <span>{lead.whatsapp}</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            }
                         },
                         {
                             key: 'comunidades',
                             label: 'Comunidades',
                             render: (c) => {
-                                const segData = c.segmentacion_despacho;
+                                const segData = getLead(c).segmentacion_despacho;
                                 const seg = Array.isArray(segData) ? segData[0] : segData;
                                 return (
                                     <span className="px-2 py-1 rounded bg-blue-500/10 text-blue-500 text-[10px] font-bold">
@@ -234,7 +260,7 @@ export default function Clientes() {
                             key: 'facturado',
                             label: 'Facturado',
                             render: (c) => {
-                                const facturas = c.lead_billing || [];
+                                const facturas = getBilling(c);
                                 const total = (Array.isArray(facturas) ? facturas : [facturas])
                                     .reduce((s, f) => s + (parseFloat(f?.importe_factura) || 0), 0);
                                 return (
@@ -249,7 +275,7 @@ export default function Clientes() {
                             label: 'Actividad',
                             align: 'center',
                             render: (c) => {
-                                const actividad = c.flujos_embudo?.[0]?.actividad;
+                                const actividad = getLead(c).flujos_embudo?.[0]?.actividad;
                                 if (!actividad) return <span className="text-variable-muted text-[10px]">—</span>;
                                 const isActive = actividad === 'lead_activo';
                                 const styles = isActive
@@ -269,7 +295,7 @@ export default function Clientes() {
                             label: 'Cliente desde',
                             render: (c) => (
                                 <span className="text-variable-muted text-sm">
-                                    {new Date(c.fecha_creacion).toLocaleDateString('es-ES')}
+                                    {new Date(c.fecha_conversion || c.fecha_creacion).toLocaleDateString('es-ES')}
                                 </span>
                             )
                         },

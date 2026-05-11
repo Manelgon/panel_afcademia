@@ -50,7 +50,8 @@ export default function Facturacion() {
                         nombre,
                         empresa_nombre,
                         email,
-                        fundae_seguimiento(id, empresa, estado, num_asistentes)
+                        fundae_seguimiento(id, empresa, estado, num_asistentes),
+                        clientes(id)
                     )
                 `)
                 .order('fecha_factura', { ascending: false, nullsFirst: false });
@@ -381,15 +382,20 @@ export default function Facturacion() {
                                             <CheckCircle2 size={14} />
                                         </button>
                                     )}
-                                    {f.lead_id && (
-                                        <Link
-                                            to={`/clientes/${f.lead_id}`}
-                                            onClick={(e) => e.stopPropagation()}
-                                            className="inline-flex items-center gap-1 px-3 py-2 glass rounded-xl text-variable-muted hover:text-primary transition-all text-xs font-bold"
-                                        >
-                                            Cliente <ArrowUpRight size={12} />
-                                        </Link>
-                                    )}
+                                    {(() => {
+                                        const cli = f.leads?.clientes;
+                                        const cliId = Array.isArray(cli) ? cli[0]?.id : cli?.id;
+                                        if (!cliId) return null;
+                                        return (
+                                            <Link
+                                                to={`/clientes/${cliId}`}
+                                                onClick={(e) => e.stopPropagation()}
+                                                className="inline-flex items-center gap-1 px-3 py-2 glass rounded-xl text-variable-muted hover:text-primary transition-all text-xs font-bold"
+                                            >
+                                                Cliente <ArrowUpRight size={12} />
+                                            </Link>
+                                        );
+                                    })()}
                                 </div>
                             )
                         }

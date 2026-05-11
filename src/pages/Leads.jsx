@@ -539,9 +539,46 @@ export default function Leads() {
 
                 if (flujoError) throw flujoError;
 
-                // 2. Si el usuario eligió "Sí" en el modal FUNDAE: crear expediente
+                // 2. Crear (o recuperar) registro en clientes — copia los datos comerciales del lead
+                let clienteId;
+                const { data: existingCli } = await supabase
+                    .from('clientes')
+                    .select('id')
+                    .eq('lead_id', lead.id)
+                    .maybeSingle();
+
+                if (existingCli?.id) {
+                    clienteId = existingCli.id;
+                } else {
+                    const clientePayload = {
+                        lead_id: lead.id,
+                        empresa_nombre: lead.empresa_nombre || null,
+                        razon_social: lead.razon_social || null,
+                        cif: lead.cif || lead.cif_nif || null,
+                        domicilio: lead.domicilio || lead.direccion || null,
+                        codigo_postal: lead.codigo_postal || null,
+                        poblacion: lead.ciudad || null,
+                        provincia: lead.provincia || null,
+                        telefono_empresa: lead.telefono_empresa || null,
+                        ccc: lead.ccc || null,
+                        cnae: lead.cnae || null,
+                        convenio_referencia: lead.convenio_referencia || null,
+                        num_medio_empleados: lead.num_medio_empleados || null,
+                        representante_empresa: lead.representante_empresa || null,
+                        nif_nie_representante: lead.nif_nie_representante || null
+                    };
+                    const { data: newCli, error: cliErr } = await supabase
+                        .from('clientes')
+                        .insert([clientePayload])
+                        .select('id')
+                        .single();
+                    if (cliErr) throw cliErr;
+                    clienteId = newCli.id;
+                }
+
+                // 3. Si el usuario eligió "Sí" en el modal FUNDAE: crear expediente
                 if (createFundae) {
-                    const payload = await buildFundaeSeguimientoPayload(lead.id);
+                    const payload = await buildFundaeSeguimientoPayload({ cliente_id: clienteId });
                     const { error: fundaeError } = await supabase
                         .from('fundae_seguimiento')
                         .insert([payload]);
@@ -554,7 +591,7 @@ export default function Leads() {
 
                 fetchLeads();
                 // Llevar al usuario directamente a la ficha del nuevo cliente
-                navigate(`/clientes/${lead.id}`);
+                navigate(`/clientes/${clienteId}`);
             } catch (err) {
                 showNotification(`Error: ${err.message}`, 'error');
             }

@@ -11,9 +11,14 @@ export default function EditClienteModal({ cliente, onClose, onSaved, showNotifi
     const [saving, setSaving] = useState(false);
     const [billing, setBilling] = useState(null);
 
-    // Datos del cliente (tabla leads)
+    // Lead asociado al cliente (para datos de contacto)
+    const lead = cliente?.leads || null;
+    const leadId = cliente?.lead_id ?? lead?.id ?? null;
+
+    // Datos del cliente (tabla clientes + contacto desde leads)
     const [datos, setDatos] = useState({
-        razon_social: '',
+        empresa_nombre: '',  // nombre del despacho (leads.empresa_nombre)
+        razon_social: '',    // dato fiscal (clientes.razon_social)
         cif_nif: '',
         direccion: '',
         ciudad: '',
@@ -34,19 +39,21 @@ export default function EditClienteModal({ cliente, onClose, onSaved, showNotifi
     useEffect(() => {
         const load = async () => {
             try {
-                const lb = (Array.isArray(cliente.lead_billing) ? cliente.lead_billing[0] : cliente.lead_billing) || null;
+                const billingRaw = cliente.lead_billing ?? lead?.lead_billing ?? null;
+                const lb = (Array.isArray(billingRaw) ? billingRaw[0] : billingRaw) || null;
                 setBilling(lb);
 
                 setDatos({
-                    razon_social: lb?.razon_social || cliente.razon_social || cliente.empresa_nombre || '',
-                    cif_nif: lb?.cif || cliente.cif || cliente.cif_nif || '',
-                    direccion: lb?.direccion_facturacion || cliente.direccion || '',
-                    ciudad: lb?.poblacion || cliente.ciudad || '',
-                    provincia: lb?.provincia || cliente.provincia || '',
-                    codigo_postal: lb?.codigo_postal || cliente.codigo_postal || '',
-                    nombre: cliente.nombre || '',
-                    email: cliente.email || '',
-                    whatsapp: cliente.whatsapp || ''
+                    empresa_nombre: cliente.empresa_nombre || lead?.empresa_nombre || '',
+                    razon_social: cliente.razon_social || lb?.razon_social || '',
+                    cif_nif: cliente.cif || lb?.cif || '',
+                    direccion: cliente.domicilio || lb?.direccion_facturacion || '',
+                    ciudad: cliente.poblacion || lb?.poblacion || lead?.ciudad || '',
+                    provincia: cliente.provincia || lb?.provincia || '',
+                    codigo_postal: cliente.codigo_postal || lb?.codigo_postal || '',
+                    nombre: lead?.nombre || '',
+                    email: lead?.email || '',
+                    whatsapp: lead?.whatsapp || ''
                 });
 
                 setCobro({
@@ -62,66 +69,79 @@ export default function EditClienteModal({ cliente, onClose, onSaved, showNotifi
     }, [cliente.id]);
 
     const handleSave = async () => {
-        if (!datos.razon_social.trim()) {
-            showNotification('La razón social es obligatoria.', 'error');
+        if (!datos.empresa_nombre.trim()) {
+            showNotification('El nombre del despacho es obligatorio.', 'error');
             return;
         }
         setSaving(true);
         let success = false;
         await withLoading(async () => {
-        try {
-            // 1. UPDATE en leads (datos personales/contacto + espejo de empresa)
-            const leadPayload = {
-                empresa_nombre: datos.razon_social,
-                razon_social: datos.razon_social,
-                cif_nif: datos.cif_nif || null,
-                cif: datos.cif_nif || null,
-                direccion: datos.direccion || null,
-                ciudad: datos.ciudad || null,
-                provincia: datos.provincia || null,
-                codigo_postal: datos.codigo_postal || null,
-                nombre: datos.nombre || null,
-                email: datos.email || null,
-                whatsapp: datos.whatsapp || null
-            };
-            const { error: leadErr } = await supabase
-                .from('leads')
-                .update(leadPayload)
-                .eq('id', cliente.id);
-            if (leadErr) throw leadErr;
+            try {
+                // 1. UPDATE en clientes (datos comerciales/fiscales — fuente de verdad)
+                const clientePayload = {
+                    empresa_nombre: datos.empresa_nombre || null,
+                    razon_social: datos.razon_social || null,
+                    cif: datos.cif_nif || null,
+                    domicilio: datos.direccion || null,
+                    poblacion: datos.ciudad || null,
+                    provincia: datos.provincia || null,
+                    codigo_postal: datos.codigo_postal || null
+                };
+                const { error: cliErr } = await supabase
+                    .from('clientes')
+                    .update(clientePayload)
+                    .eq('id', cliente.id);
+                if (cliErr) throw cliErr;
 
-            // 2. Upsert en lead_billing (fuente de verdad para datos fiscales y cobro)
-            const billingPayload = {
-                lead_id: cliente.id,
-                razon_social: datos.razon_social,
-                cif: datos.cif_nif || null,
-                direccion_facturacion: datos.direccion || null,
-                poblacion: datos.ciudad || null,
-                provincia: datos.provincia || null,
-                codigo_postal: datos.codigo_postal || null,
-                email_facturacion: cobro.email_facturacion || null,
-                metodo_pago: cobro.metodo_pago || null,
-                iban: cobro.iban || null
-            };
-            if (billing?.id) {
-                const { error } = await supabase
-                    .from('lead_billing')
-                    .update(billingPayload)
-                    .eq('id', billing.id);
-                if (error) throw error;
-            } else {
-                const { error } = await supabase
-                    .from('lead_billing')
-                    .insert(billingPayload);
-                if (error) throw error;
+                // 2. UPDATE en leads SOLO datos de contacto.
+                // empresa_nombre del lead queda como snapshot histórico de captación; no se sobrescribe.
+                if (leadId) {
+                    const leadPayload = {
+                        nombre: datos.nombre || null,
+                        email: datos.email || null,
+                        whatsapp: datos.whatsapp || null
+                    };
+                    const { error: leadErr } = await supabase
+                        .from('leads')
+                        .update(leadPayload)
+                        .eq('id', leadId);
+                    if (leadErr) throw leadErr;
+                }
+
+                // 3. Upsert en lead_billing (datos de cobro)
+                if (leadId) {
+                    const billingPayload = {
+                        lead_id: leadId,
+                        razon_social: datos.razon_social,
+                        cif: datos.cif_nif || null,
+                        direccion_facturacion: datos.direccion || null,
+                        poblacion: datos.ciudad || null,
+                        provincia: datos.provincia || null,
+                        codigo_postal: datos.codigo_postal || null,
+                        email_facturacion: cobro.email_facturacion || null,
+                        metodo_pago: cobro.metodo_pago || null,
+                        iban: cobro.iban || null
+                    };
+                    if (billing?.id) {
+                        const { error } = await supabase
+                            .from('lead_billing')
+                            .update(billingPayload)
+                            .eq('id', billing.id);
+                        if (error) throw error;
+                    } else {
+                        const { error } = await supabase
+                            .from('lead_billing')
+                            .insert(billingPayload);
+                        if (error) throw error;
+                    }
+                }
+
+                showNotification('✅ Cliente actualizado.');
+                success = true;
+            } catch (err) {
+                console.error(err);
+                showNotification('Error al guardar: ' + err.message, 'error');
             }
-
-            showNotification('✅ Cliente actualizado.');
-            success = true;
-        } catch (err) {
-            console.error(err);
-            showNotification('Error al guardar: ' + err.message, 'error');
-        }
         }, 'Guardando cambios...');
         setSaving(false);
         if (success) {
@@ -151,7 +171,7 @@ export default function EditClienteModal({ cliente, onClose, onSaved, showNotifi
                     </div>
                     <div>
                         <h3 className="text-xl font-bold text-variable-main">Editar cliente</h3>
-                        <p className="text-xs text-variable-muted">{datos.razon_social || cliente.empresa_nombre || cliente.nombre}</p>
+                        <p className="text-xs text-variable-muted">{datos.empresa_nombre || datos.razon_social || lead?.nombre}</p>
                     </div>
                 </div>
 
@@ -167,7 +187,8 @@ export default function EditClienteModal({ cliente, onClose, onSaved, showNotifi
                                 <Building2 size={14} /> Datos del Cliente
                             </p>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <Field label="Razón Social *" value={datos.razon_social} onChange={v => setDatos(d => ({ ...d, razon_social: v }))} />
+                                <Field label="Nombre del despacho *" value={datos.empresa_nombre} onChange={v => setDatos(d => ({ ...d, empresa_nombre: v }))} />
+                                <Field label="Razón Social (fiscal)" value={datos.razon_social} onChange={v => setDatos(d => ({ ...d, razon_social: v }))} />
                                 <Field label="CIF / NIF" value={datos.cif_nif} onChange={v => setDatos(d => ({ ...d, cif_nif: v.toUpperCase() }))} />
                                 <Field label="Dirección" value={datos.direccion} onChange={v => setDatos(d => ({ ...d, direccion: v }))} className="md:col-span-2" />
                                 <Field label="Ciudad" value={datos.ciudad} onChange={v => setDatos(d => ({ ...d, ciudad: v }))} />
