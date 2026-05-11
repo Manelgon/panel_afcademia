@@ -40,7 +40,7 @@ export default function CursoDetail() {
         setLoading(true);
         try {
             const [coursesRes, groupsRes] = await Promise.all([
-                supabase.functions.invoke('evolcampus-list-courses', { body: {} }),
+                supabase.functions.invoke('evolcampus-list-courses', { body: { include_inactive: true } }),
                 supabase.functions.invoke('evolcampus-get-course-groups', { body: { idCourse: Number(courseid), status: 'ACTIVE' } })
             ]);
             if (coursesRes.error) {

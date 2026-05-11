@@ -107,16 +107,20 @@ Deno.serve(async (req: Request) => {
         if (!allRes.ok) throw new Error(`getCourses ${allRes.status}: ${allText}`);
         const allData = JSON.parse(allText);
 
+        // Consideramos "inactivo" todo curso que NO aparece en getCoursesGroups (que devuelve
+        // los cursos que tienen al menos un grupo activo). La API marca status:"ACTIVE" incluso
+        // para cursos sin grupos, así que el discriminador real es la presencia en getCoursesGroups.
         const activeIds = new Set(activeCourses.map(c => Number(c.courseid)));
-        const inactiveCourses = (Array.isArray(allData?.courses) ? allData.courses : [])
-            .filter((c: any) => !activeIds.has(Number(c.id)) && c.status !== "ACTIVE")
+        const rawAll = Array.isArray(allData?.courses) ? allData.courses : [];
+        const inactiveCourses = rawAll
+            .filter((c: any) => !activeIds.has(Number(c.id)))
             .map((c: any) => ({
                 courseid: c.id,
                 course_name: c.name,
                 ngroups: c.ngroups || 0,
-                status: c.status || "INACTIVE",
+                status: "INACTIVE",
                 tags: Array.isArray(c.tags) ? c.tags : [],
-                groups: [], // getCourses no devuelve grupos
+                groups: [],
             }));
 
         return json(200, { courses: [...activeCourses, ...inactiveCourses] });
