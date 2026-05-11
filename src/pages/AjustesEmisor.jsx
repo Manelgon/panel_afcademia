@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Save, Loader2, Building2, Upload, ImageIcon, X } from 'lucide-react';
+import { Save, Loader2, Building2, Upload, ImageIcon, X, Plug, CheckCircle2, AlertCircle, Eye, EyeOff } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import Sidebar from '../components/Sidebar';
 import { useNotifications } from '../context/NotificationContext';
@@ -72,6 +72,18 @@ export default function AjustesEmisor() {
         header: { url: '', path: '', uploading: false }
     });
 
+    // Integración evolCampus
+    const [evol, setEvol] = useState({
+        configured: false,
+        clientid: '',
+        keyInput: '',
+        clientidInput: '',
+        showKey: false,
+        testing: false,
+        savingCreds: false,
+        connection: null,   // { ok, message, detail? }
+    });
+
     // Detecta si los textos han cambiado respecto al último guardado.
     // Las imágenes se persisten en el momento de subirlas, no necesitan dirty.
     useEffect(() => {
@@ -90,7 +102,75 @@ export default function AjustesEmisor() {
 
     useEffect(() => {
         loadSettings();
+        loadEvolStatus();
     }, []);
+
+    const loadEvolStatus = async () => {
+        try {
+            const { data, error } = await supabase.rpc('has_evolcampus_credentials');
+            if (error) {
+                setEvol(p => ({ ...p, configured: false, clientid: '' }));
+                return;
+            }
+            const configured = !!data?.configured;
+            setEvol(p => ({
+                ...p,
+                configured,
+                clientid: data?.clientid || '',
+                clientidInput: data?.clientid || '',
+            }));
+            // Si está configurado, comprobar conexión en vivo
+            if (configured) testConnection();
+        } catch (_) {
+            setEvol(p => ({ ...p, configured: false }));
+        }
+    };
+
+    const testConnection = async () => {
+        setEvol(p => ({ ...p, testing: true }));
+        try {
+            const { data, error } = await supabase.functions.invoke('evolcampus-test-connection', { body: {} });
+            if (error) {
+                setEvol(p => ({ ...p, testing: false, connection: { ok: false, message: error.message } }));
+                return;
+            }
+            setEvol(p => ({
+                ...p,
+                testing: false,
+                configured: !!data?.configured,
+                clientid: data?.clientid || p.clientid,
+                connection: { ok: !!data?.ok, message: data?.message || '', detail: data?.detail }
+            }));
+        } catch (err) {
+            setEvol(p => ({ ...p, testing: false, connection: { ok: false, message: err.message || 'Error de red' } }));
+        }
+    };
+
+    const saveCredentials = async () => {
+        const cid = (evol.clientidInput || '').trim();
+        const key = (evol.keyInput || '').trim();
+        if (!cid || !key) {
+            showNotification('Indica clientid y key.', 'error');
+            return;
+        }
+        setEvol(p => ({ ...p, savingCreds: true }));
+        await withLoading(async () => {
+            try {
+                const { error } = await supabase.rpc('set_evolcampus_credentials', { p_clientid: cid, p_key: key });
+                if (error) {
+                    showNotification('Error guardando credenciales: ' + error.message, 'error');
+                    return;
+                }
+                // Limpiamos la key del input por seguridad y comprobamos conexión.
+                setEvol(p => ({ ...p, keyInput: '', configured: true, clientid: cid }));
+                await testConnection();
+                showNotification('✅ Credenciales guardadas.');
+            } catch (err) {
+                showNotification('Error: ' + (err.message || ''), 'error');
+            }
+        }, 'Guardando credenciales y probando conexión...');
+        setEvol(p => ({ ...p, savingCreds: false }));
+    };
 
     const loadSettings = async () => {
         try {
@@ -345,6 +425,109 @@ export default function AjustesEmisor() {
                             >
                                 {saving ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
                                 Guardar datos
+                            </button>
+                        </div>
+                    </section>
+                )}
+
+                {/* Integración evolCampus */}
+                {!loading && (
+                    <section className="glass rounded-[2rem] p-8 border border-variable mt-6">
+                        <div className="flex items-start justify-between gap-4 mb-6 flex-wrap">
+                            <div className="flex items-start gap-3">
+                                <div className="p-2 rounded-xl bg-primary/10 text-primary">
+                                    <Plug size={20} />
+                                </div>
+                                <div>
+                                    <h2 className="text-xl font-bold text-variable-main">Integración evolCampus</h2>
+                                    <p className="text-xs text-variable-muted mt-1">
+                                        Credenciales de la API para sincronizar alumnos, cursos y matrículas.
+                                    </p>
+                                </div>
+                            </div>
+                            {/* Badge de estado */}
+                            {evol.testing ? (
+                                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-bold uppercase tracking-widest bg-blue-500/10 text-blue-500 border border-blue-500/20">
+                                    <Loader2 size={12} className="animate-spin" /> Comprobando...
+                                </span>
+                            ) : evol.connection?.ok ? (
+                                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-bold uppercase tracking-widest bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
+                                    <CheckCircle2 size={12} /> Conectado
+                                </span>
+                            ) : evol.configured ? (
+                                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-bold uppercase tracking-widest bg-rose-500/10 text-rose-500 border border-rose-500/20">
+                                    <AlertCircle size={12} /> Sin conexión
+                                </span>
+                            ) : (
+                                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-bold uppercase tracking-widest bg-amber-500/10 text-amber-500 border border-amber-500/20">
+                                    <AlertCircle size={12} /> Sin configurar
+                                </span>
+                            )}
+                        </div>
+
+                        {evol.connection && !evol.testing && (
+                            <div className={`rounded-2xl p-3 mb-5 text-xs ${evol.connection.ok ? 'bg-emerald-500/5 border border-emerald-500/20 text-emerald-400' : 'bg-rose-500/5 border border-rose-500/20 text-rose-400'}`}>
+                                {evol.connection.message}
+                                {evol.connection.detail && (
+                                    <p className="opacity-70 mt-1 font-mono break-all">{evol.connection.detail}</p>
+                                )}
+                            </div>
+                        )}
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <Field
+                                label="Client ID"
+                                value={evol.clientidInput}
+                                onChange={(v) => setEvol(p => ({ ...p, clientidInput: v }))}
+                                placeholder="174989"
+                                mono
+                            />
+                            <label className="block">
+                                <span className="text-sm font-semibold text-variable-main">Key</span>
+                                <div className="relative mt-2">
+                                    <input
+                                        type={evol.showKey ? 'text' : 'password'}
+                                        value={evol.keyInput}
+                                        onChange={(e) => setEvol(p => ({ ...p, keyInput: e.target.value }))}
+                                        placeholder={evol.configured ? '•••••••• (configurada — vacío para no cambiar)' : 'Pega aquí la key'}
+                                        className="w-full bg-white/5 border border-variable rounded-xl px-4 py-3 pr-11 focus:outline-none focus:border-primary/50 text-variable-main transition-all font-mono text-sm"
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => setEvol(p => ({ ...p, showKey: !p.showKey }))}
+                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-variable-muted hover:text-primary"
+                                        title={evol.showKey ? 'Ocultar' : 'Mostrar'}
+                                    >
+                                        {evol.showKey ? <EyeOff size={16} /> : <Eye size={16} />}
+                                    </button>
+                                </div>
+                                {evol.configured && (
+                                    <p className="text-[10px] text-variable-muted mt-1.5">
+                                        La key se mantiene oculta por seguridad. Deja el campo vacío para no cambiarla.
+                                    </p>
+                                )}
+                            </label>
+                        </div>
+
+                        <div className="flex flex-col sm:flex-row gap-3 mt-6">
+                            <button
+                                type="button"
+                                onClick={testConnection}
+                                disabled={evol.testing || !evol.configured}
+                                className="px-5 py-3 glass rounded-2xl font-bold text-variable-muted hover:text-primary transition-all disabled:opacity-50 flex items-center gap-2"
+                            >
+                                {evol.testing ? <Loader2 className="animate-spin" size={16} /> : <Plug size={16} />}
+                                Probar conexión
+                            </button>
+                            <div className="flex-1" />
+                            <button
+                                type="button"
+                                onClick={saveCredentials}
+                                disabled={evol.savingCreds || !evol.clientidInput.trim() || !evol.keyInput.trim()}
+                                className="flex items-center gap-2 bg-primary text-white px-6 py-3 rounded-2xl font-bold hover:brightness-110 active:scale-[0.98] transition-all shadow-lg shadow-primary/20 disabled:opacity-50"
+                            >
+                                {evol.savingCreds ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
+                                Guardar y conectar
                             </button>
                         </div>
                     </section>
