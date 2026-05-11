@@ -82,6 +82,24 @@ export default function ConvertirAlumnoModal({ ficha, onClose, onSaved, showNoti
                 discapacidad_33: !!ficha.discapacidad_33
             };
 
+            // Buscar alumno en evolCampus por DNI (si la ficha tiene DNI).
+            // Si existe, traemos userid + matrículas; si no, seguimos sin vincular.
+            let evolFound = null;
+            if (dniNorm) {
+                try {
+                    const { data, error } = await supabase.functions.invoke('evolcampus-find-user', {
+                        body: { dni: dniNorm }
+                    });
+                    if (error) {
+                        console.warn('[evolcampus-find-user] error:', error);
+                    } else if (data?.userid) {
+                        evolFound = data;
+                    }
+                } catch (err) {
+                    console.warn('[evolcampus-find-user] excepción:', err);
+                }
+            }
+
             let alumnoId;
             if (existing) {
                 // Construir payload final aplicando la elección campo a campo
@@ -97,6 +115,10 @@ export default function ConvertirAlumnoModal({ ficha, onClose, onSaved, showNoti
                     if (typeof v === 'boolean') cleaned[k] = v;
                     else if (v !== null && v !== undefined && v !== '') cleaned[k] = v;
                 }
+                // Vincular evolcampus_userid si lo encontramos y el alumno aún no lo tiene
+                if (evolFound?.userid && !existing.evolcampus_userid) {
+                    cleaned.evolcampus_userid = evolFound.userid;
+                }
                 const { error } = await supabase.from('alumnos').update(cleaned).eq('id', existing.id);
                 if (error) throw error;
                 alumnoId = existing.id;
@@ -106,23 +128,122 @@ export default function ConvertirAlumnoModal({ ficha, onClose, onSaved, showNoti
                     if (typeof v === 'boolean') insertPayload[k] = v;
                     else if (v !== null && v !== undefined && v !== '') insertPayload[k] = v;
                 }
+                if (evolFound?.userid) insertPayload.evolcampus_userid = evolFound.userid;
                 const { data: ins, error } = await supabase.from('alumnos').insert(insertPayload).select('id').single();
                 if (error) throw error;
                 alumnoId = ins.id;
             }
 
+            // Marcar la ficha como convertida y vinculada al alumno.
+            const fichaUpdate = {
+                alumno_id: alumnoId,
+                ficha_estado: 'convertida',
+                convertida_at: new Date().toISOString(),
+                convertida_por: user?.id ?? null
+            };
+            // Encontrar la matrícula de evolCampus que corresponde a esta ficha:
+            // 1) Si la ficha tiene evolcampus_groupid, exigimos coincidencia por groupid.
+            // 2) Si NO lo tiene y evolCampus devolvió una sola matrícula, asumimos que es esa.
+            const fichaGroupid = ficha.evolcampus_groupid != null ? Number(ficha.evolcampus_groupid) : null;
+            let matchEnroll = null;
+            if (fichaGroupid) {
+                matchEnroll = evolFound?.enrollments?.find(e => Number(e.groupid) === fichaGroupid) || null;
+            } else if (evolFound?.enrollments?.length === 1) {
+                matchEnroll = evolFound.enrollments[0];
+            }
+            if (matchEnroll) {
+                fichaUpdate.evolcampus_enrollmentid = matchEnroll.enrollmentid;
+                fichaUpdate.evolcampus_groupid = matchEnroll.groupid;
+                fichaUpdate.evolcampus_completed_percent = matchEnroll.completedpercent;
+                fichaUpdate.evolcampus_evaluations_percent = matchEnroll.evaluationscompletedpercent;
+                fichaUpdate.evolcampus_grade = matchEnroll.grade;
+                fichaUpdate.evolcampus_passed = !!matchEnroll.passrequierements;
+                fichaUpdate.evolcampus_status = matchEnroll.enrollmentstatus;
+                fichaUpdate.evolcampus_lastconnect = matchEnroll.lastconnect;
+                fichaUpdate.evolcampus_time_connected = matchEnroll.timeconnected;
+                fichaUpdate.evolcampus_connections = matchEnroll.connections;
+                fichaUpdate.evolcampus_url_diploma = matchEnroll.urldiploma;
+                fichaUpdate.evolcampus_synced_at = new Date().toISOString();
+            }
+
             const { error: fErr } = await supabase
                 .from('fundae_alumnos')
-                .update({
-                    alumno_id: alumnoId,
-                    ficha_estado: 'convertida',
-                    convertida_at: new Date().toISOString(),
-                    convertida_por: user?.id ?? null
-                })
+                .update(fichaUpdate)
                 .eq('id', ficha.id);
             if (fErr) throw fErr;
 
-            showNotification(existing ? '✅ Ficha vinculada al alumno existente.' : '✅ Alumno creado y ficha vinculada.');
+            // Si encontramos otras matrículas (de otras fichas del mismo alumno), las persistimos también.
+            if (evolFound?.enrollments?.length && alumnoId) {
+                const { data: otrasFichas } = await supabase
+                    .from('fundae_alumnos')
+                    .select('id, evolcampus_groupid, evolcampus_enrollmentid')
+                    .eq('alumno_id', alumnoId)
+                    .neq('id', ficha.id);
+                for (const otra of otrasFichas || []) {
+                    if (!otra.evolcampus_groupid) continue;
+                    const m = evolFound.enrollments.find(e => Number(e.groupid) === Number(otra.evolcampus_groupid));
+                    if (!m) continue;
+                    await supabase.from('fundae_alumnos').update({
+                        evolcampus_enrollmentid: m.enrollmentid,
+                        evolcampus_completed_percent: m.completedpercent,
+                        evolcampus_evaluations_percent: m.evaluationscompletedpercent,
+                        evolcampus_grade: m.grade,
+                        evolcampus_passed: !!m.passrequierements,
+                        evolcampus_status: m.enrollmentstatus,
+                        evolcampus_lastconnect: m.lastconnect,
+                        evolcampus_time_connected: m.timeconnected,
+                        evolcampus_connections: m.connections,
+                        evolcampus_url_diploma: m.urldiploma,
+                        evolcampus_synced_at: new Date().toISOString(),
+                    }).eq('id', otra.id);
+                }
+            }
+
+            // Sincronizar tabla matriculas: upsert por enrollmentid de cada matrícula
+            // encontrada para este alumno en evolCampus.
+            if (evolFound?.enrollments?.length && alumnoId) {
+                const ahora = new Date().toISOString();
+                // Re-leer las fichas del alumno (incluida la actual ya con enrollmentid si match)
+                const { data: fichasAlumno } = await supabase
+                    .from('fundae_alumnos')
+                    .select('id, fundae_id, evolcampus_groupid, fundae_seguimiento(cliente_id)')
+                    .eq('alumno_id', alumnoId);
+                for (const m of evolFound.enrollments) {
+                    if (!m.enrollmentid) continue;
+                    const fichaMatch = (fichasAlumno || []).find(f => Number(f.evolcampus_groupid) === Number(m.groupid));
+                    const matriculaPayload = {
+                        alumno_id: alumnoId,
+                        cliente_id: fichaMatch?.fundae_seguimiento?.cliente_id || null,
+                        fundae_alumno_id: fichaMatch?.id || null,
+                        tipo: fichaMatch ? 'fundae' : 'manual',
+                        curso_nombre: m.study,
+                        grupo_nombre: m.group,
+                        evolcampus_userid: evolFound.userid,
+                        evolcampus_enrollmentid: m.enrollmentid,
+                        evolcampus_groupid: m.groupid,
+                        completedpercent: m.completedpercent,
+                        evaluations_percent: m.evaluationscompletedpercent,
+                        grade: m.grade,
+                        passed: !!m.passrequierements,
+                        enrollmentstatus: m.enrollmentstatus,
+                        lastconnect: m.lastconnect,
+                        timeconnected: m.timeconnected,
+                        connections: m.connections,
+                        url_diploma: m.urldiploma,
+                        evolcampus_synced_at: ahora,
+                    };
+                    const { error: matErr } = await supabase
+                        .from('matriculas')
+                        .upsert(matriculaPayload, { onConflict: 'evolcampus_enrollmentid' });
+                    if (matErr) console.warn('[matriculas upsert] error:', matErr);
+                }
+            }
+
+            const baseMsg = existing ? '✅ Ficha vinculada al alumno existente.' : '✅ Alumno creado y ficha vinculada.';
+            const evolMsg = evolFound?.userid
+                ? ` Vinculado a evolCampus (userid ${evolFound.userid}${matchEnroll ? `, matrícula ${matchEnroll.enrollmentid}` : ''}).`
+                : (dniNorm ? ' No se encontró matrícula en evolCampus para este DNI.' : '');
+            showNotification(baseMsg + evolMsg);
             success = true;
         } catch (err) {
             showNotification('Error: ' + err.message, 'error');
