@@ -11,6 +11,7 @@ import {
 import { supabase } from '../lib/supabase';
 import Sidebar from '../components/Sidebar';
 import DataTable from '../components/DataTable';
+import CustomSelect from '../components/CustomSelect';
 import { useNotifications } from '../context/NotificationContext';
 
 export default function Cursos() {
@@ -20,11 +21,14 @@ export default function Cursos() {
     const [courses, setCourses] = useState([]);
     const [matriculasByCourse, setMatriculasByCourse] = useState({});
     const [search, setSearch] = useState('');
+    const [statusFilter, setStatusFilter] = useState('todos'); // todos | activos | inactivos
 
     const fetchCourses = async () => {
         setLoading(true);
         try {
-            const { data, error } = await supabase.functions.invoke('evolcampus-list-courses', { body: {} });
+            const { data, error } = await supabase.functions.invoke('evolcampus-list-courses', {
+                body: { include_inactive: true }
+            });
             if (error) {
                 let detail = error.message;
                 if (error.context?.json) try { const b = await error.context.json(); detail = b?.detail || detail; } catch (_) {}
@@ -80,14 +84,18 @@ export default function Cursos() {
     }, [courses]);
 
     const filtered = courses.filter(c => {
+        if (statusFilter === 'activos' && c.status !== 'ACTIVE') return false;
+        if (statusFilter === 'inactivos' && c.status === 'ACTIVE') return false;
         const q = search.trim().toLowerCase();
         if (!q) return true;
         return (c.course_name || '').toLowerCase().includes(q);
     });
 
+    const activos = courses.filter(c => c.status === 'ACTIVE');
     const stats = {
         total: courses.length,
-        grupos: courses.reduce((s, c) => s + (c.groups?.length || 0), 0),
+        activos: activos.length,
+        grupos: activos.reduce((s, c) => s + (c.groups?.length || 0), 0),
         alumnos: Object.values(matriculasByCourse).reduce((s, v) => s + (v.alumnos || 0), 0)
     };
 
@@ -99,17 +107,18 @@ export default function Cursos() {
                 <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6 mb-8 sm:mb-12">
                     <div>
                         <h1 className="text-2xl sm:text-4xl font-bold font-display tracking-tight mb-2 text-variable-main">Cursos</h1>
-                        <p className="text-variable-muted">Catálogo de cursos activos en evolCampus</p>
+                        <p className="text-variable-muted">Catálogo de cursos en evolCampus</p>
                     </div>
                     <button onClick={fetchCourses} className="p-3 glass rounded-2xl text-variable-muted hover:text-primary transition-all" title="Refrescar">
                         <Clock size={20} />
                     </button>
                 </header>
 
-                <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 mb-8">
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-8">
                     {[
-                        { label: 'Cursos activos', value: stats.total, icon: BookOpen, color: 'text-primary' },
-                        { label: 'Grupos totales', value: stats.grupos, icon: Layers, color: 'text-blue-500' },
+                        { label: 'Cursos totales', value: stats.total, icon: BookOpen, color: 'text-primary' },
+                        { label: 'Activos', value: stats.activos, icon: BookOpen, color: 'text-emerald-500' },
+                        { label: 'Grupos (activos)', value: stats.grupos, icon: Layers, color: 'text-blue-500' },
                         { label: 'Alumnos matriculados', value: stats.alumnos, icon: UsersIcon, color: 'text-emerald-500' }
                     ].map((kpi, i) => (
                         <div key={i} className="glass rounded-2xl p-4 flex items-center gap-3">
@@ -129,15 +138,28 @@ export default function Cursos() {
                     rowKey="courseid"
                     onRowClick={(c) => navigate(`/cursos/${c.courseid}`)}
                     toolbarLeft={
-                        <div className="relative flex-1 min-w-[220px] max-w-md">
-                            <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-variable-muted pointer-events-none" />
-                            <input
-                                type="text"
-                                value={search}
-                                onChange={(e) => setSearch(e.target.value)}
-                                className="w-full bg-white/5 border border-variable rounded-2xl pl-11 pr-5 py-2.5 focus:outline-none focus:border-primary/50 text-variable-main transition-all text-sm"
-                                placeholder="Buscar curso..."
-                            />
+                        <div className="flex flex-wrap items-center gap-3 w-full">
+                            <div className="relative flex-1 min-w-[220px] max-w-md">
+                                <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-variable-muted pointer-events-none" />
+                                <input
+                                    type="text"
+                                    value={search}
+                                    onChange={(e) => setSearch(e.target.value)}
+                                    className="w-full bg-white/5 border border-variable rounded-2xl pl-11 pr-5 py-2.5 focus:outline-none focus:border-primary/50 text-variable-main transition-all text-sm"
+                                    placeholder="Buscar curso..."
+                                />
+                            </div>
+                            <div className="w-full sm:w-48">
+                                <CustomSelect
+                                    value={statusFilter}
+                                    onChange={setStatusFilter}
+                                    options={[
+                                        { value: 'todos', label: 'Todos' },
+                                        { value: 'activos', label: 'Solo activos' },
+                                        { value: 'inactivos', label: 'Solo inactivos' }
+                                    ]}
+                                />
+                            </div>
                         </div>
                     }
                     columns={[
@@ -154,6 +176,19 @@ export default function Cursos() {
                                         <p className="text-[10px] text-variable-muted uppercase font-black tracking-widest">ID {c.courseid}</p>
                                     </div>
                                 </div>
+                            )
+                        },
+                        {
+                            key: 'estado',
+                            label: 'Estado',
+                            render: (c) => c.status === 'ACTIVE' ? (
+                                <span className="px-2 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-wider bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
+                                    Activo
+                                </span>
+                            ) : (
+                                <span className="px-2 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-wider bg-gray-500/10 text-gray-500 border border-gray-500/20">
+                                    Inactivo
+                                </span>
                             )
                         },
                         {
