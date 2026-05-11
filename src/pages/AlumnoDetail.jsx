@@ -104,8 +104,10 @@ export default function AlumnoDetail() {
             showNotification('Este alumno aún no tiene userid de evolCampus.', 'error');
             return;
         }
+        // Si se invoca como onClick directo, groupid llega como SyntheticEvent: lo ignoramos.
+        const validGroupid = (typeof groupid === 'string' || typeof groupid === 'number') ? groupid : null;
         const params = { userid: alumno.evolcampus_userid };
-        if (groupid) params.groupid = groupid;
+        if (validGroupid) params.groupid = validGroupid;
         await withLoading(async () => {
             try {
                 const { data, error } = await supabase.functions.invoke('evolcampus-proxy', {
@@ -118,7 +120,7 @@ export default function AlumnoDetail() {
             } catch (err) {
                 showNotification('Error generando autologin: ' + (err.message || ''), 'error');
             }
-        }, groupid ? 'Generando acceso al curso...' : 'Generando acceso al campus...');
+        }, validGroupid ? 'Generando acceso al curso...' : 'Generando acceso al campus...');
     };
 
     // Cambia el estado de una matrícula en evolCampus (0=activa, 1=archivada, 2=baja, 3=solo lectura).
@@ -371,7 +373,7 @@ export default function AlumnoDetail() {
                                         <KeyRound size={14} /> Resetear clave
                                     </button>
                                     <button
-                                        onClick={handleAutologin}
+                                        onClick={() => handleAutologin()}
                                         className="px-4 py-3 glass rounded-2xl text-xs font-bold text-blue-500 hover:bg-blue-500/10 transition-all flex items-center gap-2 border border-blue-500/20"
                                         title="Acceso directo al campus"
                                     >
