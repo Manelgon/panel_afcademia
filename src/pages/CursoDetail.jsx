@@ -8,13 +8,15 @@ import {
     Plus,
     Calendar,
     Award,
-    CheckCircle2
+    CheckCircle2,
+    Edit3
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../lib/supabase';
 import Sidebar from '../components/Sidebar';
 import DataTable from '../components/DataTable';
 import NuevoGrupoModal from '../components/curso/NuevoGrupoModal';
+import EditarGrupoModal from '../components/curso/EditarGrupoModal';
 import { useNotifications } from '../context/NotificationContext';
 
 const TABS = [
@@ -32,6 +34,7 @@ export default function CursoDetail() {
     const [matriculas, setMatriculas] = useState([]);
     const [activeTab, setActiveTab] = useState('grupos');
     const [nuevoGrupoOpen, setNuevoGrupoOpen] = useState(false);
+    const [editarGrupo, setEditarGrupo] = useState(null);
 
     const fetchCourseAndGroups = async () => {
         setLoading(true);
@@ -266,6 +269,20 @@ export default function CursoDetail() {
                                                 </div>
                                             );
                                         }
+                                    },
+                                    {
+                                        key: 'actions',
+                                        label: '',
+                                        align: 'right',
+                                        render: (g) => (
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); setEditarGrupo(g); }}
+                                                title="Editar grupo en evolCampus"
+                                                className="p-2 glass rounded-xl text-variable-muted hover:text-primary transition-colors border border-transparent hover:border-primary/20"
+                                            >
+                                                <Edit3 size={14} />
+                                            </button>
+                                        )
                                     }
                                 ]}
                             />
@@ -357,6 +374,14 @@ export default function CursoDetail() {
                         <NuevoGrupoModal
                             course={course}
                             onClose={() => setNuevoGrupoOpen(false)}
+                            onSaved={() => fetchCourseAndGroups()}
+                            showNotification={showNotification}
+                        />
+                    )}
+                    {editarGrupo && (
+                        <EditarGrupoModal
+                            group={editarGrupo}
+                            onClose={() => setEditarGrupo(null)}
                             onSaved={() => fetchCourseAndGroups()}
                             showNotification={showNotification}
                         />
