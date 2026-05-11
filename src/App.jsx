@@ -24,6 +24,7 @@ const Alumnos = lazy(() => import('./pages/Alumnos'));
 const AlumnoDetail = lazy(() => import('./pages/AlumnoDetail'));
 const Cursos = lazy(() => import('./pages/Cursos'));
 const CursoDetail = lazy(() => import('./pages/CursoDetail'));
+const GrupoDetail = lazy(() => import('./pages/GrupoDetail'));
 const Facturacion = lazy(() => import('./pages/Facturacion'));
 
 const RouteSpinner = () => (
@@ -137,6 +138,12 @@ function App() {
                                     <Route path="/cursos/:courseid" element={
                                         <ProtectedRoute>
                                             <CursoDetail />
+                                        </ProtectedRoute>
+                                    } />
+
+                                    <Route path="/cursos/:courseid/grupos/:groupid" element={
+                                        <ProtectedRoute>
+                                            <GrupoDetail />
                                         </ProtectedRoute>
                                     } />
 

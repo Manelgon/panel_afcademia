@@ -41,7 +41,9 @@ export default function CursoDetail() {
         try {
             const [coursesRes, groupsRes] = await Promise.all([
                 supabase.functions.invoke('evolcampus-list-courses', { body: { include_inactive: true } }),
-                supabase.functions.invoke('evolcampus-get-course-groups', { body: { idCourse: Number(courseid), status: 'ACTIVE' } })
+                supabase.functions.invoke('evolcampus-get-course-groups', {
+                    body: { idCourse: Number(courseid), status: 'ACTIVE', include_from_enrollments: true }
+                })
             ]);
             if (coursesRes.error) {
                 showNotification('Error cargando curso', 'error');
@@ -200,14 +202,22 @@ export default function CursoDetail() {
                                 tableId={`grupos-curso-${courseid}`}
                                 data={groups}
                                 rowKey="id"
+                                onRowClick={(g) => navigate(`/cursos/${courseid}/grupos/${g.id}`)}
                                 columns={[
                                     {
                                         key: 'name',
                                         label: 'Grupo',
                                         render: (g) => (
-                                            <div>
-                                                <p className="font-bold text-variable-main">{g.name}</p>
-                                                <p className="text-[10px] text-variable-muted uppercase tracking-widest">ID {g.id}</p>
+                                            <div className="flex items-center gap-2">
+                                                <div>
+                                                    <p className="font-bold text-variable-main">{g.name}</p>
+                                                    <p className="text-[10px] text-variable-muted uppercase tracking-widest">ID {g.id}</p>
+                                                </div>
+                                                {g.status && g.status !== 'ACTIVE' && (
+                                                    <span className="px-2 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-wider bg-gray-500/10 text-gray-500 border border-gray-500/20">
+                                                        Archivado
+                                                    </span>
+                                                )}
                                             </div>
                                         )
                                     },
