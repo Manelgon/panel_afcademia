@@ -252,16 +252,70 @@ export default function Alumnos() {
         setImportingEnrollment(enrollmentid);
         await withLoading(async () => {
             try {
-                // 1. Crear alumno (o reutilizar si ya existe por DNI: import idempotente).
-                const { data: alumno, error: aErr } = await supabase
-                    .from('alumnos')
-                    .upsert(
-                        { dni, nombre, apellidos, email, telefono, evolcampus_userid: userid },
-                        { onConflict: 'dni' }
-                    )
-                    .select('id')
-                    .single();
-                if (aErr) throw aErr;
+                // 1. Buscar alumno existente por userid → dni → email (mismo orden que el sync).
+                //    Si ya existe en BD, actualizamos por id y evitamos los choques con los
+                //    índices únicos de email/dni (caso típico: BD tiene email pero dni distinto,
+                //    o el alumno se creó antes con placeholder EVOL-* y ahora evolCampus trae
+                //    el DNI real).
+                let existing = null;
+                if (userid) {
+                    const { data } = await supabase
+                        .from('alumnos')
+                        .select('id, dni, email, evolcampus_userid')
+                        .eq('evolcampus_userid', userid)
+                        .maybeSingle();
+                    if (data) existing = data;
+                }
+                if (!existing && dni) {
+                    const { data } = await supabase
+                        .from('alumnos')
+                        .select('id, dni, email, evolcampus_userid')
+                        .eq('dni', dni)
+                        .maybeSingle();
+                    if (data) existing = data;
+                }
+                if (!existing && email) {
+                    const { data } = await supabase
+                        .from('alumnos')
+                        .select('id, dni, email, evolcampus_userid')
+                        .ilike('email', email)
+                        .maybeSingle();
+                    if (data) existing = data;
+                }
+
+                let alumno;
+                if (existing) {
+                    // Update por id. Solo pisamos el DNI si el actual es placeholder EVOL-* y
+                    // ahora evolCampus trae uno real (mismo criterio que evolcampus-sync-alumnos).
+                    const updPayload = {
+                        nombre: nombre || undefined,
+                        apellidos: apellidos || undefined,
+                        email: email || undefined,
+                        telefono: telefono || undefined,
+                        evolcampus_userid: userid ?? existing.evolcampus_userid,
+                    };
+                    if (dniReal && (!existing.dni || String(existing.dni).startsWith('EVOL-')) && dniReal !== existing.dni) {
+                        updPayload.dni = dniReal;
+                    }
+                    // Limpiar undefined para no enviar columnas vacías
+                    const cleaned = Object.fromEntries(Object.entries(updPayload).filter(([, v]) => v !== undefined));
+                    const { data: upd, error: uErr } = await supabase
+                        .from('alumnos')
+                        .update(cleaned)
+                        .eq('id', existing.id)
+                        .select('id')
+                        .single();
+                    if (uErr) throw uErr;
+                    alumno = upd;
+                } else {
+                    const { data: ins, error: iErr } = await supabase
+                        .from('alumnos')
+                        .insert({ dni, nombre, apellidos, email, telefono, evolcampus_userid: userid })
+                        .select('id')
+                        .single();
+                    if (iErr) throw iErr;
+                    alumno = ins;
+                }
 
                 // 2. Insertar todas las matrículas que evolCampus tiene para esta persona.
                 const enrollmentsToImport = enrollment._matriculas || [enrollment];
