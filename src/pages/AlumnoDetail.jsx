@@ -104,9 +104,18 @@ export default function AlumnoDetail() {
         refreshInFlightRef.current = true;
         setRefreshing(true);
         try {
+            // El helper hace fallback por userid+groupid si una matrícula local no tiene
+            // evolcampus_enrollmentid; aquí inyectamos el userid+dni del alumno en cada
+            // fila para que ese fallback pueda hacer match aunque la matrícula no los
+            // tenga guardados (matrículas manuales antiguas).
+            const rowsWithAlumno = (localRows ?? matriculas).map(m => ({
+                ...m,
+                evolcampus_userid: m.evolcampus_userid || alumno.evolcampus_userid,
+                alumnos: m.alumnos || { evolcampus_userid: alumno.evolcampus_userid, dni: alumno.dni }
+            }));
             await refreshMatriculasLive({
                 filterParams: { userid: Number(userid) },
-                localMatriculas: localRows ?? matriculas,
+                localMatriculas: rowsWithAlumno,
                 setMatriculas
             });
             setLastSync(new Date());
@@ -546,8 +555,14 @@ export default function AlumnoDetail() {
                                     key: 'progreso',
                                     label: 'Progreso',
                                     render: (m) => {
-                                        const pct = parseFloat(m.completedpercent);
-                                        if (isNaN(pct)) return <span className="text-variable-muted text-[10px]">Sin sincronizar</span>;
+                                        let pct = parseFloat(m.completedpercent);
+                                        if (isNaN(pct)) {
+                                            // Si la matrícula está ligada a evolCampus, asumimos 0% (alumno
+                                            // matriculado pero sin actividad todavía). Solo dejamos "Sin
+                                            // sincronizar" cuando no hay vínculo con el campus en absoluto.
+                                            if (m.evolcampus_enrollmentid) pct = 0;
+                                            else return <span className="text-variable-muted text-[10px]">Sin sincronizar</span>;
+                                        }
                                         const color = m.passed ? 'bg-emerald-500' : pct >= 50 ? 'bg-blue-500' : 'bg-amber-500';
                                         return (
                                             <div className="min-w-[140px]">
