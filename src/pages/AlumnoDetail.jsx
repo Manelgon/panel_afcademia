@@ -139,13 +139,17 @@ export default function AlumnoDetail() {
     }, [id]);
 
     // Cuando llega el alumno (con su userid) y hay matrículas, refresca desde evolCampus.
+    // Disparamos cuando cualquiera de los dos pasa a "listo": fetchAlumno y fetchMatriculas
+    // son paralelos y antes sólo dependíamos del userid, perdiendo el refresh si alumno
+    // llegaba primero (matriculas seguía vacía y se abortaba sin dejar reintentos).
+    const hasUserid = !!alumno?.evolcampus_userid;
+    const hasMatriculas = matriculas.length > 0;
     useEffect(() => {
-        if (alumno?.evolcampus_userid && matriculas.length > 0) {
+        if (hasUserid && hasMatriculas) {
             refreshLive(matriculas);
         }
-        // Solo queremos disparar cuando aparece userid; los reintentos por focus se manejan abajo.
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [alumno?.evolcampus_userid]);
+    }, [hasUserid, hasMatriculas]);
 
     useEffect(() => {
         const onFocus = () => { if (matriculas.length > 0) refreshLive(matriculas); };
@@ -154,9 +158,14 @@ export default function AlumnoDetail() {
         };
         window.addEventListener('focus', onFocus);
         document.addEventListener('visibilitychange', onVisibility);
+        // Polling cada 30s mientras la pestaña sea visible.
+        const interval = setInterval(() => {
+            if (document.visibilityState === 'visible' && matriculas.length > 0) refreshLive(matriculas);
+        }, 30000);
         return () => {
             window.removeEventListener('focus', onFocus);
             document.removeEventListener('visibilitychange', onVisibility);
+            clearInterval(interval);
         };
     }, [matriculas, alumno?.evolcampus_userid]);
 

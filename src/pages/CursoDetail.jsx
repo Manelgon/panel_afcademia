@@ -128,7 +128,7 @@ export default function CursoDetail() {
         }
     }, [groups]);
 
-    // Re-sincroniza cuando la pestaña vuelve a primer plano.
+    // Re-sincroniza cuando la pestaña vuelve a primer plano + polling cada 30s.
     useEffect(() => {
         const onFocus = () => {
             if (matriculas.length > 0) refreshLive(matriculas);
@@ -138,9 +138,13 @@ export default function CursoDetail() {
         };
         window.addEventListener('focus', onFocus);
         document.addEventListener('visibilitychange', onVisibility);
+        const interval = setInterval(() => {
+            if (document.visibilityState === 'visible' && matriculas.length > 0) refreshLive(matriculas);
+        }, 30000);
         return () => {
             window.removeEventListener('focus', onFocus);
             document.removeEventListener('visibilitychange', onVisibility);
+            clearInterval(interval);
         };
     }, [matriculas]);
 
