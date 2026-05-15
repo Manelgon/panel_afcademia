@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
     ArrowLeft,
@@ -24,7 +24,8 @@ import {
     Archive,
     Ban,
     Eye,
-    Power
+    Power,
+    RefreshCw
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../lib/supabase';
@@ -33,6 +34,7 @@ import DataTable from '../components/DataTable';
 import NuevaMatriculaModal from '../components/alumno/NuevaMatriculaModal';
 import { useNotifications } from '../context/NotificationContext';
 import { useGlobalLoading } from '../context/LoadingContext';
+import { refreshMatriculasLive } from '../lib/evolcampusLive';
 
 export default function AlumnoDetail() {
     const { id } = useParams();
@@ -47,6 +49,9 @@ export default function AlumnoDetail() {
     const [editCampusOpen, setEditCampusOpen] = useState(false);
     const [resetPwdOpen, setResetPwdOpen] = useState(false);
     const [extendOpen, setExtendOpen] = useState(null); // matricula obj o null
+    const [refreshing, setRefreshing] = useState(false);
+    const [lastSync, setLastSync] = useState(null);
+    const refreshInFlightRef = useRef(false);
 
     const fetchAlumno = async () => {
         setLoading(true);
@@ -80,10 +85,36 @@ export default function AlumnoDetail() {
                 .eq('alumno_id', id)
                 .order('fecha_matricula', { ascending: false });
             if (error) throw error;
-            setMatriculas(data || []);
+            const rows = data || [];
+            setMatriculas(rows);
+            return rows;
         } catch (err) {
             console.error('Error fetching matriculas:', err);
             showNotification(`Error al cargar matrículas: ${err.message}`, 'error');
+            return [];
+        }
+    };
+
+    // Refresca campos vivos desde evolCampus filtrando por el userid del alumno (si lo tenemos).
+    // Si el alumno no tiene userid en evolCampus, se omite el refresh.
+    const refreshLive = async (localRows) => {
+        if (refreshInFlightRef.current) return;
+        const userid = alumno?.evolcampus_userid;
+        if (!userid) return;
+        refreshInFlightRef.current = true;
+        setRefreshing(true);
+        try {
+            await refreshMatriculasLive({
+                filterParams: { userid: Number(userid) },
+                localMatriculas: localRows ?? matriculas,
+                setMatriculas
+            });
+            setLastSync(new Date());
+        } catch (err) {
+            console.warn('[AlumnoDetail] live refresh failed:', err);
+        } finally {
+            refreshInFlightRef.current = false;
+            setRefreshing(false);
         }
     };
 
@@ -97,6 +128,28 @@ export default function AlumnoDetail() {
             .subscribe();
         return () => supabase.removeChannel(channel);
     }, [id]);
+
+    // Cuando llega el alumno (con su userid) y hay matrículas, refresca desde evolCampus.
+    useEffect(() => {
+        if (alumno?.evolcampus_userid && matriculas.length > 0) {
+            refreshLive(matriculas);
+        }
+        // Solo queremos disparar cuando aparece userid; los reintentos por focus se manejan abajo.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [alumno?.evolcampus_userid]);
+
+    useEffect(() => {
+        const onFocus = () => { if (matriculas.length > 0) refreshLive(matriculas); };
+        const onVisibility = () => {
+            if (document.visibilityState === 'visible' && matriculas.length > 0) refreshLive(matriculas);
+        };
+        window.addEventListener('focus', onFocus);
+        document.addEventListener('visibilitychange', onVisibility);
+        return () => {
+            window.removeEventListener('focus', onFocus);
+            document.removeEventListener('visibilitychange', onVisibility);
+        };
+    }, [matriculas, alumno?.evolcampus_userid]);
 
     // Si se pasa groupid el alumno entra directo al home del curso, no al dashboard general.
     const handleAutologin = async (groupid = null) => {
@@ -291,8 +344,8 @@ export default function AlumnoDetail() {
 
     const stats = {
         total: matriculas.length,
-        completadas: matriculas.filter(m => m.passed === true).length,
-        enCurso: matriculas.filter(m => m.enrollmentstatus === 0 && !m.passed).length,
+        completadas: matriculas.filter(m => m.passed === true && (parseFloat(m.completedpercent) || 0) >= 100).length,
+        enCurso: matriculas.filter(m => m.enrollmentstatus === 0 && !(m.passed && (parseFloat(m.completedpercent) || 0) >= 100)).length,
         promedio: matriculas.length > 0
             ? matriculas.reduce((s, m) => s + (parseFloat(m.completedpercent) || 0), 0) / matriculas.length
             : 0
@@ -358,6 +411,15 @@ export default function AlumnoDetail() {
                         <div className="flex flex-wrap items-center gap-2 sm:gap-3 flex-shrink-0">
                             {alumno.evolcampus_userid && (
                                 <>
+                                    <button
+                                        onClick={() => refreshLive(matriculas)}
+                                        disabled={refreshing}
+                                        title={lastSync ? `Actualizado ${lastSync.toLocaleTimeString('es-ES')}` : 'Sincronizar con evolCampus'}
+                                        className="px-3 py-3 glass rounded-2xl text-xs font-bold text-variable-muted hover:text-primary transition-all flex items-center gap-2 disabled:opacity-50"
+                                    >
+                                        <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} />
+                                        <span className="hidden sm:inline">{refreshing ? 'Sincronizando…' : 'En directo'}</span>
+                                    </button>
                                     <button
                                         onClick={() => setEditCampusOpen(true)}
                                         className="px-4 py-3 glass rounded-2xl text-xs font-bold text-variable-muted hover:text-primary transition-all flex items-center gap-2"
@@ -508,7 +570,9 @@ export default function AlumnoDetail() {
                                     key: 'estado',
                                     label: 'Estado',
                                     render: (m) => {
-                                        if (m.passed) return <span className="px-2 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-wider bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">Superado</span>;
+                                        const pct = parseFloat(m.completedpercent);
+                                        const completed = !isNaN(pct) && pct >= 100;
+                                        if (m.passed && completed) return <span className="px-2 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-wider bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">Superado</span>;
                                         if (m.enrollmentstatus === 1) return <span className="px-2 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-wider bg-gray-500/10 text-gray-500 border border-gray-500/20">Archivada</span>;
                                         if (m.enrollmentstatus === 2) return <span className="px-2 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-wider bg-rose-500/10 text-rose-500 border border-rose-500/20">Baja</span>;
                                         return <span className="px-2 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-wider bg-blue-500/10 text-blue-500 border border-blue-500/20">En curso</span>;
@@ -536,7 +600,8 @@ export default function AlumnoDetail() {
                                         const hoy = new Date();
                                         hoy.setHours(0, 0, 0, 0);
                                         const dias = Math.ceil((fin - hoy) / (1000 * 60 * 60 * 24));
-                                        const finalizada = m.passed || m.enrollmentstatus === 1 || m.enrollmentstatus === 2;
+                                        const pctFin = parseFloat(m.completedpercent);
+                                        const finalizada = (m.passed && !isNaN(pctFin) && pctFin >= 100) || m.enrollmentstatus === 1 || m.enrollmentstatus === 2;
                                         const colorBadge = finalizada
                                             ? 'bg-gray-500/10 text-gray-500 border-gray-500/20'
                                             : dias < 0

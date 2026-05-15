@@ -720,7 +720,7 @@ export default function Alumnos() {
                                 if (ms.length === 0) {
                                     return <span className="text-variable-muted text-[10px]">—</span>;
                                 }
-                                const completadas = ms.filter(m => m.passed).length;
+                                const completadas = ms.filter(m => m.passed && (parseFloat(m.completedpercent) || 0) >= 100).length;
                                 return (
                                     <div className="flex items-center gap-2">
                                         <span className="px-2 py-1 rounded bg-blue-500/10 text-blue-500 text-[10px] font-bold border border-blue-500/20">

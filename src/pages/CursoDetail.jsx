@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
     ArrowLeft,
@@ -9,7 +9,8 @@ import {
     Calendar,
     Award,
     CheckCircle2,
-    Edit3
+    Edit3,
+    RefreshCw
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../lib/supabase';
@@ -18,6 +19,7 @@ import DataTable from '../components/DataTable';
 import NuevoGrupoModal from '../components/curso/NuevoGrupoModal';
 import EditarGrupoModal from '../components/curso/EditarGrupoModal';
 import { useNotifications } from '../context/NotificationContext';
+import { refreshMatriculasLive } from '../lib/evolcampusLive';
 
 const TABS = [
     { id: 'grupos', label: 'Grupos', icon: Layers },
@@ -35,6 +37,9 @@ export default function CursoDetail() {
     const [activeTab, setActiveTab] = useState('grupos');
     const [nuevoGrupoOpen, setNuevoGrupoOpen] = useState(false);
     const [editarGrupo, setEditarGrupo] = useState(null);
+    const [refreshing, setRefreshing] = useState(false);
+    const [lastSync, setLastSync] = useState(null);
+    const refreshInFlightRef = useRef(false);
 
     const fetchCourseAndGroups = async () => {
         setLoading(true);
@@ -65,10 +70,10 @@ export default function CursoDetail() {
         // Matrículas locales filtradas por los groupids de este curso (los obtenemos de groups).
         if (!groups || groups.length === 0) {
             setMatriculas([]);
-            return;
+            return [];
         }
         const groupIds = groups.map(g => Number(g.id)).filter(Boolean);
-        if (groupIds.length === 0) { setMatriculas([]); return; }
+        if (groupIds.length === 0) { setMatriculas([]); return []; }
         const { data, error } = await supabase
             .from('matriculas')
             .select(`
@@ -81,8 +86,33 @@ export default function CursoDetail() {
                 clientes(id, razon_social)
             `)
             .in('evolcampus_groupid', groupIds);
-        if (error) { showNotification('Error cargando matrículas: ' + error.message, 'error'); return; }
-        setMatriculas(data || []);
+        if (error) { showNotification('Error cargando matrículas: ' + error.message, 'error'); return []; }
+        const rows = data || [];
+        setMatriculas(rows);
+        return rows;
+    };
+
+    // Refresca los campos vivos (completedpercent, passed, lastconnect, etc.) llamando a
+    // evolCampus filtrando por studyid del curso. Re-entrada protegida con un ref para
+    // evitar carreras cuando se dispara por focus + cambio de grupos a la vez.
+    const refreshLive = async (localRows) => {
+        if (refreshInFlightRef.current) return;
+        if (!courseid) return;
+        refreshInFlightRef.current = true;
+        setRefreshing(true);
+        try {
+            await refreshMatriculasLive({
+                filterParams: { studyid: Number(courseid) },
+                localMatriculas: localRows ?? matriculas,
+                setMatriculas
+            });
+            setLastSync(new Date());
+        } catch (err) {
+            console.warn('[CursoDetail] live refresh failed:', err);
+        } finally {
+            refreshInFlightRef.current = false;
+            setRefreshing(false);
+        }
     };
 
     useEffect(() => {
@@ -90,9 +120,29 @@ export default function CursoDetail() {
     }, [courseid]);
 
     useEffect(() => {
-        if (groups.length > 0) fetchMatriculas();
-        else setMatriculas([]);
+        if (groups.length > 0) {
+            // Tras pintar lo local, dispara el refresh en directo (no bloquea la UI).
+            fetchMatriculas().then(rows => { if (rows.length > 0) refreshLive(rows); });
+        } else {
+            setMatriculas([]);
+        }
     }, [groups]);
+
+    // Re-sincroniza cuando la pestaña vuelve a primer plano.
+    useEffect(() => {
+        const onFocus = () => {
+            if (matriculas.length > 0) refreshLive(matriculas);
+        };
+        const onVisibility = () => {
+            if (document.visibilityState === 'visible' && matriculas.length > 0) refreshLive(matriculas);
+        };
+        window.addEventListener('focus', onFocus);
+        document.addEventListener('visibilitychange', onVisibility);
+        return () => {
+            window.removeEventListener('focus', onFocus);
+            document.removeEventListener('visibilitychange', onVisibility);
+        };
+    }, [matriculas]);
 
     const matriculasByGroup = (() => {
         const m = {};
@@ -118,7 +168,7 @@ export default function CursoDetail() {
     const stats = {
         grupos: groups.length,
         alumnos: new Set(matriculas.map(m => m.alumno_id)).size,
-        completadas: matriculas.filter(m => m.passed).length,
+        completadas: matriculas.filter(m => m.passed && (parseFloat(m.completedpercent) || 0) >= 100).length,
         progresoMedio: matriculas.length > 0
             ? matriculas.reduce((s, m) => s + (parseFloat(m.completedpercent) || 0), 0) / matriculas.length
             : 0
@@ -151,12 +201,25 @@ export default function CursoDetail() {
                             </div>
                         </div>
 
-                        <button
-                            onClick={() => setNuevoGrupoOpen(true)}
-                            className="inline-flex items-center gap-2 px-4 py-3 bg-primary text-white rounded-2xl font-bold text-xs hover:brightness-110 transition-all shadow-lg shadow-primary/20"
-                        >
-                            <Plus size={14} /> Nuevo grupo
-                        </button>
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={() => refreshLive(matriculas)}
+                                disabled={refreshing}
+                                title={lastSync ? `Actualizado ${lastSync.toLocaleTimeString('es-ES')}` : 'Sincronizar con evolCampus'}
+                                className="inline-flex items-center gap-2 px-3 py-3 glass rounded-2xl text-variable-muted hover:text-primary border border-variable transition-all disabled:opacity-50"
+                            >
+                                <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} />
+                                <span className="text-[10px] uppercase font-bold tracking-widest hidden sm:inline">
+                                    {refreshing ? 'Sincronizando…' : 'En directo'}
+                                </span>
+                            </button>
+                            <button
+                                onClick={() => setNuevoGrupoOpen(true)}
+                                className="inline-flex items-center gap-2 px-4 py-3 bg-primary text-white rounded-2xl font-bold text-xs hover:brightness-110 transition-all shadow-lg shadow-primary/20"
+                            >
+                                <Plus size={14} /> Nuevo grupo
+                            </button>
+                        </div>
                     </div>
                 </header>
 
@@ -360,7 +423,9 @@ export default function CursoDetail() {
                                         key: 'estado',
                                         label: 'Estado',
                                         render: (m) => {
-                                            if (m.passed) return <span className="px-2 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-wider bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">Superado</span>;
+                                            const pct = parseFloat(m.completedpercent);
+                                            const completed = !isNaN(pct) && pct >= 100;
+                                            if (m.passed && completed) return <span className="px-2 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-wider bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">Superado</span>;
                                             if (m.enrollmentstatus === 1) return <span className="px-2 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-wider bg-gray-500/10 text-gray-500 border border-gray-500/20">Archivada</span>;
                                             if (m.enrollmentstatus === 2) return <span className="px-2 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-wider bg-rose-500/10 text-rose-500 border border-rose-500/20">Baja</span>;
                                             return <span className="px-2 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-wider bg-blue-500/10 text-blue-500 border border-blue-500/20">En curso</span>;

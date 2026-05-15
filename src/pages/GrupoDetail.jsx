@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
     ArrowLeft,
@@ -7,7 +7,8 @@ import {
     Award,
     CheckCircle2,
     Calendar,
-    Edit3
+    Edit3,
+    RefreshCw
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { supabase } from '../lib/supabase';
@@ -15,6 +16,7 @@ import Sidebar from '../components/Sidebar';
 import DataTable from '../components/DataTable';
 import EditarGrupoModal from '../components/curso/EditarGrupoModal';
 import { useNotifications } from '../context/NotificationContext';
+import { refreshMatriculasLive } from '../lib/evolcampusLive';
 
 export default function GrupoDetail() {
     const { courseid, groupid } = useParams();
@@ -25,9 +27,13 @@ export default function GrupoDetail() {
     const [group, setGroup] = useState(null);
     const [matriculas, setMatriculas] = useState([]);
     const [editarGrupoOpen, setEditarGrupoOpen] = useState(false);
+    const [refreshing, setRefreshing] = useState(false);
+    const [lastSync, setLastSync] = useState(null);
+    const refreshInFlightRef = useRef(false);
 
     const fetchAll = async () => {
         setLoading(true);
+        let rows = [];
         try {
             const [coursesRes, groupsRes] = await Promise.all([
                 supabase.functions.invoke('evolcampus-list-courses', { body: { include_inactive: true } }),
@@ -59,14 +65,51 @@ export default function GrupoDetail() {
             if (error) {
                 showNotification('Error cargando alumnos del grupo: ' + error.message, 'error');
             } else {
-                setMatriculas(data || []);
+                rows = data || [];
+                setMatriculas(rows);
             }
         } finally {
             setLoading(false);
         }
+        return rows;
     };
 
-    useEffect(() => { fetchAll(); }, [courseid, groupid]);
+    const refreshLive = async (localRows) => {
+        if (refreshInFlightRef.current) return;
+        if (!groupid) return;
+        refreshInFlightRef.current = true;
+        setRefreshing(true);
+        try {
+            await refreshMatriculasLive({
+                filterParams: { groupid: Number(groupid) },
+                localMatriculas: localRows ?? matriculas,
+                setMatriculas
+            });
+            setLastSync(new Date());
+        } catch (err) {
+            console.warn('[GrupoDetail] live refresh failed:', err);
+        } finally {
+            refreshInFlightRef.current = false;
+            setRefreshing(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchAll().then(rows => { if (rows.length > 0) refreshLive(rows); });
+    }, [courseid, groupid]);
+
+    useEffect(() => {
+        const onFocus = () => { if (matriculas.length > 0) refreshLive(matriculas); };
+        const onVisibility = () => {
+            if (document.visibilityState === 'visible' && matriculas.length > 0) refreshLive(matriculas);
+        };
+        window.addEventListener('focus', onFocus);
+        document.addEventListener('visibilitychange', onVisibility);
+        return () => {
+            window.removeEventListener('focus', onFocus);
+            document.removeEventListener('visibilitychange', onVisibility);
+        };
+    }, [matriculas]);
 
     if (loading) {
         return (
@@ -81,7 +124,7 @@ export default function GrupoDetail() {
 
     const stats = {
         alumnos: new Set(matriculas.map(m => m.alumno_id)).size,
-        completadas: matriculas.filter(m => m.passed).length,
+        completadas: matriculas.filter(m => m.passed && (parseFloat(m.completedpercent) || 0) >= 100).length,
         progresoMedio: matriculas.length > 0
             ? matriculas.reduce((s, m) => s + (parseFloat(m.completedpercent) || 0), 0) / matriculas.length
             : 0
@@ -138,14 +181,27 @@ export default function GrupoDetail() {
                             </div>
                         </div>
 
-                        {group && !isArchived && (
+                        <div className="flex items-center gap-2">
                             <button
-                                onClick={() => setEditarGrupoOpen(true)}
-                                className="inline-flex items-center gap-2 px-4 py-3 glass rounded-2xl text-xs font-bold text-primary hover:bg-primary/10 transition-all border border-primary/20"
+                                onClick={() => refreshLive(matriculas)}
+                                disabled={refreshing}
+                                title={lastSync ? `Actualizado ${lastSync.toLocaleTimeString('es-ES')}` : 'Sincronizar con evolCampus'}
+                                className="inline-flex items-center gap-2 px-3 py-3 glass rounded-2xl text-variable-muted hover:text-primary border border-variable transition-all disabled:opacity-50"
                             >
-                                <Edit3 size={14} /> Editar grupo
+                                <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} />
+                                <span className="text-[10px] uppercase font-bold tracking-widest hidden sm:inline">
+                                    {refreshing ? 'Sincronizando…' : 'En directo'}
+                                </span>
                             </button>
-                        )}
+                            {group && !isArchived && (
+                                <button
+                                    onClick={() => setEditarGrupoOpen(true)}
+                                    className="inline-flex items-center gap-2 px-4 py-3 glass rounded-2xl text-xs font-bold text-primary hover:bg-primary/10 transition-all border border-primary/20"
+                                >
+                                    <Edit3 size={14} /> Editar grupo
+                                </button>
+                            )}
+                        </div>
                     </div>
                 </header>
 
@@ -223,7 +279,9 @@ export default function GrupoDetail() {
                                 key: 'estado',
                                 label: 'Estado',
                                 render: (m) => {
-                                    if (m.passed) return <span className="px-2 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-wider bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">Superado</span>;
+                                    const pct = parseFloat(m.completedpercent);
+                                    const completed = !isNaN(pct) && pct >= 100;
+                                    if (m.passed && completed) return <span className="px-2 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-wider bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">Superado</span>;
                                     if (m.enrollmentstatus === 1) return <span className="px-2 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-wider bg-gray-500/10 text-gray-500 border border-gray-500/20">Archivada</span>;
                                     if (m.enrollmentstatus === 2) return <span className="px-2 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-wider bg-rose-500/10 text-rose-500 border border-rose-500/20">Baja</span>;
                                     return <span className="px-2 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-wider bg-blue-500/10 text-blue-500 border border-blue-500/20">En curso</span>;

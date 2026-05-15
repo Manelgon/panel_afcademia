@@ -60,7 +60,7 @@ export default function Cursos() {
             byCourse[cid].totalMatriculas++;
             // null cuenta como 0 (alumno matriculado pero sin progreso reportado todavía)
             byCourse[cid].totalPct += parseFloat(m.completedpercent) || 0;
-            if (m.passed) byCourse[cid].completadas++;
+            if (m.passed && (parseFloat(m.completedpercent) || 0) >= 100) byCourse[cid].completadas++;
         }
         const summary = {};
         for (const [cid, v] of Object.entries(byCourse)) {
